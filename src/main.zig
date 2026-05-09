@@ -3,6 +3,7 @@ const zfr = @import("zig_font_renderer");
 
 const CliError = error{
     InvalidFontSize,
+    InvalidMargin,
     MissingFontPath,
     MissingOptionValue,
     TooManyArguments,
@@ -14,6 +15,9 @@ const CliOptions = struct {
     text: ?[]const u8,
     output_path: ?[]const u8,
     font_size_px: f64 = 64.0,
+    margin_px: f64 = 8.0,
+    fill: []const u8 = "black",
+    background: ?[]const u8 = null,
     quiet: bool = false,
     help: bool = false,
 };
@@ -60,7 +64,12 @@ pub fn main() !void {
 
     if (options.text) |text| {
         if (options.output_path) |output_path| {
-            try writeSvg(allocator, stderr, options.font_path, text, output_path, options.font_size_px);
+            try writeSvg(allocator, stderr, options.font_path, text, output_path, .{
+                .font_size_px = options.font_size_px,
+                .margin_px = options.margin_px,
+                .fill = options.fill,
+                .background = options.background,
+            });
         } else {
             var loaded = try loadFaceOrExit(allocator, stderr, options.font_path);
             defer loaded.deinit(allocator);
@@ -102,6 +111,9 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
     var text: ?[]const u8 = null;
     var output_path: ?[]const u8 = null;
     var font_size_px: f64 = 64.0;
+    var margin_px: f64 = 8.0;
+    var fill: []const u8 = "black";
+    var background: ?[]const u8 = null;
     var quiet = false;
     var positional_count: u8 = 0;
 
@@ -146,6 +158,28 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
             continue;
         }
 
+        if (std.mem.eql(u8, arg, "--margin")) {
+            index += 1;
+            if (index >= args.len) return CliError.MissingOptionValue;
+            margin_px = std.fmt.parseFloat(f64, args[index]) catch return CliError.InvalidMargin;
+            if (margin_px < 0 or !std.math.isFinite(margin_px)) return CliError.InvalidMargin;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, "--fill")) {
+            index += 1;
+            if (index >= args.len) return CliError.MissingOptionValue;
+            fill = args[index];
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, "--background")) {
+            index += 1;
+            if (index >= args.len) return CliError.MissingOptionValue;
+            background = args[index];
+            continue;
+        }
+
         if (std.mem.startsWith(u8, arg, "-")) return CliError.UnknownOption;
 
         switch (positional_count) {
@@ -161,6 +195,9 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
         .text = text,
         .output_path = output_path,
         .font_size_px = font_size_px,
+        .margin_px = margin_px,
+        .fill = fill,
+        .background = background,
         .quiet = quiet,
     };
 }
@@ -168,6 +205,7 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
 fn cliErrorMessage(err: CliError) []const u8 {
     return switch (err) {
         CliError.InvalidFontSize => "invalid font size",
+        CliError.InvalidMargin => "invalid margin",
         CliError.MissingFontPath => "missing font path",
         CliError.MissingOptionValue => "missing value after option",
         CliError.TooManyArguments => "too many positional arguments",
@@ -178,7 +216,7 @@ fn cliErrorMessage(err: CliError) []const u8 {
 fn printUsage(writer: *std.Io.Writer) !void {
     try writer.print(
         \\Usage:
-        \\  zig_font_renderer --font <font-file> [--text <utf8-text>] [--output <svg-file>] [--font-size <px>] [--quiet]
+        \\  zig_font_renderer --font <font-file> [--text <utf8-text>] [--output <svg-file>] [--font-size <px>] [--margin <px>] [--fill <color>] [--background <color>] [--quiet]
         \\  zig_font_renderer <font-file> [utf8-text]
         \\
         \\Prints data currently available from the Unit 1 font parser:
@@ -229,12 +267,10 @@ fn writeSvg(
     font_path: []const u8,
     text: []const u8,
     output_path: []const u8,
-    font_size_px: f64,
+    render_options: zfr.RenderOptions,
 ) !void {
     const svg = zfr.renderToSvg(allocator, font_path, text, .{
-        .render = .{
-            .font_size_px = font_size_px,
-        },
+        .render = render_options,
     }) catch |err| {
         try stderr.print("error: failed to render SVG: {s}\n", .{@errorName(err)});
         try stderr.flush();
@@ -258,12 +294,32 @@ test "parse positional font and text arguments" {
 }
 
 test "parse named font and text arguments" {
-    const args = [_][]const u8{ "zig_font_renderer", "--font", "font.otf", "--text", "A", "--output", "out.svg", "--font-size", "96", "--quiet" };
+    const args = [_][]const u8{
+        "zig_font_renderer",
+        "--font",
+        "font.otf",
+        "--text",
+        "A",
+        "--output",
+        "out.svg",
+        "--font-size",
+        "96",
+        "--margin",
+        "12",
+        "--fill",
+        "#222",
+        "--background",
+        "white",
+        "--quiet",
+    };
     const options = try parseArgs(&args);
     try std.testing.expectEqualStrings("font.otf", options.font_path);
     try std.testing.expectEqualStrings("A", options.text.?);
     try std.testing.expectEqualStrings("out.svg", options.output_path.?);
     try std.testing.expectEqual(@as(f64, 96.0), options.font_size_px);
+    try std.testing.expectEqual(@as(f64, 12.0), options.margin_px);
+    try std.testing.expectEqualStrings("#222", options.fill);
+    try std.testing.expectEqualStrings("white", options.background.?);
     try std.testing.expect(options.quiet);
 }
 
@@ -275,4 +331,9 @@ test "parse rejects missing font path" {
 test "parse rejects invalid font size" {
     const args = [_][]const u8{ "zig_font_renderer", "--font", "font.ttf", "--font-size", "0" };
     try std.testing.expectError(CliError.InvalidFontSize, parseArgs(&args));
+}
+
+test "parse rejects invalid margin" {
+    const args = [_][]const u8{ "zig_font_renderer", "--font", "font.ttf", "--margin", "-1" };
+    try std.testing.expectError(CliError.InvalidMargin, parseArgs(&args));
 }

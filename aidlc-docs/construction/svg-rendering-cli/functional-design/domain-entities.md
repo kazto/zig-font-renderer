@@ -13,10 +13,12 @@ High-level API options:
 
 ## RenderOptions
 
-Renderer options for visible output sizing:
+Renderer options for visible output sizing and basic styling:
 
 - `font_size_px`
 - `margin_px`
+- `fill`
+- `background`
 
 ## Point
 
@@ -41,8 +43,12 @@ Internal FUnit bounding box:
 
 ## Composite Component
 
-Internal component record in a composite TrueType glyph. The current implementation supports component glyph ID plus XY offset placement.
+Internal component record in a composite TrueType glyph. The current implementation supports component glyph ID, XY offset placement, uniform scale, separate XY scale, and 2x2 transforms.
+
+## Transform
+
+Internal affine transform used to compose shaped glyph placement and composite component transforms before writing SVG path coordinates.
 
 ## SVG Document
 
-UTF-8 text buffer containing `<svg>`, one scaled `<g>`, and one `<path>` per rendered simple glyph.
+UTF-8 text buffer containing `<svg>`, an optional background `<rect>`, one scaled `<g>`, and one `<path>` per rendered simple glyph.

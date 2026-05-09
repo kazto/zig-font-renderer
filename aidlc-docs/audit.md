@@ -342,3 +342,34 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Cross-unit source refactoring. No functional stage transition.
 
 ---
+
+## Unit 3 SVG Styling - Implemented
+**Timestamp**: 2026-05-09T11:47:12Z
+**User Input**: "次に進もう"
+**AI Response**: "Added SVG styling controls for glyph fill, optional background, and custom margin. Exposed the controls through CLI options and validated style values before emitting SVG attributes."
+**Verification**:
+- `zig fmt src/svg_renderer.zig src/main.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text SVG --output /tmp/zig-font-renderer-style.svg --font-size 96 --margin 16 --fill '#1d4ed8' --background '#f8fafc'`
+- `sed -n '1,8p' /tmp/zig-font-renderer-style.svg`
+- `wc -c /tmp/zig-font-renderer-style.svg`
+**Context**: Construction Phase - Unit 3 - SVG styling and CLI usability increment.
+
+---
+
+## Unit 3 Composite Transforms - Implemented
+**Timestamp**: 2026-05-09T12:18:04Z
+**User Input**: "作業を続けて"
+**AI Response**: "Implemented affine transform support for composite TrueType glyph components, including uniform scale, separate XY scale, and 2x2 component transforms. Path coordinates are emitted after composing shaped placement and nested component transforms."
+**Verification**:
+- `zig fmt src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text é --output /tmp/zig-font-renderer-transform-eacute.svg --font-size 96`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text SVG --output /tmp/zig-font-renderer-transform-style.svg --font-size 96 --margin 16 --fill '#1d4ed8' --background '#f8fafc'`
+- `sed -n '1,8p' /tmp/zig-font-renderer-transform-style.svg`
+- `wc -c /tmp/zig-font-renderer-transform-eacute.svg /tmp/zig-font-renderer-transform-style.svg`
+**Context**: Construction Phase - Unit 3 - Composite glyph transform support. Point-matched components, CFF outlines, and full shaping remain pending.
+
+---

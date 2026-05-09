@@ -6,7 +6,7 @@
 
 ## Scope
 
-Implemented the first visible SVG rendering increment for TrueType simple glyph outlines.
+Implemented visible SVG rendering increments for TrueType outlines, including high-level rendering and basic SVG styling controls.
 
 ## Application Code
 
@@ -17,7 +17,10 @@ Implemented the first visible SVG rendering increment for TrueType simple glyph 
   - Reads glyph header bounds and computes shaped text bounds.
   - Decodes simple TrueType `glyf` contours.
   - Expands composite TrueType glyphs when components use XY offsets.
+  - Applies composite uniform scale, separate XY scale, and 2x2 transforms to emitted path coordinates.
   - Emits SVG path commands with bounds-based width, height, viewBox, and scaled group transform.
+  - Supports glyph fill color, optional background color, and custom margin.
+  - Rejects SVG color strings that can break attribute syntax.
 
 - Created `src/font_rendering_service.zig`
   - Defines `renderToSvg`.
@@ -31,6 +34,7 @@ Implemented the first visible SVG rendering increment for TrueType simple glyph 
 - Modified `src/main.zig`
   - Adds `--output <svg-file>`.
   - Adds `--font-size <px>` and `--quiet`.
+  - Adds `--margin <px>`, `--fill <color>`, and `--background <color>`.
   - Writes SVG when `--font`, `--text`, and `--output` are supplied.
   - Suppresses metadata output by default when writing SVG files.
   - Routes SVG output through the high-level `renderToSvg` API.
@@ -71,11 +75,21 @@ Implemented the first visible SVG rendering increment for TrueType simple glyph 
 - Result: Passed; generated SVG through high-level API path.
 - Command: `wc -c /tmp/zig-font-renderer-service.svg`
 - Result: `1242 /tmp/zig-font-renderer-service.svg`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text SVG --output /tmp/zig-font-renderer-style.svg --font-size 96 --margin 16 --fill '#1d4ed8' --background '#f8fafc'`
+- Result: Passed; generated styled SVG through CLI.
+- Command: `sed -n '1,8p' /tmp/zig-font-renderer-style.svg`
+- Result: Passed; generated SVG includes `<rect width="100%" height="100%" fill="#f8fafc"/>` and `<g fill="#1d4ed8" ...>`.
+- Command: `wc -c /tmp/zig-font-renderer-style.svg`
+- Result: `1298 /tmp/zig-font-renderer-style.svg`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text é --output /tmp/zig-font-renderer-transform-eacute.svg --font-size 96`
+- Result: Passed; composite glyph output path still renders after transform pipeline change.
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text SVG --output /tmp/zig-font-renderer-transform-style.svg --font-size 96 --margin 16 --fill '#1d4ed8' --background '#f8fafc'`
+- Result: Passed; styled SVG output still renders after transform pipeline change.
+- Command: `wc -c /tmp/zig-font-renderer-transform-eacute.svg /tmp/zig-font-renderer-transform-style.svg`
+- Result: `867 /tmp/zig-font-renderer-transform-eacute.svg`, `1892 /tmp/zig-font-renderer-transform-style.svg`
 
 ## Known Limitations
 
 - Point-matched composite glyphs are not implemented.
-- Scaled or matrix-transformed composite glyphs are not implemented.
 - CFF outlines are not implemented.
-- CLI custom margins and styling options are not exposed.
 - Complex shaping remains incomplete.

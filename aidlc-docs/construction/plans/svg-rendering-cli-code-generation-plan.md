@@ -63,13 +63,27 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Re-export high-level API from `src/root.zig`.
   - Route CLI SVG output through the high-level API.
 
+- [x] Step 10: Add SVG styling controls
+  - Add renderer `fill` and optional `background` options.
+  - Add CLI `--margin <px>`, `--fill <color>`, and `--background <color>`.
+  - Validate margin values as finite non-negative numbers.
+  - Reject SVG color strings that can break attribute syntax.
+
+- [x] Step 11: Add transformed composite glyph rendering
+  - Decode composite glyph F2Dot14 scale values.
+  - Support uniform scale, separate XY scale, and 2x2 component transforms.
+  - Compose nested component transforms before emitting path coordinates.
+  - Preserve explicit rejection for point-matched composite components.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
 - [x] Composite glyphs with XY offsets can be expanded into visible component paths.
+- [x] Composite glyphs with scale or matrix transforms can be emitted as transformed paths.
 - [x] SVG output has practical pixel dimensions.
 - [x] SVG output is sized from actual rendered glyph bounds.
 - [x] High-level API is available for one-call SVG rendering.
+- [x] SVG output can be styled with fill, background, and margin controls.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
 - [x] CFF and full typography remain explicitly deferred.

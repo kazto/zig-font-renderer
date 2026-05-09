@@ -3,6 +3,7 @@ const font_parser = @import("font_parser.zig");
 const shaper = @import("shaper.zig");
 
 pub const SvgError = font_parser.ParserError || shaper.ShapeError || std.mem.Allocator.Error || error{
+    InvalidSvgColor,
     UnsupportedCompositeGlyph,
     MissingText,
 };
@@ -78,6 +79,8 @@ const CompositeGlyph = struct {
 pub const RenderOptions = struct {
     font_size_px: f64 = default_font_size_px,
     margin_px: f64 = default_margin_px,
+    fill: []const u8 = "black",
+    background: ?[]const u8 = null,
 };
 
 const Point = struct {
@@ -89,6 +92,44 @@ const Point = struct {
 const GlyphRange = struct {
     start: usize,
     end: usize,
+};
+
+const Transform = struct {
+    xx: f64 = 1.0,
+    yx: f64 = 0.0,
+    xy: f64 = 0.0,
+    yy: f64 = 1.0,
+    dx: f64 = 0.0,
+    dy: f64 = 0.0,
+
+    fn translate(x: i32, y: i32) Transform {
+        return .{ .dx = @floatFromInt(x), .dy = @floatFromInt(y) };
+    }
+
+    fn compose(self: Transform, inner: Transform) Transform {
+        return .{
+            .xx = self.xx * inner.xx + self.xy * inner.yx,
+            .xy = self.xx * inner.xy + self.xy * inner.yy,
+            .yx = self.yx * inner.xx + self.yy * inner.yx,
+            .yy = self.yx * inner.xy + self.yy * inner.yy,
+            .dx = self.xx * inner.dx + self.xy * inner.dy + self.dx,
+            .dy = self.yx * inner.dx + self.yy * inner.dy + self.dy,
+        };
+    }
+
+    fn apply(self: Transform, x: i32, y: i32) TransformedPoint {
+        const fx: f64 = @floatFromInt(x);
+        const fy: f64 = @floatFromInt(y);
+        return .{
+            .x = self.xx * fx + self.xy * fy + self.dx,
+            .y = self.yx * fx + self.yy * fy + self.dy,
+        };
+    }
+};
+
+const TransformedPoint = struct {
+    x: f64,
+    y: f64,
 };
 
 const Bounds = struct {
@@ -146,6 +187,8 @@ pub const SvgRenderer = struct {
         const height_px = @as(f64, @floatFromInt(bounds.height())) * scale + options.margin_px * 2.0;
         const translate_x = options.margin_px - @as(f64, @floatFromInt(bounds.min_x)) * scale;
         const translate_y = options.margin_px + @as(f64, @floatFromInt(bounds.max_y)) * scale;
+        try validateSvgColor(options.fill);
+        if (options.background) |background| try validateSvgColor(background);
 
         var output = std.ArrayList(u8).empty;
         errdefer output.deinit(allocator);
@@ -153,13 +196,23 @@ pub const SvgRenderer = struct {
 
         try writer.print(
             \\<svg xmlns="http://www.w3.org/2000/svg" width="{d:.2}" height="{d:.2}" viewBox="0 0 {d:.2} {d:.2}">
-            \\  <g fill="black" transform="translate({d:.2} {d:.2}) scale({d:.6} {d:.6})">
             \\
         , .{
             width_px,
             height_px,
             width_px,
             height_px,
+        });
+
+        if (options.background) |background| {
+            try writer.print("  <rect width=\"100%\" height=\"100%\" fill=\"{s}\"/>\n", .{background});
+        }
+
+        try writer.print(
+            \\  <g fill="{s}" transform="translate({d:.2} {d:.2}) scale({d:.6} {d:.6})">
+            \\
+        , .{
+            options.fill,
             translate_x,
             translate_y,
             scale,
@@ -167,7 +220,7 @@ pub const SvgRenderer = struct {
         });
 
         for (shaped.glyphs) |glyph| {
-            try appendGlyphPath(allocator, writer, face, glyph.glyph_id, glyph.x_offset, 0, 0);
+            try appendGlyphPath(allocator, writer, face, glyph.glyph_id, Transform.translate(glyph.x_offset, 0), 0);
         }
 
         try writer.print(
@@ -179,6 +232,14 @@ pub const SvgRenderer = struct {
         return try output.toOwnedSlice(allocator);
     }
 };
+
+fn validateSvgColor(value: []const u8) SvgError!void {
+    if (value.len == 0) return SvgError.InvalidSvgColor;
+    for (value) |char| {
+        const valid = std.ascii.isAlphanumeric(char) or char == '#' or char == '-' or char == '_' or char == '(' or char == ')' or char == ',' or char == '.' or char == '%' or char == ' ';
+        if (!valid) return SvgError.InvalidSvgColor;
+    }
+}
 
 fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText) font_parser.ParserError!Bounds {
     var maybe_bounds: ?Bounds = null;
@@ -230,8 +291,7 @@ fn appendGlyphPath(
     writer: std.ArrayList(u8).Writer,
     face: font_parser.Face,
     glyph_id: u16,
-    x_offset: i32,
-    y_offset: i32,
+    transform: Transform,
     depth: u8,
 ) SvgError!void {
     if (depth > max_composite_depth) return SvgError.UnsupportedCompositeGlyph;
@@ -246,7 +306,7 @@ fn appendGlyphPath(
     const number_of_contours = try readI16(glyph, Glyf.number_of_contours_offset);
     if (number_of_contours == Glyf.empty_contour_count) return;
     if (number_of_contours <= Glyf.composite_contour_marker_max) {
-        return appendCompositeGlyphPaths(allocator, writer, face, glyph, x_offset, y_offset, depth + 1);
+        return appendCompositeGlyphPaths(allocator, writer, face, glyph, transform, depth + 1);
     }
 
     const contour_count = @as(usize, @intCast(number_of_contours));
@@ -309,7 +369,7 @@ fn appendGlyphPath(
     var contour_start: usize = 0;
     for (end_points) |end_point| {
         const contour_end = @as(usize, end_point);
-        try appendContourPath(writer, points[contour_start .. contour_end + 1], x_offset, y_offset);
+        try appendContourPath(writer, points[contour_start .. contour_end + 1], transform);
         contour_start = contour_end + 1;
     }
     try writer.print("\"/>\n", .{});
@@ -320,8 +380,7 @@ fn appendCompositeGlyphPaths(
     writer: std.ArrayList(u8).Writer,
     face: font_parser.Face,
     glyph: []const u8,
-    x_offset: i32,
-    y_offset: i32,
+    transform: Transform,
     depth: u8,
 ) SvgError!void {
     var offset: usize = CompositeGlyph.components_offset;
@@ -347,25 +406,31 @@ fn appendCompositeGlyphPaths(
             offset += CompositeGlyph.byte_args_size;
         }
 
+        var component_transform = Transform.translate(component_x, component_y);
         if ((flags & CompositeGlyphFlag.has_scale) != 0) {
             if (offset + CompositeGlyph.scale_size > glyph.len) return font_parser.ParserError.InvalidTable;
-            const scale = try readI16(glyph, offset);
+            const scale = try readF2Dot14(glyph, offset);
             offset += CompositeGlyph.scale_size;
-            if (scale != CompositeGlyph.f2dot14_one) return SvgError.UnsupportedCompositeGlyph;
+            component_transform.xx = scale;
+            component_transform.yy = scale;
         } else if ((flags & CompositeGlyphFlag.has_xy_scale) != 0) {
             if (offset + CompositeGlyph.xy_scale_size > glyph.len) return font_parser.ParserError.InvalidTable;
-            const x_scale = try readI16(glyph, offset);
-            const y_scale = try readI16(glyph, offset + 2);
+            const x_scale = try readF2Dot14(glyph, offset);
+            const y_scale = try readF2Dot14(glyph, offset + 2);
             offset += CompositeGlyph.xy_scale_size;
-            if (x_scale != CompositeGlyph.f2dot14_one or y_scale != CompositeGlyph.f2dot14_one) return SvgError.UnsupportedCompositeGlyph;
+            component_transform.xx = x_scale;
+            component_transform.yy = y_scale;
         } else if ((flags & CompositeGlyphFlag.has_2x2) != 0) {
             if (offset + CompositeGlyph.matrix_2x2_size > glyph.len) return font_parser.ParserError.InvalidTable;
-            const xx = try readI16(glyph, offset);
-            const yx = try readI16(glyph, offset + 2);
-            const xy = try readI16(glyph, offset + 4);
-            const yy = try readI16(glyph, offset + 6);
+            const xx = try readF2Dot14(glyph, offset);
+            const yx = try readF2Dot14(glyph, offset + 2);
+            const xy = try readF2Dot14(glyph, offset + 4);
+            const yy = try readF2Dot14(glyph, offset + 6);
             offset += CompositeGlyph.matrix_2x2_size;
-            if (xx != CompositeGlyph.f2dot14_one or yx != 0 or xy != 0 or yy != CompositeGlyph.f2dot14_one) return SvgError.UnsupportedCompositeGlyph;
+            component_transform.xx = xx;
+            component_transform.yx = yx;
+            component_transform.xy = xy;
+            component_transform.yy = yy;
         }
 
         try appendGlyphPath(
@@ -373,8 +438,7 @@ fn appendCompositeGlyphPaths(
             writer,
             face,
             component_glyph_id,
-            x_offset + component_x,
-            y_offset + component_y,
+            transform.compose(component_transform),
             depth,
         );
 
@@ -384,26 +448,32 @@ fn appendCompositeGlyphPaths(
     if (offset > glyph.len) return font_parser.ParserError.InvalidTable;
 }
 
-fn appendContourPath(writer: std.ArrayList(u8).Writer, contour: []const Point, x_offset: i32, y_offset: i32) !void {
+fn appendContourPath(writer: std.ArrayList(u8).Writer, contour: []const Point, transform: Transform) !void {
     if (contour.len == 0) return;
 
     const first = contour[0];
-    try writer.print("M {d} {d} ", .{ x_offset + first.x, y_offset + first.y });
+    const first_transformed = transform.apply(first.x, first.y);
+    try writer.print("M {d:.2} {d:.2} ", .{ first_transformed.x, first_transformed.y });
 
     var index: usize = 1;
     while (index < contour.len) : (index += 1) {
         const current = contour[index];
         if (current.on_curve) {
-            try writer.print("L {d} {d} ", .{ x_offset + current.x, y_offset + current.y });
+            const transformed = transform.apply(current.x, current.y);
+            try writer.print("L {d:.2} {d:.2} ", .{ transformed.x, transformed.y });
         } else {
             const next = contour[(index + 1) % contour.len];
             if (next.on_curve) {
-                try writer.print("Q {d} {d} {d} {d} ", .{ x_offset + current.x, y_offset + current.y, x_offset + next.x, y_offset + next.y });
+                const current_transformed = transform.apply(current.x, current.y);
+                const next_transformed = transform.apply(next.x, next.y);
+                try writer.print("Q {d:.2} {d:.2} {d:.2} {d:.2} ", .{ current_transformed.x, current_transformed.y, next_transformed.x, next_transformed.y });
                 if (index + 1 < contour.len) index += 1;
             } else {
                 const mid_x = midpoint(current.x, next.x);
                 const mid_y = midpoint(current.y, next.y);
-                try writer.print("Q {d} {d} {d} {d} ", .{ x_offset + current.x, y_offset + current.y, x_offset + mid_x, y_offset + mid_y });
+                const current_transformed = transform.apply(current.x, current.y);
+                const mid_transformed = transform.apply(mid_x, mid_y);
+                try writer.print("Q {d:.2} {d:.2} {d:.2} {d:.2} ", .{ current_transformed.x, current_transformed.y, mid_transformed.x, mid_transformed.y });
             }
         }
     }
@@ -454,6 +524,11 @@ fn midpoint(a: i16, b: i16) i32 {
     return @divTrunc(@as(i32, a) + @as(i32, b), 2);
 }
 
+fn readF2Dot14(data: []const u8, offset: usize) font_parser.ParserError!f64 {
+    const raw = try readI16(data, offset);
+    return @as(f64, @floatFromInt(raw)) / @as(f64, @floatFromInt(CompositeGlyph.f2dot14_one));
+}
+
 fn readU16(data: []const u8, offset: usize) font_parser.ParserError!u16 {
     if (offset + 2 > data.len) return font_parser.ParserError.InvalidTable;
     return std.mem.readInt(u16, data[offset..][0..2], .big);
@@ -474,6 +549,21 @@ test "midpoint uses integer midpoint" {
     try std.testing.expectEqual(@as(i32, -5), midpoint(-10, 0));
 }
 
+test "transform compose applies nested composite placement" {
+    const parent = Transform.translate(10, 20);
+    const child = Transform{ .xx = 0.5, .yy = 0.5, .dx = 4, .dy = 6 };
+    const point = parent.compose(child).apply(100, 200);
+    try std.testing.expectEqual(@as(f64, 64.0), point.x);
+    try std.testing.expectEqual(@as(f64, 126.0), point.y);
+}
+
+test "read F2Dot14 scale values" {
+    const one = [_]u8{ 0x40, 0x00 };
+    const half = [_]u8{ 0x20, 0x00 };
+    try std.testing.expectEqual(@as(f64, 1.0), try readF2Dot14(&one, 0));
+    try std.testing.expectEqual(@as(f64, 0.5), try readF2Dot14(&half, 0));
+}
+
 test "composite glyph parser rejects point-matched components" {
     const allocator = std.testing.allocator;
     var output = std.ArrayList(u8).empty;
@@ -487,6 +577,12 @@ test "composite glyph parser rejects point-matched components" {
 
     try std.testing.expectError(
         SvgError.UnsupportedCompositeGlyph,
-        appendCompositeGlyphPaths(allocator, writer, face, &glyph, 0, 0, 0),
+        appendCompositeGlyphPaths(allocator, writer, face, &glyph, Transform{}, 0),
     );
+}
+
+test "svg color validation rejects attribute-breaking characters" {
+    try std.testing.expectError(SvgError.InvalidSvgColor, validateSvgColor("\"red\""));
+    try validateSvgColor("#1d4ed8");
+    try validateSvgColor("rgb(10, 20, 30)");
 }
