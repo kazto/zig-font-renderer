@@ -23,17 +23,25 @@ Implemented Unit 1: Font Parser for US-1 - TrueType/OpenTypeファイルの解�
   - Replaces the template API with public Font Parser exports.
 
 - Modified `src/main.zig`
-  - Removes template demo behavior.
-  - Keeps a minimal CLI placeholder until Unit 3.
+  - Implements a parser inspection CLI using the current Unit 1 APIs.
+  - Supports `--font <font-file>` and optional `--text <utf8-text>`.
+  - Prints scalar font metadata, SFNT table records, and glyph IDs plus horizontal metrics for UTF-8 text.
+  - Does not implement shaping, outline extraction, SVG rendering, or final Unit 3 CLI behavior.
 
 ## Verification
 
 - Command: `zig build test`
 - Result: Passed
+- Command: `zig build`
+- Result: Passed
+- Command: `zig build run -- --help`
+- Result: Passed
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text Aあ`
+- Result: Passed; displayed font metadata, 20 tables, glyph metrics for `A`, and glyph ID 0 fallback for `あ`.
 
 ## Known Limitations
 
 - Glyph outline extraction is not implemented in Unit 1.
 - Composite glyph handling is not implemented in Unit 1.
 - CFF outline parsing is not implemented in Unit 1.
-- CLI rendering behavior is intentionally deferred to Unit 3.
+- CLI rendering behavior is intentionally deferred to Unit 3; the current CLI only displays parser-extracted data.
