@@ -23,6 +23,15 @@ Internal decoded TrueType point:
 
 Internal byte range into the `glyf` table, resolved from `loca`.
 
+## Bounds
+
+Internal FUnit bounding box:
+
+- `min_x`
+- `min_y`
+- `max_x`
+- `max_y`
+
 ## Composite Component
 
 Internal component record in a composite TrueType glyph. The current implementation supports component glyph ID plus XY offset placement.

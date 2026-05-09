@@ -24,3 +24,4 @@
 - Provide a simple CLI path to visible output through `--output`.
 - Provide `--font-size` so generated SVGs have predictable display dimensions.
 - Keep `--output` mode quiet enough for script usage.
+- Avoid clipping descenders and accents by sizing from actual glyph bounds.

@@ -51,11 +51,18 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Add CLI `--font-size <px>`.
   - Suppress metadata output when writing SVG files.
 
+- [x] Step 8: Add bounds-based SVG layout
+  - Read glyph header bounds from `glyf`.
+  - Combine shaped glyph bounds into text bounds.
+  - Use bounds to compute SVG width, height, and baseline translation.
+  - Preserve advance width in output bounds where it exceeds visible outline bounds.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
 - [x] Composite glyphs with XY offsets can be expanded into visible component paths.
 - [x] SVG output has practical pixel dimensions.
+- [x] SVG output is sized from actual rendered glyph bounds.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
 - [x] CFF and full typography remain explicitly deferred.

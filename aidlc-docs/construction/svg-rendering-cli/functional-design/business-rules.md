@@ -11,6 +11,8 @@
 - Composite recursion is bounded to prevent malformed fonts from causing unbounded expansion.
 - `--font-size` must be a positive finite number.
 - SVG output includes `width`, `height`, and a pixel-space `viewBox`.
+- SVG output dimensions are derived from actual glyph bounds plus margin.
+- Text advance remains included in horizontal bounds when advance exceeds visible outline bounds.
 - CLI metadata output is suppressed when `--output` is used.
 
 ## Deferred Rules

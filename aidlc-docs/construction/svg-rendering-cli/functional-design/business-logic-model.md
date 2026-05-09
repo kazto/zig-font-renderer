@@ -13,8 +13,9 @@ The current increment renders shaped text as SVG paths for simple TrueType `glyf
 5. Convert contour points to SVG path commands.
 6. Place each glyph at the shaped glyph `x_offset`.
 7. For supported composite glyphs, recursively render component glyphs with XY offsets.
-8. Scale raw FUnit path coordinates into a pixel-sized SVG group transform.
-9. Write a complete SVG document.
+8. Combine glyph header bounds into shaped text bounds.
+9. Scale raw FUnit path coordinates into a pixel-sized SVG group transform.
+10. Write a complete SVG document.
 
 ## Deferred Logic
 

@@ -33,6 +33,10 @@ const Loca = struct {
 const Glyf = struct {
     const header_size = 10;
     const number_of_contours_offset = 0;
+    const x_min_offset = 2;
+    const y_min_offset = 4;
+    const x_max_offset = 6;
+    const y_max_offset = 8;
     const end_points_offset = 10;
     const contour_endpoint_size = 2;
     const instruction_length_size = 2;
@@ -87,6 +91,28 @@ const GlyphRange = struct {
     end: usize,
 };
 
+const Bounds = struct {
+    min_x: i32,
+    min_y: i32,
+    max_x: i32,
+    max_y: i32,
+
+    fn width(self: Bounds) i32 {
+        return @max(1, self.max_x - self.min_x);
+    }
+
+    fn height(self: Bounds) i32 {
+        return @max(1, self.max_y - self.min_y);
+    }
+
+    fn include(self: *Bounds, other: Bounds) void {
+        self.min_x = @min(self.min_x, other.min_x);
+        self.min_y = @min(self.min_y, other.min_y);
+        self.max_x = @max(self.max_x, other.max_x);
+        self.max_y = @max(self.max_y, other.max_y);
+    }
+};
+
 pub const SvgRenderer = struct {
     pub fn init() SvgRenderer {
         return .{};
@@ -114,10 +140,12 @@ pub const SvgRenderer = struct {
         var shaped = try engine.shapeText(allocator, face, text);
         defer shaped.deinit(allocator);
 
-        const raw_width = if (shaped.total_advance > 0) shaped.total_advance else @as(i32, face.units_per_em);
+        const bounds = try textBounds(face, shaped);
         const scale = options.font_size_px / @as(f64, @floatFromInt(face.units_per_em));
-        const width_px = @as(f64, @floatFromInt(raw_width)) * scale + options.margin_px * 2.0;
-        const height_px = options.font_size_px * 1.25 + options.margin_px * 2.0;
+        const width_px = @as(f64, @floatFromInt(bounds.width())) * scale + options.margin_px * 2.0;
+        const height_px = @as(f64, @floatFromInt(bounds.height())) * scale + options.margin_px * 2.0;
+        const translate_x = options.margin_px - @as(f64, @floatFromInt(bounds.min_x)) * scale;
+        const translate_y = options.margin_px + @as(f64, @floatFromInt(bounds.max_y)) * scale;
 
         var output = std.ArrayList(u8).empty;
         errdefer output.deinit(allocator);
@@ -132,8 +160,8 @@ pub const SvgRenderer = struct {
             height_px,
             width_px,
             height_px,
-            options.margin_px,
-            options.margin_px + options.font_size_px,
+            translate_x,
+            translate_y,
             scale,
             -scale,
         });
@@ -151,6 +179,51 @@ pub const SvgRenderer = struct {
         return try output.toOwnedSlice(allocator);
     }
 };
+
+fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText) font_parser.ParserError!Bounds {
+    var maybe_bounds: ?Bounds = null;
+
+    for (shaped.glyphs) |glyph| {
+        const bounds = (try glyphBounds(face, glyph.glyph_id)) orelse continue;
+        const positioned: Bounds = .{
+            .min_x = bounds.min_x + glyph.x_offset,
+            .min_y = bounds.min_y + glyph.y_offset,
+            .max_x = bounds.max_x + glyph.x_offset,
+            .max_y = bounds.max_y + glyph.y_offset,
+        };
+
+        if (maybe_bounds) |*current| {
+            current.include(positioned);
+        } else {
+            maybe_bounds = positioned;
+        }
+    }
+
+    var bounds = maybe_bounds orelse Bounds{
+        .min_x = 0,
+        .min_y = 0,
+        .max_x = @max(1, shaped.total_advance),
+        .max_y = @as(i32, face.units_per_em),
+    };
+    bounds.max_x = @max(bounds.max_x, shaped.total_advance);
+    return bounds;
+}
+
+fn glyphBounds(face: font_parser.Face, glyph_id: u16) font_parser.ParserError!?Bounds {
+    const range = try glyphRange(face, glyph_id);
+    if (range.start == range.end) return null;
+
+    const glyf = try face.requireTable(TableTags.glyf);
+    if (range.end > glyf.len or range.start + Glyf.header_size > range.end) return font_parser.ParserError.InvalidTable;
+
+    const glyph = glyf[range.start..range.end];
+    return .{
+        .min_x = try readI16(glyph, Glyf.x_min_offset),
+        .min_y = try readI16(glyph, Glyf.y_min_offset),
+        .max_x = try readI16(glyph, Glyf.x_max_offset),
+        .max_y = try readI16(glyph, Glyf.y_max_offset),
+    };
+}
 
 fn appendGlyphPath(
     allocator: std.mem.Allocator,

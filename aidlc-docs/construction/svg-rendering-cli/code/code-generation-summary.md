@@ -14,9 +14,10 @@ Implemented the first visible SVG rendering increment for TrueType simple glyph 
   - Defines `SvgRenderer` and `SvgError`.
   - Defines `RenderOptions` for SVG sizing.
   - Resolves glyph byte ranges with `loca`.
+  - Reads glyph header bounds and computes shaped text bounds.
   - Decodes simple TrueType `glyf` contours.
   - Expands composite TrueType glyphs when components use XY offsets.
-  - Emits SVG path commands with width, height, viewBox, and scaled group transform.
+  - Emits SVG path commands with bounds-based width, height, viewBox, and scaled group transform.
 
 - Modified `src/root.zig`
   - Re-exports `SvgRenderer` and `SvgError`.
@@ -53,6 +54,12 @@ Implemented the first visible SVG rendering increment for TrueType simple glyph 
 - Result: Passed; generated SVG includes `width="141.20"`, `height="136.00"`, and a scaled transform.
 - Command: `wc -c /tmp/zig-font-renderer-av-96.svg`
 - Result: `418 /tmp/zig-font-renderer-av-96.svg`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text gé --output /tmp/zig-font-renderer-bounds.svg --font-size 96`
+- Result: Passed; generated SVG quietly.
+- Command: `sed -n '1,5p' /tmp/zig-font-renderer-bounds.svg`
+- Result: Passed; generated SVG includes bounds-derived `width="130.70"`, `height="112.75"`, and transform `translate(2.70 84.78)`.
+- Command: `wc -c /tmp/zig-font-renderer-bounds.svg`
+- Result: `1187 /tmp/zig-font-renderer-bounds.svg`
 
 ## Known Limitations
 

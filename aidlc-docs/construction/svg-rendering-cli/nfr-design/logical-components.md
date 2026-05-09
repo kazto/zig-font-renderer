@@ -7,6 +7,8 @@
 - `appendGlyphPath`: Internal glyph-to-path converter.
 - `appendCompositeGlyphPaths`: Internal composite glyph expander for XY-offset components.
 - `glyphRange`: Internal `loca` resolver.
+- `textBounds`: Internal shaped text bounds calculator.
+- `glyphBounds`: Internal glyph header bounds reader.
 - CLI `--output`: File-writing path for generated SVG.
 - CLI `--font-size`: Pixel size control for generated SVG.
 

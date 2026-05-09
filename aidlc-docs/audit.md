@@ -299,6 +299,21 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 
 ---
 
+## Unit 3 SVG Bounds Layout - Implemented
+**Timestamp**: 2026-05-09T10:08:30Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented bounds-based SVG layout using glyph header bounds and shaped glyph offsets so generated SVG dimensions and transforms fit actual outlines, including descenders and accents."
+**Verification**:
+- `zig fmt src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text gé --output /tmp/zig-font-renderer-bounds.svg --font-size 96`
+- `sed -n '1,5p' /tmp/zig-font-renderer-bounds.svg`
+- `wc -c /tmp/zig-font-renderer-bounds.svg`
+**Context**: Construction Phase - Unit 3 - SVG visual layout refinement.
+
+---
+
 ## Refactoring - Named Font Constants
 **Timestamp**: 2026-05-09T10:02:50Z
 **User Input**: "いったんここでリファクタリング。ソースコードを見ると、マジックナンバーを多用している。Zigのcomptimeを活用して、定数に名前を付けて。"
