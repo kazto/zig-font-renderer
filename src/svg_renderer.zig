@@ -11,6 +11,66 @@ const max_composite_depth = 8;
 const default_font_size_px = 64.0;
 const default_margin_px = 8.0;
 
+const TableTags = struct {
+    const glyf = "glyf".*;
+    const head = "head".*;
+    const loca = "loca".*;
+};
+
+const Head = struct {
+    const min_size_for_loca_format = 52;
+    const index_to_loc_format_offset = 50;
+    const short_loca_format = 0;
+    const long_loca_format = 1;
+};
+
+const Loca = struct {
+    const short_entry_size = 2;
+    const short_entry_scale = 2;
+    const long_entry_size = 4;
+};
+
+const Glyf = struct {
+    const header_size = 10;
+    const number_of_contours_offset = 0;
+    const end_points_offset = 10;
+    const contour_endpoint_size = 2;
+    const instruction_length_size = 2;
+    const empty_contour_count = 0;
+    const composite_contour_marker_max = -1;
+};
+
+const SimpleGlyphFlag = struct {
+    const on_curve = 0x01;
+    const x_short_vector = 0x02;
+    const y_short_vector = 0x04;
+    const repeat = 0x08;
+    const x_is_same_or_positive_short = 0x10;
+    const y_is_same_or_positive_short = 0x20;
+};
+
+const CompositeGlyphFlag = struct {
+    const arg_1_and_2_are_words = 0x0001;
+    const args_are_xy_values = 0x0002;
+    const has_scale = 0x0008;
+    const more_components = 0x0020;
+    const has_xy_scale = 0x0040;
+    const has_2x2 = 0x0080;
+};
+
+const CompositeGlyph = struct {
+    const components_offset = 10;
+    const component_header_size = 4;
+    const flags_offset = 0;
+    const glyph_id_offset = 2;
+    const word_args_size = 4;
+    const byte_args_size = 2;
+    const scale_size = 2;
+    const xy_scale_size = 4;
+    const matrix_2x2_size = 8;
+    const f2dot14_one = 0x4000;
+};
+
 pub const RenderOptions = struct {
     font_size_px: f64 = default_font_size_px,
     margin_px: f64 = default_margin_px,
@@ -106,29 +166,29 @@ fn appendGlyphPath(
     const range = try glyphRange(face, glyph_id);
     if (range.start == range.end) return;
 
-    const glyf = try face.requireTable("glyf".*);
-    if (range.end > glyf.len or range.start + 10 > range.end) return font_parser.ParserError.InvalidTable;
+    const glyf = try face.requireTable(TableTags.glyf);
+    if (range.end > glyf.len or range.start + Glyf.header_size > range.end) return font_parser.ParserError.InvalidTable;
 
     const glyph = glyf[range.start..range.end];
-    const number_of_contours = try readI16(glyph, 0);
-    if (number_of_contours == 0) return;
-    if (number_of_contours < 0) {
+    const number_of_contours = try readI16(glyph, Glyf.number_of_contours_offset);
+    if (number_of_contours == Glyf.empty_contour_count) return;
+    if (number_of_contours <= Glyf.composite_contour_marker_max) {
         return appendCompositeGlyphPaths(allocator, writer, face, glyph, x_offset, y_offset, depth + 1);
     }
 
     const contour_count = @as(usize, @intCast(number_of_contours));
-    if (10 + contour_count * 2 + 2 > glyph.len) return font_parser.ParserError.InvalidTable;
+    if (Glyf.end_points_offset + contour_count * Glyf.contour_endpoint_size + Glyf.instruction_length_size > glyph.len) return font_parser.ParserError.InvalidTable;
 
     const end_points = try allocator.alloc(u16, contour_count);
     defer allocator.free(end_points);
     for (end_points, 0..) |*end_point, index| {
-        end_point.* = try readU16(glyph, 10 + index * 2);
+        end_point.* = try readU16(glyph, Glyf.end_points_offset + index * Glyf.contour_endpoint_size);
     }
 
     const point_count = @as(usize, end_points[end_points.len - 1]) + 1;
-    const instruction_len_offset = 10 + contour_count * 2;
+    const instruction_len_offset = Glyf.end_points_offset + contour_count * Glyf.contour_endpoint_size;
     const instruction_len = try readU16(glyph, instruction_len_offset);
-    var offset = instruction_len_offset + 2 + @as(usize, instruction_len);
+    var offset = instruction_len_offset + Glyf.instruction_length_size + @as(usize, instruction_len);
     if (offset > glyph.len) return font_parser.ParserError.InvalidTable;
 
     const flags = try allocator.alloc(u8, point_count);
@@ -141,7 +201,7 @@ fn appendGlyphPath(
         flags[flag_index] = flag;
         flag_index += 1;
 
-        if ((flag & 0x08) != 0) {
+        if ((flag & SimpleGlyphFlag.repeat) != 0) {
             if (offset >= glyph.len) return font_parser.ParserError.InvalidTable;
             const repeat_count = glyph[offset];
             offset += 1;
@@ -159,15 +219,15 @@ fn appendGlyphPath(
 
     var x: i16 = 0;
     for (points, flags) |*point, flag| {
-        const delta = try readCoordinateDelta(glyph, &offset, flag, 0x02, 0x10);
+        const delta = try readCoordinateDelta(glyph, &offset, flag, SimpleGlyphFlag.x_short_vector, SimpleGlyphFlag.x_is_same_or_positive_short);
         x = @as(i16, @intCast(@as(i32, x) + delta));
         point.x = x;
-        point.on_curve = (flag & 0x01) != 0;
+        point.on_curve = (flag & SimpleGlyphFlag.on_curve) != 0;
     }
 
     var y: i16 = 0;
     for (points, flags) |*point, flag| {
-        const delta = try readCoordinateDelta(glyph, &offset, flag, 0x04, 0x20);
+        const delta = try readCoordinateDelta(glyph, &offset, flag, SimpleGlyphFlag.y_short_vector, SimpleGlyphFlag.y_is_same_or_positive_short);
         y = @as(i16, @intCast(@as(i32, y) + delta));
         point.y = y;
     }
@@ -191,48 +251,48 @@ fn appendCompositeGlyphPaths(
     y_offset: i32,
     depth: u8,
 ) SvgError!void {
-    var offset: usize = 10;
+    var offset: usize = CompositeGlyph.components_offset;
     var more_components = true;
     while (more_components) {
-        if (offset + 4 > glyph.len) return font_parser.ParserError.InvalidTable;
-        const flags = try readU16(glyph, offset);
-        const component_glyph_id = try readU16(glyph, offset + 2);
-        offset += 4;
+        if (offset + CompositeGlyph.component_header_size > glyph.len) return font_parser.ParserError.InvalidTable;
+        const flags = try readU16(glyph, offset + CompositeGlyph.flags_offset);
+        const component_glyph_id = try readU16(glyph, offset + CompositeGlyph.glyph_id_offset);
+        offset += CompositeGlyph.component_header_size;
 
-        if ((flags & 0x0002) == 0) return SvgError.UnsupportedCompositeGlyph;
+        if ((flags & CompositeGlyphFlag.args_are_xy_values) == 0) return SvgError.UnsupportedCompositeGlyph;
 
         var component_x: i32 = 0;
         var component_y: i32 = 0;
-        if ((flags & 0x0001) != 0) {
+        if ((flags & CompositeGlyphFlag.arg_1_and_2_are_words) != 0) {
             component_x = try readI16(glyph, offset);
             component_y = try readI16(glyph, offset + 2);
-            offset += 4;
+            offset += CompositeGlyph.word_args_size;
         } else {
-            if (offset + 2 > glyph.len) return font_parser.ParserError.InvalidTable;
+            if (offset + CompositeGlyph.byte_args_size > glyph.len) return font_parser.ParserError.InvalidTable;
             component_x = @as(i32, @as(i8, @bitCast(glyph[offset])));
             component_y = @as(i32, @as(i8, @bitCast(glyph[offset + 1])));
-            offset += 2;
+            offset += CompositeGlyph.byte_args_size;
         }
 
-        if ((flags & 0x0008) != 0) {
-            if (offset + 2 > glyph.len) return font_parser.ParserError.InvalidTable;
+        if ((flags & CompositeGlyphFlag.has_scale) != 0) {
+            if (offset + CompositeGlyph.scale_size > glyph.len) return font_parser.ParserError.InvalidTable;
             const scale = try readI16(glyph, offset);
-            offset += 2;
-            if (scale != 0x4000) return SvgError.UnsupportedCompositeGlyph;
-        } else if ((flags & 0x0040) != 0) {
-            if (offset + 4 > glyph.len) return font_parser.ParserError.InvalidTable;
+            offset += CompositeGlyph.scale_size;
+            if (scale != CompositeGlyph.f2dot14_one) return SvgError.UnsupportedCompositeGlyph;
+        } else if ((flags & CompositeGlyphFlag.has_xy_scale) != 0) {
+            if (offset + CompositeGlyph.xy_scale_size > glyph.len) return font_parser.ParserError.InvalidTable;
             const x_scale = try readI16(glyph, offset);
             const y_scale = try readI16(glyph, offset + 2);
-            offset += 4;
-            if (x_scale != 0x4000 or y_scale != 0x4000) return SvgError.UnsupportedCompositeGlyph;
-        } else if ((flags & 0x0080) != 0) {
-            if (offset + 8 > glyph.len) return font_parser.ParserError.InvalidTable;
+            offset += CompositeGlyph.xy_scale_size;
+            if (x_scale != CompositeGlyph.f2dot14_one or y_scale != CompositeGlyph.f2dot14_one) return SvgError.UnsupportedCompositeGlyph;
+        } else if ((flags & CompositeGlyphFlag.has_2x2) != 0) {
+            if (offset + CompositeGlyph.matrix_2x2_size > glyph.len) return font_parser.ParserError.InvalidTable;
             const xx = try readI16(glyph, offset);
             const yx = try readI16(glyph, offset + 2);
             const xy = try readI16(glyph, offset + 4);
             const yy = try readI16(glyph, offset + 6);
-            offset += 8;
-            if (xx != 0x4000 or yx != 0 or xy != 0 or yy != 0x4000) return SvgError.UnsupportedCompositeGlyph;
+            offset += CompositeGlyph.matrix_2x2_size;
+            if (xx != CompositeGlyph.f2dot14_one or yx != 0 or xy != 0 or yy != CompositeGlyph.f2dot14_one) return SvgError.UnsupportedCompositeGlyph;
         }
 
         try appendGlyphPath(
@@ -245,7 +305,7 @@ fn appendCompositeGlyphPaths(
             depth,
         );
 
-        more_components = (flags & 0x0020) != 0;
+        more_components = (flags & CompositeGlyphFlag.more_components) != 0;
     }
 
     if (offset > glyph.len) return font_parser.ParserError.InvalidTable;
@@ -281,21 +341,21 @@ fn appendContourPath(writer: std.ArrayList(u8).Writer, contour: []const Point, x
 fn glyphRange(face: font_parser.Face, glyph_id: u16) font_parser.ParserError!GlyphRange {
     if (glyph_id >= face.num_glyphs) return font_parser.ParserError.InvalidGlyphId;
 
-    const head = try face.requireTable("head".*);
-    const loca = try face.requireTable("loca".*);
-    const glyf = try face.requireTable("glyf".*);
-    if (head.len < 52) return font_parser.ParserError.InvalidTable;
+    const head = try face.requireTable(TableTags.head);
+    const loca = try face.requireTable(TableTags.loca);
+    const glyf = try face.requireTable(TableTags.glyf);
+    if (head.len < Head.min_size_for_loca_format) return font_parser.ParserError.InvalidTable;
 
-    const index_to_loc_format = try readI16(head, 50);
+    const index_to_loc_format = try readI16(head, Head.index_to_loc_format_offset);
     const index = @as(usize, glyph_id);
     const start: usize = switch (index_to_loc_format) {
-        0 => @as(usize, try readU16(loca, index * 2)) * 2,
-        1 => @as(usize, try readU32(loca, index * 4)),
+        Head.short_loca_format => @as(usize, try readU16(loca, index * Loca.short_entry_size)) * Loca.short_entry_scale,
+        Head.long_loca_format => @as(usize, try readU32(loca, index * Loca.long_entry_size)),
         else => return font_parser.ParserError.InvalidTable,
     };
     const end: usize = switch (index_to_loc_format) {
-        0 => @as(usize, try readU16(loca, (index + 1) * 2)) * 2,
-        1 => @as(usize, try readU32(loca, (index + 1) * 4)),
+        Head.short_loca_format => @as(usize, try readU16(loca, (index + 1) * Loca.short_entry_size)) * Loca.short_entry_scale,
+        Head.long_loca_format => @as(usize, try readU32(loca, (index + 1) * Loca.long_entry_size)),
         else => unreachable,
     };
 

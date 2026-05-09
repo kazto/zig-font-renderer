@@ -298,3 +298,17 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - SVG output sizing and CLI usability increment.
 
 ---
+
+## Refactoring - Named Font Constants
+**Timestamp**: 2026-05-09T10:02:50Z
+**User Input**: "いったんここでリファクタリング。ソースコードを見ると、マジックナンバーを多用している。Zigのcomptimeを活用して、定数に名前を付けて。"
+**AI Response**: "Refactored SFNT, cmap, hmtx, kern, glyf, loca, and composite glyph magic numbers into named compile-time constants while preserving behavior."
+**Verification**:
+- `zig fmt src/font_parser.zig src/shaper.zig src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text é --output /tmp/zig-font-renderer-refactor.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-refactor.svg`
+**Context**: Cross-unit source refactoring. No functional stage transition.
+
+---

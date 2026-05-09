@@ -1,6 +1,36 @@
 const std = @import("std");
 const font_parser = @import("font_parser.zig");
 
+const TableTags = struct {
+    const kern = "kern".*;
+};
+
+const Kern = struct {
+    const version_offset = 0;
+    const n_tables_offset = 2;
+    const header_size = 4;
+    const subtable_header_size = 6;
+    const subtable_length_offset = 2;
+    const subtable_coverage_offset = 4;
+    const version0 = 0;
+};
+
+const KernCoverage = struct {
+    const horizontal_mask = 0x0001;
+    const format_shift = 8;
+    const format0 = 0;
+};
+
+const KernFormat0 = struct {
+    const min_size = 14;
+    const n_pairs_offset = 6;
+    const pair_records_offset = 14;
+    const pair_record_size = 6;
+    const left_glyph_offset = 0;
+    const right_glyph_offset = 2;
+    const value_offset = 4;
+};
+
 pub const ShapeError = font_parser.ParserError || std.mem.Allocator.Error || error{
     InvalidUtf8,
 };
@@ -97,27 +127,27 @@ fn applyKerning(face: font_parser.Face, glyphs: []ShapedGlyph) font_parser.Parse
 }
 
 fn getLegacyKernAdjustment(face: font_parser.Face, left: u16, right: u16) font_parser.ParserError!i16 {
-    const kern = face.getTable("kern".*) orelse return 0;
-    if (kern.len < 4) return font_parser.ParserError.InvalidTable;
+    const kern = face.getTable(TableTags.kern) orelse return 0;
+    if (kern.len < Kern.header_size) return font_parser.ParserError.InvalidTable;
 
-    const version = try readU16(kern, 0);
-    if (version != 0) return 0;
+    const version = try readU16(kern, Kern.version_offset);
+    if (version != Kern.version0) return 0;
 
-    const n_tables = try readU16(kern, 2);
-    var offset: usize = 4;
+    const n_tables = try readU16(kern, Kern.n_tables_offset);
+    var offset: usize = Kern.header_size;
     var total: i32 = 0;
 
     var table_index: usize = 0;
     while (table_index < n_tables) : (table_index += 1) {
-        if (offset + 6 > kern.len) return font_parser.ParserError.InvalidTable;
+        if (offset + Kern.subtable_header_size > kern.len) return font_parser.ParserError.InvalidTable;
 
-        const length = try readU16(kern, offset + 2);
-        const coverage = try readU16(kern, offset + 4);
-        if (length < 6 or offset + length > kern.len) return font_parser.ParserError.InvalidTable;
+        const length = try readU16(kern, offset + Kern.subtable_length_offset);
+        const coverage = try readU16(kern, offset + Kern.subtable_coverage_offset);
+        if (length < Kern.subtable_header_size or offset + length > kern.len) return font_parser.ParserError.InvalidTable;
 
-        const format = @as(u8, @intCast(coverage >> 8));
-        const horizontal = (coverage & 0x0001) != 0;
-        if (format == 0 and horizontal) {
+        const format = @as(u8, @intCast(coverage >> KernCoverage.format_shift));
+        const horizontal = (coverage & KernCoverage.horizontal_mask) != 0;
+        if (format == KernCoverage.format0 and horizontal) {
             total += try lookupKernFormat0(kern[offset .. offset + length], left, right);
         }
 
@@ -131,26 +161,26 @@ fn getLegacyKernAdjustment(face: font_parser.Face, left: u16, right: u16) font_p
 }
 
 fn lookupKernFormat0(subtable: []const u8, left: u16, right: u16) font_parser.ParserError!i16 {
-    if (subtable.len < 14) return font_parser.ParserError.InvalidTable;
+    if (subtable.len < KernFormat0.min_size) return font_parser.ParserError.InvalidTable;
 
-    const n_pairs = try readU16(subtable, 6);
-    if (14 + @as(usize, n_pairs) * 6 > subtable.len) return font_parser.ParserError.InvalidTable;
+    const n_pairs = try readU16(subtable, KernFormat0.n_pairs_offset);
+    if (KernFormat0.pair_records_offset + @as(usize, n_pairs) * KernFormat0.pair_record_size > subtable.len) return font_parser.ParserError.InvalidTable;
 
     const target = (@as(u32, left) << 16) | @as(u32, right);
     var low: usize = 0;
     var high: usize = n_pairs;
     while (low < high) {
         const mid = low + (high - low) / 2;
-        const pair_offset = 14 + mid * 6;
-        const pair = (@as(u32, try readU16(subtable, pair_offset)) << 16) |
-            @as(u32, try readU16(subtable, pair_offset + 2));
+        const pair_offset = KernFormat0.pair_records_offset + mid * KernFormat0.pair_record_size;
+        const pair = (@as(u32, try readU16(subtable, pair_offset + KernFormat0.left_glyph_offset)) << 16) |
+            @as(u32, try readU16(subtable, pair_offset + KernFormat0.right_glyph_offset));
 
         if (target < pair) {
             high = mid;
         } else if (target > pair) {
             low = mid + 1;
         } else {
-            return try readI16(subtable, pair_offset + 4);
+            return try readI16(subtable, pair_offset + KernFormat0.value_offset);
         }
     }
 

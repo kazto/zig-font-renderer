@@ -1,5 +1,91 @@
 const std = @import("std");
 
+const Sfnt = struct {
+    const header_size = 12;
+    const num_tables_offset = 4;
+    const table_record_size = 16;
+    const table_record_tag_offset = 0;
+    const table_record_offset_offset = 8;
+    const table_record_length_offset = 12;
+    const truetype_flavor = 0x00010000;
+};
+
+const TableTags = struct {
+    const cff = "CFF ".*;
+    const cmap = "cmap".*;
+    const glyf = "glyf".*;
+    const head = "head".*;
+    const hhea = "hhea".*;
+    const hmtx = "hmtx".*;
+    const maxp = "maxp".*;
+    const otto = "OTTO".*;
+};
+
+const Head = struct {
+    const min_size = 20;
+    const units_per_em_offset = 18;
+};
+
+const Maxp = struct {
+    const min_size = 6;
+    const num_glyphs_offset = 4;
+};
+
+const Hhea = struct {
+    const min_size = 36;
+    const number_of_h_metrics_offset = 34;
+};
+
+const Hmtx = struct {
+    const long_metric_size = 4;
+    const lsb_offset = 2;
+    const short_lsb_size = 2;
+};
+
+const Cmap = struct {
+    const header_size = 4;
+    const num_tables_offset = 2;
+    const encoding_record_size = 8;
+    const platform_id_offset = 0;
+    const encoding_id_offset = 2;
+    const subtable_offset_offset = 4;
+    const format_size = 2;
+
+    const format4 = 4;
+    const format12 = 12;
+
+    const unicode_platform_id = 0;
+    const windows_platform_id = 3;
+    const windows_bmp_encoding_id = 1;
+    const windows_full_unicode_encoding_id = 10;
+
+    const priority_windows_full_unicode = 0;
+    const priority_windows_bmp = 1;
+    const priority_unicode = 2;
+    const priority_fallback = 3;
+    const priority_unset = 255;
+};
+
+const CmapFormat4 = struct {
+    const min_size = 16;
+    const length_offset = 2;
+    const seg_count_x2_offset = 6;
+    const end_codes_offset = 14;
+    const reserved_pad_size = 2;
+    const code_unit_size = 2;
+};
+
+const CmapFormat12 = struct {
+    const min_size = 16;
+    const length_offset = 4;
+    const num_groups_offset = 12;
+    const groups_offset = 16;
+    const group_size = 12;
+    const start_char_offset = 0;
+    const end_char_offset = 4;
+    const start_glyph_offset = 8;
+};
+
 pub const ParserError = error{
     InvalidFontFormat,
     MissingMandatoryTable,
@@ -40,47 +126,47 @@ pub const Face = struct {
     cmap: ?CmapSelection,
 
     pub fn init(allocator: std.mem.Allocator, data: []const u8) ParserError!Face {
-        if (data.len < 12) return ParserError.InvalidFontFormat;
+        if (data.len < Sfnt.header_size) return ParserError.InvalidFontFormat;
 
         const flavor = try readU32(data, 0);
-        if (flavor != 0x00010000 and flavor != tagToU32("OTTO".*)) {
+        if (flavor != Sfnt.truetype_flavor and flavor != tagToU32(TableTags.otto)) {
             return ParserError.InvalidFontFormat;
         }
 
-        const num_tables = try readU16(data, 4);
-        const directory_len = 12 + @as(usize, num_tables) * 16;
+        const num_tables = try readU16(data, Sfnt.num_tables_offset);
+        const directory_len = Sfnt.header_size + @as(usize, num_tables) * Sfnt.table_record_size;
         if (directory_len > data.len) return ParserError.TableOutOfBounds;
 
         const tables = allocator.alloc(TableMetadata, num_tables) catch return ParserError.InvalidTable;
         errdefer allocator.free(tables);
 
         for (tables, 0..) |*table, index| {
-            const record_offset = 12 + index * 16;
-            const offset = try readU32(data, record_offset + 8);
-            const length = try readU32(data, record_offset + 12);
+            const record_offset = Sfnt.header_size + index * Sfnt.table_record_size;
+            const offset = try readU32(data, record_offset + Sfnt.table_record_offset_offset);
+            const length = try readU32(data, record_offset + Sfnt.table_record_length_offset);
             try validateRange(data, offset, length);
 
             table.* = .{
-                .tag = data[record_offset..][0..4].*,
+                .tag = data[record_offset + Sfnt.table_record_tag_offset ..][0..4].*,
                 .offset = offset,
                 .length = length,
             };
         }
 
-        const head = try requiredTable(data, tables, "head".*);
-        const maxp = try requiredTable(data, tables, "maxp".*);
-        const hhea = try requiredTable(data, tables, "hhea".*);
-        _ = try requiredTable(data, tables, "hmtx".*);
-        _ = try requiredTable(data, tables, "cmap".*);
-        if (findTable(tables, "glyf".*) == null and findTable(tables, "CFF ".*) == null) {
+        const head = try requiredTable(data, tables, TableTags.head);
+        const maxp = try requiredTable(data, tables, TableTags.maxp);
+        const hhea = try requiredTable(data, tables, TableTags.hhea);
+        _ = try requiredTable(data, tables, TableTags.hmtx);
+        _ = try requiredTable(data, tables, TableTags.cmap);
+        if (findTable(tables, TableTags.glyf) == null and findTable(tables, TableTags.cff) == null) {
             return ParserError.MissingMandatoryTable;
         }
 
-        if (head.len < 20 or maxp.len < 6 or hhea.len < 36) return ParserError.InvalidTable;
+        if (head.len < Head.min_size or maxp.len < Maxp.min_size or hhea.len < Hhea.min_size) return ParserError.InvalidTable;
 
-        const units_per_em = try readU16(head, 18);
-        const num_glyphs = try readU16(maxp, 4);
-        const number_of_h_metrics = try readU16(hhea, 34);
+        const units_per_em = try readU16(head, Head.units_per_em_offset);
+        const num_glyphs = try readU16(maxp, Maxp.num_glyphs_offset);
+        const number_of_h_metrics = try readU16(hhea, Hhea.number_of_h_metrics_offset);
         if (number_of_h_metrics == 0) return ParserError.InvalidTable;
 
         return .{
@@ -109,10 +195,10 @@ pub const Face = struct {
 
     pub fn getGlyphId(self: Face, codepoint: u32) ParserError!u16 {
         const cmap = self.cmap orelse return ParserError.MissingMandatoryTable;
-        const cmap_table = try self.requireTable("cmap".*);
+        const cmap_table = try self.requireTable(TableTags.cmap);
         return switch (cmap.format) {
-            4 => try lookupCmapFormat4(cmap_table, cmap.offset, codepoint),
-            12 => try lookupCmapFormat12(cmap_table, cmap.offset, codepoint),
+            Cmap.format4 => try lookupCmapFormat4(cmap_table, cmap.offset, codepoint),
+            Cmap.format12 => try lookupCmapFormat12(cmap_table, cmap.offset, codepoint),
             else => ParserError.UnsupportedCmapFormat,
         };
     }
@@ -120,23 +206,23 @@ pub const Face = struct {
     pub fn getHMetric(self: Face, glyph_id: u16) ParserError!HMetric {
         if (glyph_id >= self.num_glyphs) return ParserError.InvalidGlyphId;
 
-        const hmtx = try self.requireTable("hmtx".*);
+        const hmtx = try self.requireTable(TableTags.hmtx);
         const metric_count = @as(usize, self.number_of_h_metrics);
         const glyph_index = @as(usize, glyph_id);
         if (metric_count == 0) return ParserError.InvalidTable;
 
         if (glyph_index < metric_count) {
-            const offset = glyph_index * 4;
-            if (offset + 4 > hmtx.len) return ParserError.InvalidTable;
+            const offset = glyph_index * Hmtx.long_metric_size;
+            if (offset + Hmtx.long_metric_size > hmtx.len) return ParserError.InvalidTable;
             return .{
                 .advance_width = try readU16(hmtx, offset),
-                .lsb = try readI16(hmtx, offset + 2),
+                .lsb = try readI16(hmtx, offset + Hmtx.lsb_offset),
             };
         }
 
-        const last_metric_offset = (metric_count - 1) * 4;
-        const lsb_offset = metric_count * 4 + (glyph_index - metric_count) * 2;
-        if (last_metric_offset + 4 > hmtx.len or lsb_offset + 2 > hmtx.len) {
+        const last_metric_offset = (metric_count - 1) * Hmtx.long_metric_size;
+        const lsb_offset = metric_count * Hmtx.long_metric_size + (glyph_index - metric_count) * Hmtx.short_lsb_size;
+        if (last_metric_offset + Hmtx.long_metric_size > hmtx.len or lsb_offset + Hmtx.short_lsb_size > hmtx.len) {
             return ParserError.InvalidTable;
         }
 
@@ -170,23 +256,23 @@ fn requiredTable(data: []const u8, tables: []const TableMetadata, tag: [4]u8) Pa
 }
 
 fn selectCmap(data: []const u8, tables: []const TableMetadata) ParserError!?CmapSelection {
-    const cmap = try requiredTable(data, tables, "cmap".*);
-    if (cmap.len < 4) return ParserError.InvalidTable;
+    const cmap = try requiredTable(data, tables, TableTags.cmap);
+    if (cmap.len < Cmap.header_size) return ParserError.InvalidTable;
 
-    const num_tables = try readU16(cmap, 2);
-    if (4 + @as(usize, num_tables) * 8 > cmap.len) return ParserError.InvalidTable;
+    const num_tables = try readU16(cmap, Cmap.num_tables_offset);
+    if (Cmap.header_size + @as(usize, num_tables) * Cmap.encoding_record_size > cmap.len) return ParserError.InvalidTable;
 
     var fallback: ?CmapSelection = null;
     var best: ?CmapSelection = null;
-    var best_priority: u8 = 255;
+    var best_priority: u8 = Cmap.priority_unset;
 
     var index: usize = 0;
     while (index < num_tables) : (index += 1) {
-        const record = 4 + index * 8;
-        const platform_id = try readU16(cmap, record);
-        const encoding_id = try readU16(cmap, record + 2);
-        const offset = try readU32(cmap, record + 4);
-        if (offset + 2 > cmap.len) return ParserError.InvalidTable;
+        const record = Cmap.header_size + index * Cmap.encoding_record_size;
+        const platform_id = try readU16(cmap, record + Cmap.platform_id_offset);
+        const encoding_id = try readU16(cmap, record + Cmap.encoding_id_offset);
+        const offset = try readU32(cmap, record + Cmap.subtable_offset_offset);
+        if (offset + Cmap.format_size > cmap.len) return ParserError.InvalidTable;
 
         const format = try readU16(cmap, offset);
         const selection: CmapSelection = .{ .offset = offset, .format = format };
@@ -203,49 +289,49 @@ fn selectCmap(data: []const u8, tables: []const TableMetadata) ParserError!?Cmap
 }
 
 fn cmapPriority(platform_id: u16, encoding_id: u16) u8 {
-    if (platform_id == 3 and encoding_id == 10) return 0;
-    if (platform_id == 3 and encoding_id == 1) return 1;
-    if (platform_id == 0) return 2;
-    return 3;
+    if (platform_id == Cmap.windows_platform_id and encoding_id == Cmap.windows_full_unicode_encoding_id) return Cmap.priority_windows_full_unicode;
+    if (platform_id == Cmap.windows_platform_id and encoding_id == Cmap.windows_bmp_encoding_id) return Cmap.priority_windows_bmp;
+    if (platform_id == Cmap.unicode_platform_id) return Cmap.priority_unicode;
+    return Cmap.priority_fallback;
 }
 
 fn lookupCmapFormat4(cmap: []const u8, offset: u32, codepoint: u32) ParserError!u16 {
     if (codepoint > 0xFFFF) return 0;
     const start = @as(usize, offset);
-    if (start + 16 > cmap.len) return ParserError.InvalidTable;
+    if (start + CmapFormat4.min_size > cmap.len) return ParserError.InvalidTable;
 
-    const length = try readU16(cmap, start + 2);
+    const length = try readU16(cmap, start + CmapFormat4.length_offset);
     if (start + length > cmap.len) return ParserError.InvalidTable;
 
-    const seg_count_x2 = try readU16(cmap, start + 6);
+    const seg_count_x2 = try readU16(cmap, start + CmapFormat4.seg_count_x2_offset);
     if (seg_count_x2 % 2 != 0) return ParserError.InvalidTable;
     const seg_count = @as(usize, seg_count_x2 / 2);
-    const end_codes = start + 14;
-    const reserved_pad = end_codes + seg_count * 2;
-    const start_codes = reserved_pad + 2;
-    const id_deltas = start_codes + seg_count * 2;
-    const id_range_offsets = id_deltas + seg_count * 2;
-    const glyph_array = id_range_offsets + seg_count * 2;
+    const end_codes = start + CmapFormat4.end_codes_offset;
+    const reserved_pad = end_codes + seg_count * CmapFormat4.code_unit_size;
+    const start_codes = reserved_pad + CmapFormat4.reserved_pad_size;
+    const id_deltas = start_codes + seg_count * CmapFormat4.code_unit_size;
+    const id_range_offsets = id_deltas + seg_count * CmapFormat4.code_unit_size;
+    const glyph_array = id_range_offsets + seg_count * CmapFormat4.code_unit_size;
     if (glyph_array > start + length) return ParserError.InvalidTable;
 
     const cp = @as(u16, @intCast(codepoint));
     var i: usize = 0;
     while (i < seg_count) : (i += 1) {
-        const end_code = try readU16(cmap, end_codes + i * 2);
+        const end_code = try readU16(cmap, end_codes + i * CmapFormat4.code_unit_size);
         if (cp > end_code) continue;
 
-        const start_code = try readU16(cmap, start_codes + i * 2);
+        const start_code = try readU16(cmap, start_codes + i * CmapFormat4.code_unit_size);
         if (cp < start_code) return 0;
 
-        const delta = try readI16(cmap, id_deltas + i * 2);
-        const range_offset_location = id_range_offsets + i * 2;
+        const delta = try readI16(cmap, id_deltas + i * CmapFormat4.code_unit_size);
+        const range_offset_location = id_range_offsets + i * CmapFormat4.code_unit_size;
         const range_offset = try readU16(cmap, range_offset_location);
         if (range_offset == 0) {
             return wrapU16(@as(i32, cp) + @as(i32, delta));
         }
 
-        const glyph_index_offset = range_offset_location + range_offset + (@as(usize, cp - start_code) * 2);
-        if (glyph_index_offset + 2 > start + length) return ParserError.InvalidTable;
+        const glyph_index_offset = range_offset_location + range_offset + (@as(usize, cp - start_code) * CmapFormat4.code_unit_size);
+        if (glyph_index_offset + CmapFormat4.code_unit_size > start + length) return ParserError.InvalidTable;
         const glyph_id = try readU16(cmap, glyph_index_offset);
         if (glyph_id == 0) return 0;
         return wrapU16(@as(i32, glyph_id) + @as(i32, delta));
@@ -256,22 +342,22 @@ fn lookupCmapFormat4(cmap: []const u8, offset: u32, codepoint: u32) ParserError!
 
 fn lookupCmapFormat12(cmap: []const u8, offset: u32, codepoint: u32) ParserError!u16 {
     const start = @as(usize, offset);
-    if (start + 16 > cmap.len) return ParserError.InvalidTable;
+    if (start + CmapFormat12.min_size > cmap.len) return ParserError.InvalidTable;
 
-    const length = try readU32(cmap, start + 4);
+    const length = try readU32(cmap, start + CmapFormat12.length_offset);
     if (start + length > cmap.len) return ParserError.InvalidTable;
 
-    const num_groups = try readU32(cmap, start + 12);
-    if (16 + @as(usize, num_groups) * 12 > length) return ParserError.InvalidTable;
+    const num_groups = try readU32(cmap, start + CmapFormat12.num_groups_offset);
+    if (CmapFormat12.groups_offset + @as(usize, num_groups) * CmapFormat12.group_size > length) return ParserError.InvalidTable;
 
     var low: usize = 0;
     var high: usize = num_groups;
     while (low < high) {
         const mid = low + (high - low) / 2;
-        const group = start + 16 + mid * 12;
-        const start_char = try readU32(cmap, group);
-        const end_char = try readU32(cmap, group + 4);
-        const start_glyph = try readU32(cmap, group + 8);
+        const group = start + CmapFormat12.groups_offset + mid * CmapFormat12.group_size;
+        const start_char = try readU32(cmap, group + CmapFormat12.start_char_offset);
+        const end_char = try readU32(cmap, group + CmapFormat12.end_char_offset);
+        const start_glyph = try readU32(cmap, group + CmapFormat12.start_glyph_offset);
 
         if (codepoint < start_char) {
             high = mid;
