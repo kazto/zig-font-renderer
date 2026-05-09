@@ -32,6 +32,10 @@ Internal decoded TrueType point:
 
 Internal byte range into the `glyf` table, resolved from `loca`.
 
+## UnsupportedCffOutlines
+
+Renderer error used when a font exposes `CFF ` or `CFF2` outlines instead of TrueType `glyf` outlines.
+
 ## Bounds
 
 Internal FUnit bounding box:

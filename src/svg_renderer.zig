@@ -4,6 +4,7 @@ const shaper = @import("shaper.zig");
 
 pub const SvgError = font_parser.ParserError || shaper.ShapeError || std.mem.Allocator.Error || error{
     InvalidSvgColor,
+    UnsupportedCffOutlines,
     UnsupportedCompositeGlyph,
     MissingText,
 };
@@ -13,6 +14,8 @@ const default_font_size_px = 64.0;
 const default_margin_px = 8.0;
 
 const TableTags = struct {
+    const cff = "CFF ".*;
+    const cff2 = "CFF2".*;
     const glyf = "glyf".*;
     const head = "head".*;
     const loca = "loca".*;
@@ -241,7 +244,7 @@ fn validateSvgColor(value: []const u8) SvgError!void {
     }
 }
 
-fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText) font_parser.ParserError!Bounds {
+fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText) SvgError!Bounds {
     var maybe_bounds: ?Bounds = null;
 
     for (shaped.glyphs) |glyph| {
@@ -270,7 +273,7 @@ fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText) font_parser.Par
     return bounds;
 }
 
-fn glyphBounds(face: font_parser.Face, glyph_id: u16) font_parser.ParserError!?Bounds {
+fn glyphBounds(face: font_parser.Face, glyph_id: u16) SvgError!?Bounds {
     const range = try glyphRange(face, glyph_id);
     if (range.start == range.end) return null;
 
@@ -481,8 +484,11 @@ fn appendContourPath(writer: std.ArrayList(u8).Writer, contour: []const Point, t
     try writer.print("Z ", .{});
 }
 
-fn glyphRange(face: font_parser.Face, glyph_id: u16) font_parser.ParserError!GlyphRange {
+fn glyphRange(face: font_parser.Face, glyph_id: u16) SvgError!GlyphRange {
     if (glyph_id >= face.num_glyphs) return font_parser.ParserError.InvalidGlyphId;
+    if (face.getTable(TableTags.glyf) == null and (face.getTable(TableTags.cff) != null or face.getTable(TableTags.cff2) != null)) {
+        return SvgError.UnsupportedCffOutlines;
+    }
 
     const head = try face.requireTable(TableTags.head);
     const loca = try face.requireTable(TableTags.loca);
@@ -562,6 +568,25 @@ test "read F2Dot14 scale values" {
     const half = [_]u8{ 0x20, 0x00 };
     try std.testing.expectEqual(@as(f64, 1.0), try readF2Dot14(&one, 0));
     try std.testing.expectEqual(@as(f64, 0.5), try readF2Dot14(&half, 0));
+}
+
+test "CFF outlines return explicit unsupported error" {
+    const data = [_]u8{};
+    const tables = [_]font_parser.TableMetadata{.{
+        .tag = TableTags.cff,
+        .offset = 0,
+        .length = 0,
+    }};
+    const face = font_parser.Face{
+        .data = &data,
+        .units_per_em = 1000,
+        .num_glyphs = 1,
+        .tables = &tables,
+        .number_of_h_metrics = 1,
+        .cmap = null,
+    };
+
+    try std.testing.expectError(SvgError.UnsupportedCffOutlines, glyphRange(face, 0));
 }
 
 test "composite glyph parser rejects point-matched components" {

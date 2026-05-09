@@ -75,6 +75,11 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Compose nested component transforms before emitting path coordinates.
   - Preserve explicit rejection for point-matched composite components.
 
+- [x] Step 12: Add explicit CFF outline unsupported handling
+  - Detect `CFF ` and `CFF2` tables when `glyf` is absent.
+  - Return `UnsupportedCffOutlines` instead of generic missing-table errors.
+  - Keep CFF charstring outline decoding deferred.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
@@ -84,6 +89,7 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] SVG output is sized from actual rendered glyph bounds.
 - [x] High-level API is available for one-call SVG rendering.
 - [x] SVG output can be styled with fill, background, and margin controls.
+- [x] CFF/CFF2 SVG attempts fail with an explicit unsupported-outline error.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
 - [x] CFF and full typography remain explicitly deferred.

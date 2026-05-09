@@ -12,6 +12,7 @@
 - Bounds-check all `head`, `loca`, and `glyf` reads.
 - Bound composite glyph recursion.
 - Return explicit errors for unsupported composite placement modes.
+- Return explicit errors for unsupported CFF/CFF2 outline fonts.
 - Return explicit errors for invalid SVG color attributes.
 - Preserve existing parser and shaper behavior.
 
@@ -21,6 +22,7 @@
 - Reject malformed glyph ranges and coordinate streams.
 - Reject composite component records that would read past glyph bounds.
 - Reject point-matched composite placement until point attachment semantics are implemented.
+- Reject CFF/CFF2 outline rendering until charstring decoding is implemented.
 - Reject style values containing attribute-breaking characters before emitting SVG.
 
 ## Usability

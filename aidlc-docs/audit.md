@@ -373,3 +373,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - Composite glyph transform support. Point-matched components, CFF outlines, and full shaping remain pending.
 
 ---
+
+## Unit 3 CFF Unsupported Handling - Implemented
+**Timestamp**: 2026-05-09T12:36:28Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Added explicit CFF/CFF2 unsupported-outline detection in the SVG renderer so OTF/CFF SVG attempts report `UnsupportedCffOutlines` instead of generic missing `glyf` table failures."
+**Verification**:
+- `zig fmt src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff.svg`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text SVG --output /tmp/zig-font-renderer-cff-regression.svg --font-size 96 --fill '#111827'`
+- `wc -c /tmp/zig-font-renderer-cff-regression.svg`
+**Context**: Construction Phase - Unit 3 - CFF unsupported handling. CFF charstring outline decoding remains pending.
+
+---

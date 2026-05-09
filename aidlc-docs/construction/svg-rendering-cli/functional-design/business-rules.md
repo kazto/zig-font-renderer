@@ -22,8 +22,9 @@
 - CLI metadata output is suppressed when `--output` is used.
 - `renderToSvg` owns file loading and returns an allocated SVG buffer owned by the caller.
 - CLI SVG output must use the same high-level API exposed to library users.
+- CFF/CFF2 outline fonts return `UnsupportedCffOutlines` until charstring outline decoding is implemented.
 
 ## Deferred Rules
 
 - Point-matched composite components return `UnsupportedCompositeGlyph`.
-- CFF fonts are not rendered.
+- CFF charstring outlines are not rendered.

@@ -18,6 +18,7 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Decodes simple TrueType `glyf` contours.
   - Expands composite TrueType glyphs when components use XY offsets.
   - Applies composite uniform scale, separate XY scale, and 2x2 transforms to emitted path coordinates.
+  - Detects CFF/CFF2 outlines and returns `UnsupportedCffOutlines` until charstring decoding exists.
   - Emits SVG path commands with bounds-based width, height, viewBox, and scaled group transform.
   - Supports glyph fill color, optional background color, and custom margin.
   - Rejects SVG color strings that can break attribute syntax.
@@ -87,9 +88,15 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed; styled SVG output still renders after transform pipeline change.
 - Command: `wc -c /tmp/zig-font-renderer-transform-eacute.svg /tmp/zig-font-renderer-transform-style.svg`
 - Result: `867 /tmp/zig-font-renderer-transform-eacute.svg`, `1892 /tmp/zig-font-renderer-transform-style.svg`
+- Command: `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff.svg`
+- Result: Expected failure; CLI reports `error: failed to render SVG: UnsupportedCffOutlines`.
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text SVG --output /tmp/zig-font-renderer-cff-regression.svg --font-size 96 --fill '#111827'`
+- Result: Passed; TrueType SVG rendering still works after CFF unsupported detection.
+- Command: `wc -c /tmp/zig-font-renderer-cff-regression.svg`
+- Result: `1838 /tmp/zig-font-renderer-cff-regression.svg`
 
 ## Known Limitations
 
 - Point-matched composite glyphs are not implemented.
-- CFF outlines are not implemented.
+- CFF charstring outlines are not implemented.
 - Complex shaping remains incomplete.
