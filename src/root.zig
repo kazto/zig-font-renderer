@@ -16,6 +16,7 @@ pub const ShapedGlyph = shaper.ShapedGlyph;
 pub const ShapedText = shaper.ShapedText;
 
 pub const SvgError = svg_renderer.SvgError;
+pub const RenderOptions = svg_renderer.RenderOptions;
 pub const SvgRenderer = svg_renderer.SvgRenderer;
 
 test {

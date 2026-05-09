@@ -283,3 +283,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - Composite glyph SVG increment. CFF, scaled composite transforms, and full shaping remain pending.
 
 ---
+
+## Unit 3 SVG Sizing - Implemented
+**Timestamp**: 2026-05-09T09:49:09Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Added SVG pixel sizing via `RenderOptions` and CLI `--font-size`, emitted SVG width/height/viewBox attributes, and made `--output` mode quiet by default."
+**Verification**:
+- `zig fmt src/svg_renderer.zig src/root.zig src/main.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-av-96.svg --font-size 96`
+- `sed -n '1,6p' /tmp/zig-font-renderer-av-96.svg`
+- `wc -c /tmp/zig-font-renderer-av-96.svg`
+**Context**: Construction Phase - Unit 3 - SVG output sizing and CLI usability increment.
+
+---

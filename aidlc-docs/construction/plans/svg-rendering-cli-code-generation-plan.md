@@ -45,10 +45,17 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Recursively emit component paths with bounded recursion.
   - Reject point-matched or transformed components that are not yet supported.
 
+- [x] Step 7: Add SVG sizing controls
+  - Add renderer `RenderOptions`.
+  - Emit SVG `width`, `height`, and pixel-space `viewBox`.
+  - Add CLI `--font-size <px>`.
+  - Suppress metadata output when writing SVG files.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
 - [x] Composite glyphs with XY offsets can be expanded into visible component paths.
+- [x] SVG output has practical pixel dimensions.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
 - [x] CFF and full typography remain explicitly deferred.

@@ -4,6 +4,13 @@
 
 Public renderer entry point that converts a parsed `Face` and UTF-8 text into an owned SVG document buffer.
 
+## RenderOptions
+
+Renderer options for visible output sizing:
+
+- `font_size_px`
+- `margin_px`
+
 ## Point
 
 Internal decoded TrueType point:
@@ -22,4 +29,4 @@ Internal component record in a composite TrueType glyph. The current implementat
 
 ## SVG Document
 
-UTF-8 text buffer containing `<svg>`, one `<g>`, and one `<path>` per rendered simple glyph.
+UTF-8 text buffer containing `<svg>`, one scaled `<g>`, and one `<path>` per rendered simple glyph.

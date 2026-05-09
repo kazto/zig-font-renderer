@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-04-27T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Unit 3: SVG Rendering & CLI - Composite Glyph Review
+- **Current Stage**: CONSTRUCTION - Unit 3: SVG Rendering & CLI - Sizing Review
 
 ## Execution Plan Summary
 - **Total Stages**: 14 (Total workflow stages including those executed/skipped)
@@ -39,13 +39,14 @@
 - [x] Unit 3: NFR Design - SVG INCREMENT (2026-05-09)
 - [x] Unit 3: Code Generation - SIMPLE SVG (2026-05-09)
 - [x] Unit 3: Code Generation - COMPOSITE GLYPH SVG (2026-05-09) - REVIEW REQUIRED
+- [x] Unit 3: Code Generation - SVG SIZING (2026-05-09) - REVIEW REQUIRED
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 3: SVG Rendering & CLI - Composite Glyph Review
-- **Last Completed**: Unit 3: Composite Glyph SVG Code Generation
-- **Next Stage**: Unit 3: SVG Scaling/Styling or CFF Outline Increment
-- **Status**: Simple TrueType glyph outlines and XY-offset composite glyphs can be rendered to SVG through CLI `--output`; CFF and full shaping remain pending
+- **Current Stage**: Unit 3: SVG Rendering & CLI - Sizing Review
+- **Last Completed**: Unit 3: SVG Sizing Code Generation
+- **Next Stage**: Unit 3: SVG Styling/Bounds Refinement or CFF Outline Increment
+- **Status**: SVG output supports simple TrueType outlines, XY-offset composite glyphs, CLI `--output`, and `--font-size`; CFF and full shaping remain pending

@@ -8,6 +8,13 @@ pub const SvgError = font_parser.ParserError || shaper.ShapeError || std.mem.All
 };
 
 const max_composite_depth = 8;
+const default_font_size_px = 64.0;
+const default_margin_px = 8.0;
+
+pub const RenderOptions = struct {
+    font_size_px: f64 = default_font_size_px,
+    margin_px: f64 = default_margin_px,
+};
 
 const Point = struct {
     x: i16,
@@ -31,22 +38,45 @@ pub const SvgRenderer = struct {
         face: font_parser.Face,
         text: []const u8,
     ) SvgError![]u8 {
+        return self.renderTextWithOptions(allocator, face, text, .{});
+    }
+
+    pub fn renderTextWithOptions(
+        self: SvgRenderer,
+        allocator: std.mem.Allocator,
+        face: font_parser.Face,
+        text: []const u8,
+        options: RenderOptions,
+    ) SvgError![]u8 {
         _ = self;
 
         const engine = shaper.ShapeEngine.init();
         var shaped = try engine.shapeText(allocator, face, text);
         defer shaped.deinit(allocator);
 
-        const width = if (shaped.total_advance > 0) shaped.total_advance else @as(i32, face.units_per_em);
+        const raw_width = if (shaped.total_advance > 0) shaped.total_advance else @as(i32, face.units_per_em);
+        const scale = options.font_size_px / @as(f64, @floatFromInt(face.units_per_em));
+        const width_px = @as(f64, @floatFromInt(raw_width)) * scale + options.margin_px * 2.0;
+        const height_px = options.font_size_px * 1.25 + options.margin_px * 2.0;
+
         var output = std.ArrayList(u8).empty;
         errdefer output.deinit(allocator);
         const writer = output.writer(allocator);
 
         try writer.print(
-            \\<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -{d} {d} {d}">
-            \\  <g fill="black" transform="scale(1 -1)">
+            \\<svg xmlns="http://www.w3.org/2000/svg" width="{d:.2}" height="{d:.2}" viewBox="0 0 {d:.2} {d:.2}">
+            \\  <g fill="black" transform="translate({d:.2} {d:.2}) scale({d:.6} {d:.6})">
             \\
-        , .{ face.units_per_em, width, face.units_per_em + face.units_per_em / 4 });
+        , .{
+            width_px,
+            height_px,
+            width_px,
+            height_px,
+            options.margin_px,
+            options.margin_px + options.font_size_px,
+            scale,
+            -scale,
+        });
 
         for (shaped.glyphs) |glyph| {
             try appendGlyphPath(allocator, writer, face, glyph.glyph_id, glyph.x_offset, 0, 0);

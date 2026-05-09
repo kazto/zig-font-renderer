@@ -9,10 +9,13 @@
 - Empty glyph ranges produce no path.
 - Composite glyphs are expanded when their components use XY offsets.
 - Composite recursion is bounded to prevent malformed fonts from causing unbounded expansion.
+- `--font-size` must be a positive finite number.
+- SVG output includes `width`, `height`, and a pixel-space `viewBox`.
+- CLI metadata output is suppressed when `--output` is used.
 
 ## Deferred Rules
 
 - Point-matched composite components return `UnsupportedCompositeGlyph`.
 - Scaled or matrix-transformed composite components return `UnsupportedCompositeGlyph`.
 - CFF fonts are not rendered.
-- Font-size scaling and custom viewBox controls are not exposed.
+- Custom margins and style controls are not exposed through CLI.

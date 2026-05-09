@@ -15,3 +15,7 @@ Contour endpoint, flag, and point arrays are allocated per glyph and freed befor
 ## Bounded Recursion
 
 Composite glyph expansion uses a fixed recursion limit to prevent malformed component graphs from recursing indefinitely.
+
+## Transform-Based Scaling
+
+Raw font-unit path coordinates are preserved in path data, while the SVG group transform maps them to pixel output. This keeps path generation simple and avoids rounding geometry during extraction.

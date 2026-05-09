@@ -22,3 +22,5 @@
 ## Usability
 
 - Provide a simple CLI path to visible output through `--output`.
+- Provide `--font-size` so generated SVGs have predictable display dimensions.
+- Keep `--output` mode quiet enough for script usage.
