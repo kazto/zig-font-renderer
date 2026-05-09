@@ -240,3 +240,46 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 2 - Basic shaping increment. GSUB/GPOS remains pending.
 
 ---
+
+## Unit 2 Legacy Kerning - Implemented
+**Timestamp**: 2026-05-09T02:02:26Z
+**User Input**: "次の機能実装をお願い"
+**AI Response**: "Implemented legacy `kern` table version 0 horizontal format 0 pair adjustment in the Shaping Engine and exposed the applied adjustment in CLI output."
+**Verification**:
+- `zig fmt src/shaper.zig src/main.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV`
+**Context**: Construction Phase - Unit 2 - Legacy kerning increment. GSUB/GPOS remains pending.
+
+---
+
+## Unit 3 Simple SVG Rendering - Implemented
+**Timestamp**: 2026-05-09T02:15:51Z
+**User Input**: "SVG生成を優先して実装しよう。まずは目で見える成果がほしいよね。"
+**AI Response**: "Implemented a first visible SVG rendering increment: simple TrueType `glyf` outline extraction, SVG path generation, and CLI `--output` file writing."
+**Verification**:
+- `zig fmt src/svg_renderer.zig src/root.zig src/main.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-av.svg`
+- `rg "<path|<svg|viewBox" /tmp/zig-font-renderer-av.svg`
+- `wc -c /tmp/zig-font-renderer-av.svg`
+**Context**: Construction Phase - Unit 3 - First visible SVG output. Composite glyphs, CFF outlines, and full shaping remain pending.
+
+---
+
+## Unit 3 Composite Glyph SVG - Implemented
+**Timestamp**: 2026-05-09T09:43:27Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented recursive composite TrueType glyph expansion for XY-offset components, enabling visible SVG output for glyphs such as `é` that combine a base glyph and accent component."
+**Verification**:
+- `zig fmt src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text é --output /tmp/zig-font-renderer-eacute.svg`
+- `rg "<path|<svg|viewBox" /tmp/zig-font-renderer-eacute.svg`
+- `wc -c /tmp/zig-font-renderer-eacute.svg`
+**Context**: Construction Phase - Unit 3 - Composite glyph SVG increment. CFF, scaled composite transforms, and full shaping remain pending.
+
+---

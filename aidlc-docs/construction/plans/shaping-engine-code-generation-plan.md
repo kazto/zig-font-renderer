@@ -34,9 +34,16 @@ This plan covers the first incremental implementation for Unit 2. It intentional
   - Add invalid UTF-8 coverage for `ShapeEngine`.
   - Run `zig build test`, `zig build`, and real-font CLI smoke tests.
 
+- [x] Step 6: Add legacy kerning support
+  - Parse legacy `kern` table version 0.
+  - Support horizontal format 0 pair adjustment subtables.
+  - Apply pair adjustment to the previous glyph's `x_advance`.
+  - Recompute glyph `x_offset` and `total_advance` after kerning.
+
 ## Completion Criteria
 
 - [x] Unit 2 basic shaping API exists.
 - [x] CLI uses the shaping API for text glyph display.
 - [x] Existing parser tests still pass.
+- [x] Legacy `kern` format 0 pair adjustment is supported.
 - [x] GSUB/GPOS remains explicitly deferred.

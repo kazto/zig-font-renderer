@@ -15,6 +15,7 @@ Stateless entry point for transforming UTF-8 text and a parsed `Face` into posit
 - `y_advance`: Vertical advance, currently always 0.
 - `advance_width`: Original horizontal metric from the font.
 - `lsb`: Left side bearing from the font.
+- `kern_adjustment`: Legacy `kern` pair adjustment applied to this glyph's advance.
 
 ## ShapedText
 

@@ -13,6 +13,7 @@ const CliError = error{
 const CliOptions = struct {
     font_path: []const u8,
     text: ?[]const u8,
+    output_path: ?[]const u8,
     help: bool = false,
 };
 
@@ -61,7 +62,11 @@ pub fn main() !void {
 
     try printFaceInfo(stdout, options.font_path, face);
     if (options.text) |text| {
-        try printTextGlyphs(stdout, face, text);
+        if (options.output_path) |output_path| {
+            try writeSvg(allocator, stderr, face, text, output_path);
+        } else {
+            try printTextGlyphs(stdout, face, text);
+        }
     }
     try stdout.flush();
 }
@@ -69,13 +74,14 @@ pub fn main() !void {
 fn parseArgs(args: []const []const u8) CliError!CliOptions {
     var font_path: ?[]const u8 = null;
     var text: ?[]const u8 = null;
+    var output_path: ?[]const u8 = null;
     var positional_count: u8 = 0;
 
     var index: usize = 1;
     while (index < args.len) : (index += 1) {
         const arg = args[index];
         if (std.mem.eql(u8, arg, "-h") or std.mem.eql(u8, arg, "--help")) {
-            return .{ .font_path = "", .text = null, .help = true };
+            return .{ .font_path = "", .text = null, .output_path = null, .help = true };
         }
 
         if (std.mem.eql(u8, arg, "--font")) {
@@ -92,6 +98,13 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
             continue;
         }
 
+        if (std.mem.eql(u8, arg, "--output")) {
+            index += 1;
+            if (index >= args.len) return CliError.MissingOptionValue;
+            output_path = args[index];
+            continue;
+        }
+
         if (std.mem.startsWith(u8, arg, "-")) return CliError.UnknownOption;
 
         switch (positional_count) {
@@ -105,6 +118,7 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
     return .{
         .font_path = font_path orelse return CliError.MissingFontPath,
         .text = text,
+        .output_path = output_path,
     };
 }
 
@@ -120,13 +134,14 @@ fn cliErrorMessage(err: CliError) []const u8 {
 fn printUsage(writer: *std.Io.Writer) !void {
     try writer.print(
         \\Usage:
-        \\  zig_font_renderer --font <font-file> [--text <utf8-text>]
+        \\  zig_font_renderer --font <font-file> [--text <utf8-text>] [--output <svg-file>]
         \\  zig_font_renderer <font-file> [utf8-text]
         \\
         \\Prints data currently available from the Unit 1 font parser:
         \\  - font scalar metadata
         \\  - SFNT table records
         \\  - glyph IDs and horizontal metrics for UTF-8 text
+        \\  - SVG output for simple TrueType glyph outlines when --output is set
         \\
     , .{});
 }
@@ -157,11 +172,33 @@ fn printTextGlyphs(writer: *std.Io.Writer, face: zfr.Face, text: []const u8) !vo
     try writer.print("\nText glyphs:\n", .{});
     for (shaped.glyphs, 0..) |glyph, index| {
         try writer.print(
-            "  [{d}] cluster={d} U+{X:0>4} glyph_id={d} x_offset={d} x_advance={d} lsb={d}\n",
-            .{ index, glyph.cluster, glyph.codepoint, glyph.glyph_id, glyph.x_offset, glyph.x_advance, glyph.lsb },
+            "  [{d}] cluster={d} U+{X:0>4} glyph_id={d} x_offset={d} x_advance={d} kern={d} lsb={d}\n",
+            .{ index, glyph.cluster, glyph.codepoint, glyph.glyph_id, glyph.x_offset, glyph.x_advance, glyph.kern_adjustment, glyph.lsb },
         );
     }
     try writer.print("  total_advance={d}\n", .{shaped.total_advance});
+}
+
+fn writeSvg(
+    allocator: std.mem.Allocator,
+    stderr: *std.Io.Writer,
+    face: zfr.Face,
+    text: []const u8,
+    output_path: []const u8,
+) !void {
+    const renderer = zfr.SvgRenderer.init();
+    const svg = renderer.renderText(allocator, face, text) catch |err| {
+        try stderr.print("error: failed to render SVG: {s}\n", .{@errorName(err)});
+        try stderr.flush();
+        std.process.exit(1);
+    };
+    defer allocator.free(svg);
+
+    std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = svg }) catch |err| {
+        try stderr.print("error: failed to write SVG '{s}': {s}\n", .{ output_path, @errorName(err) });
+        try stderr.flush();
+        std.process.exit(1);
+    };
 }
 
 test "parse positional font and text arguments" {
@@ -169,13 +206,15 @@ test "parse positional font and text arguments" {
     const options = try parseArgs(&args);
     try std.testing.expectEqualStrings("font.ttf", options.font_path);
     try std.testing.expectEqualStrings("Hello", options.text.?);
+    try std.testing.expect(options.output_path == null);
 }
 
 test "parse named font and text arguments" {
-    const args = [_][]const u8{ "zig_font_renderer", "--font", "font.otf", "--text", "A" };
+    const args = [_][]const u8{ "zig_font_renderer", "--font", "font.otf", "--text", "A", "--output", "out.svg" };
     const options = try parseArgs(&args);
     try std.testing.expectEqualStrings("font.otf", options.font_path);
     try std.testing.expectEqualStrings("A", options.text.?);
+    try std.testing.expectEqualStrings("out.svg", options.output_path.?);
 }
 
 test "parse rejects missing font path" {

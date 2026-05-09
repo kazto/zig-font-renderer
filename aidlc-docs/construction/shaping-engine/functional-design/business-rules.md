@@ -7,11 +7,13 @@
 - Missing codepoints inherit Unit 1 behavior and become glyph ID 0.
 - `x_offset` is the cumulative pen position before the glyph.
 - `x_advance` is the glyph horizontal advance width in raw FUnits.
+- If a legacy horizontal `kern` format 0 pair exists, the pair value is added to the left glyph's `x_advance`.
+- `kern_adjustment` records the pair adjustment applied to the glyph.
 - `y_offset` and `y_advance` remain 0 in this increment.
 - Cluster indexes follow input codepoint order.
 
 ## Deferred Rules
 
 - Ligature clusters may span multiple input codepoints after GSUB support is added.
-- Kerning and other pair positioning may modify offsets and advances after GPOS support is added.
+- GPOS pair positioning may further modify offsets and advances after GPOS support is added.
 - Complex script reordering is not applied.

@@ -15,6 +15,7 @@ pub const ShapedGlyph = struct {
     y_advance: i32,
     advance_width: u16,
     lsb: i16,
+    kern_adjustment: i16,
 };
 
 pub const ShapedText = struct {
@@ -62,10 +63,13 @@ pub const ShapeEngine = struct {
                 .y_advance = 0,
                 .advance_width = info.advance_width,
                 .lsb = info.lsb,
+                .kern_adjustment = 0,
             });
 
             pen_x += x_advance;
         }
+
+        pen_x = try applyKerning(face, glyphs.items);
 
         return .{
             .glyphs = try glyphs.toOwnedSlice(allocator),
@@ -74,6 +78,95 @@ pub const ShapeEngine = struct {
     }
 };
 
+fn applyKerning(face: font_parser.Face, glyphs: []ShapedGlyph) font_parser.ParserError!i32 {
+    if (glyphs.len == 0) return 0;
+
+    var index: usize = 0;
+    while (index + 1 < glyphs.len) : (index += 1) {
+        const adjustment = try getLegacyKernAdjustment(face, glyphs[index].glyph_id, glyphs[index + 1].glyph_id);
+        glyphs[index].kern_adjustment = adjustment;
+        glyphs[index].x_advance = @as(i32, glyphs[index].advance_width) + @as(i32, adjustment);
+    }
+
+    var pen_x: i32 = 0;
+    for (glyphs) |*glyph| {
+        glyph.x_offset = pen_x;
+        pen_x += glyph.x_advance;
+    }
+    return pen_x;
+}
+
+fn getLegacyKernAdjustment(face: font_parser.Face, left: u16, right: u16) font_parser.ParserError!i16 {
+    const kern = face.getTable("kern".*) orelse return 0;
+    if (kern.len < 4) return font_parser.ParserError.InvalidTable;
+
+    const version = try readU16(kern, 0);
+    if (version != 0) return 0;
+
+    const n_tables = try readU16(kern, 2);
+    var offset: usize = 4;
+    var total: i32 = 0;
+
+    var table_index: usize = 0;
+    while (table_index < n_tables) : (table_index += 1) {
+        if (offset + 6 > kern.len) return font_parser.ParserError.InvalidTable;
+
+        const length = try readU16(kern, offset + 2);
+        const coverage = try readU16(kern, offset + 4);
+        if (length < 6 or offset + length > kern.len) return font_parser.ParserError.InvalidTable;
+
+        const format = @as(u8, @intCast(coverage >> 8));
+        const horizontal = (coverage & 0x0001) != 0;
+        if (format == 0 and horizontal) {
+            total += try lookupKernFormat0(kern[offset .. offset + length], left, right);
+        }
+
+        offset += length;
+    }
+
+    if (total < std.math.minInt(i16) or total > std.math.maxInt(i16)) {
+        return font_parser.ParserError.InvalidTable;
+    }
+    return @as(i16, @intCast(total));
+}
+
+fn lookupKernFormat0(subtable: []const u8, left: u16, right: u16) font_parser.ParserError!i16 {
+    if (subtable.len < 14) return font_parser.ParserError.InvalidTable;
+
+    const n_pairs = try readU16(subtable, 6);
+    if (14 + @as(usize, n_pairs) * 6 > subtable.len) return font_parser.ParserError.InvalidTable;
+
+    const target = (@as(u32, left) << 16) | @as(u32, right);
+    var low: usize = 0;
+    var high: usize = n_pairs;
+    while (low < high) {
+        const mid = low + (high - low) / 2;
+        const pair_offset = 14 + mid * 6;
+        const pair = (@as(u32, try readU16(subtable, pair_offset)) << 16) |
+            @as(u32, try readU16(subtable, pair_offset + 2));
+
+        if (target < pair) {
+            high = mid;
+        } else if (target > pair) {
+            low = mid + 1;
+        } else {
+            return try readI16(subtable, pair_offset + 4);
+        }
+    }
+
+    return 0;
+}
+
+fn readU16(data: []const u8, offset: usize) font_parser.ParserError!u16 {
+    if (offset + 2 > data.len) return font_parser.ParserError.InvalidTable;
+    return std.mem.readInt(u16, data[offset..][0..2], .big);
+}
+
+fn readI16(data: []const u8, offset: usize) font_parser.ParserError!i16 {
+    if (offset + 2 > data.len) return font_parser.ParserError.InvalidTable;
+    return std.mem.readInt(i16, data[offset..][0..2], .big);
+}
+
 test "shape engine rejects invalid utf8" {
     const engine = ShapeEngine.init();
     const face: font_parser.Face = undefined;
@@ -81,4 +174,33 @@ test "shape engine rejects invalid utf8" {
         ShapeError.InvalidUtf8,
         engine.shapeText(std.testing.allocator, face, "\xff"),
     );
+}
+
+test "legacy kern format 0 lookup returns pair adjustment" {
+    var subtable = [_]u8{0} ** 26;
+    writeU16(&subtable, 2, 26);
+    writeU16(&subtable, 4, 0x0001);
+    writeU16(&subtable, 6, 2);
+    writeU16(&subtable, 8, 12);
+    writeU16(&subtable, 10, 1);
+    writeU16(&subtable, 12, 0);
+
+    writeU16(&subtable, 14, 10);
+    writeU16(&subtable, 16, 20);
+    writeI16(&subtable, 18, -40);
+    writeU16(&subtable, 20, 10);
+    writeU16(&subtable, 22, 30);
+    writeI16(&subtable, 24, -80);
+
+    try std.testing.expectEqual(@as(i16, -40), try lookupKernFormat0(&subtable, 10, 20));
+    try std.testing.expectEqual(@as(i16, -80), try lookupKernFormat0(&subtable, 10, 30));
+    try std.testing.expectEqual(@as(i16, 0), try lookupKernFormat0(&subtable, 20, 10));
+}
+
+fn writeU16(data: []u8, offset: usize, value: u16) void {
+    std.mem.writeInt(u16, data[offset..][0..2], value, .big);
+}
+
+fn writeI16(data: []u8, offset: usize, value: i16) void {
+    std.mem.writeInt(i16, data[offset..][0..2], value, .big);
 }

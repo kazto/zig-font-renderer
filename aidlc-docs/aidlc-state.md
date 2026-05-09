@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-04-27T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Unit 2: Shaping Engine - Code Generation Review
+- **Current Stage**: CONSTRUCTION - Unit 3: SVG Rendering & CLI - Composite Glyph Review
 
 ## Execution Plan Summary
 - **Total Stages**: 14 (Total workflow stages including those executed/skipped)
@@ -32,14 +32,20 @@
 - [x] Unit 2: Functional Design (2026-05-09)
 - [x] Unit 2: NFR Requirements (2026-05-09)
 - [x] Unit 2: NFR Design (2026-05-09)
-- [x] Unit 2: Code Generation - BASIC SHAPING (2026-05-09) - REVIEW REQUIRED
+- [x] Unit 2: Code Generation - BASIC SHAPING (2026-05-09)
+- [x] Unit 2: Code Generation - LEGACY KERNING (2026-05-09) - REVIEW REQUIRED
+- [x] Unit 3: Functional Design - SVG INCREMENT (2026-05-09)
+- [x] Unit 3: NFR Requirements - SVG INCREMENT (2026-05-09)
+- [x] Unit 3: NFR Design - SVG INCREMENT (2026-05-09)
+- [x] Unit 3: Code Generation - SIMPLE SVG (2026-05-09)
+- [x] Unit 3: Code Generation - COMPOSITE GLYPH SVG (2026-05-09) - REVIEW REQUIRED
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 2: Shaping Engine - Code Generation Review
-- **Last Completed**: Unit 2: Shaping Engine - Basic Shaping Code Generation
-- **Next Stage**: Unit 2: GSUB/GPOS Shaping Increment
-- **Status**: Basic UTF-8 to glyph positioning implemented and verified; GSUB/GPOS remains pending
+- **Current Stage**: Unit 3: SVG Rendering & CLI - Composite Glyph Review
+- **Last Completed**: Unit 3: Composite Glyph SVG Code Generation
+- **Next Stage**: Unit 3: SVG Scaling/Styling or CFF Outline Increment
+- **Status**: Simple TrueType glyph outlines and XY-offset composite glyphs can be rendered to SVG through CLI `--output`; CFF and full shaping remain pending

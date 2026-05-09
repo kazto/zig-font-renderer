@@ -11,3 +11,7 @@
 ## Error Propagation
 
 Parser errors are propagated directly from Unit 1. Invalid UTF-8 is reported at the shaping boundary.
+
+## Table-Local Lookup
+
+Legacy `kern` format 0 pairs are looked up directly from the font table using bounded big-endian reads and binary search. No cache is introduced in this increment.
