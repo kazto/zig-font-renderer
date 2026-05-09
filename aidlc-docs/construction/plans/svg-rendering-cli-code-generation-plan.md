@@ -57,12 +57,19 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Use bounds to compute SVG width, height, and baseline translation.
   - Preserve advance width in output bounds where it exceeds visible outline bounds.
 
+- [x] Step 9: Add high-level render API
+  - Add `renderToSvg(allocator, font_path, text, options)`.
+  - Add `RenderToSvgOptions`.
+  - Re-export high-level API from `src/root.zig`.
+  - Route CLI SVG output through the high-level API.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
 - [x] Composite glyphs with XY offsets can be expanded into visible component paths.
 - [x] SVG output has practical pixel dimensions.
 - [x] SVG output is sized from actual rendered glyph bounds.
+- [x] High-level API is available for one-call SVG rendering.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
 - [x] CFF and full typography remain explicitly deferred.

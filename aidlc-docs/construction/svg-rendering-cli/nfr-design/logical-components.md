@@ -3,6 +3,8 @@
 ## Components
 
 - `SvgRenderer`: Public SVG document generator.
+- `renderToSvg`: High-level API for file loading, parsing, shaping, and SVG rendering.
+- `RenderToSvgOptions`: High-level API configuration.
 - `RenderOptions`: Public renderer sizing options.
 - `appendGlyphPath`: Internal glyph-to-path converter.
 - `appendCompositeGlyphPaths`: Internal composite glyph expander for XY-offset components.

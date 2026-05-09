@@ -1,6 +1,7 @@
 //! Public library surface for zig-font-renderer.
 
 pub const font_parser = @import("font_parser.zig");
+pub const font_rendering_service = @import("font_rendering_service.zig");
 pub const shaper = @import("shaper.zig");
 pub const svg_renderer = @import("svg_renderer.zig");
 
@@ -19,8 +20,13 @@ pub const SvgError = svg_renderer.SvgError;
 pub const RenderOptions = svg_renderer.RenderOptions;
 pub const SvgRenderer = svg_renderer.SvgRenderer;
 
+pub const RenderToSvgError = font_rendering_service.RenderToSvgError;
+pub const RenderToSvgOptions = font_rendering_service.RenderToSvgOptions;
+pub const renderToSvg = font_rendering_service.renderToSvg;
+
 test {
     _ = font_parser;
+    _ = font_rendering_service;
     _ = shaper;
     _ = svg_renderer;
 }

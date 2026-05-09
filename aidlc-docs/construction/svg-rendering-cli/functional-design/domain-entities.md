@@ -4,6 +4,13 @@
 
 Public renderer entry point that converts a parsed `Face` and UTF-8 text into an owned SVG document buffer.
 
+## RenderToSvgOptions
+
+High-level API options:
+
+- `render`: SVG render options.
+- `max_font_bytes`: maximum font file size to load.
+
 ## RenderOptions
 
 Renderer options for visible output sizing:

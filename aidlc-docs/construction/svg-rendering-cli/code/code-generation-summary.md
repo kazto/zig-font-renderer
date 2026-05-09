@@ -19,14 +19,21 @@ Implemented the first visible SVG rendering increment for TrueType simple glyph 
   - Expands composite TrueType glyphs when components use XY offsets.
   - Emits SVG path commands with bounds-based width, height, viewBox, and scaled group transform.
 
+- Created `src/font_rendering_service.zig`
+  - Defines `renderToSvg`.
+  - Defines `RenderToSvgOptions`.
+  - Loads font bytes, parses `Face`, and returns an owned SVG buffer.
+
 - Modified `src/root.zig`
   - Re-exports `SvgRenderer` and `SvgError`.
+  - Re-exports `renderToSvg`, `RenderToSvgOptions`, and `RenderToSvgError`.
 
 - Modified `src/main.zig`
   - Adds `--output <svg-file>`.
   - Adds `--font-size <px>` and `--quiet`.
   - Writes SVG when `--font`, `--text`, and `--output` are supplied.
   - Suppresses metadata output by default when writing SVG files.
+  - Routes SVG output through the high-level `renderToSvg` API.
 
 ## Verification
 
@@ -60,6 +67,10 @@ Implemented the first visible SVG rendering increment for TrueType simple glyph 
 - Result: Passed; generated SVG includes bounds-derived `width="130.70"`, `height="112.75"`, and transform `translate(2.70 84.78)`.
 - Command: `wc -c /tmp/zig-font-renderer-bounds.svg`
 - Result: `1187 /tmp/zig-font-renderer-bounds.svg`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text SVG --output /tmp/zig-font-renderer-service.svg --font-size 96`
+- Result: Passed; generated SVG through high-level API path.
+- Command: `wc -c /tmp/zig-font-renderer-service.svg`
+- Result: `1242 /tmp/zig-font-renderer-service.svg`
 
 ## Known Limitations
 

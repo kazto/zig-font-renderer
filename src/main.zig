@@ -1,8 +1,6 @@
 const std = @import("std");
 const zfr = @import("zig_font_renderer");
 
-const max_font_bytes = 256 * 1024 * 1024;
-
 const CliError = error{
     InvalidFontSize,
     MissingFontPath,
@@ -18,6 +16,17 @@ const CliOptions = struct {
     font_size_px: f64 = 64.0,
     quiet: bool = false,
     help: bool = false,
+};
+
+const LoadedFace = struct {
+    data: []u8,
+    face: zfr.Face,
+
+    fn deinit(self: *LoadedFace, allocator: std.mem.Allocator) void {
+        self.face.deinit(allocator);
+        allocator.free(self.data);
+        self.* = undefined;
+    }
 };
 
 pub fn main() !void {
@@ -49,31 +58,43 @@ pub fn main() !void {
         return;
     }
 
-    const font_data = std.fs.cwd().readFileAlloc(allocator, options.font_path, max_font_bytes) catch |err| {
-        try stderr.print("error: failed to read font file '{s}': {s}\n", .{ options.font_path, @errorName(err) });
-        try stderr.flush();
-        std.process.exit(1);
-    };
-    defer allocator.free(font_data);
-
-    var face = zfr.Face.init(allocator, font_data) catch |err| {
-        try stderr.print("error: failed to parse font file '{s}': {s}\n", .{ options.font_path, @errorName(err) });
-        try stderr.flush();
-        std.process.exit(1);
-    };
-    defer face.deinit(allocator);
-
-    if (!options.quiet and options.output_path == null) {
-        try printFaceInfo(stdout, options.font_path, face);
-    }
     if (options.text) |text| {
         if (options.output_path) |output_path| {
-            try writeSvg(allocator, stderr, face, text, output_path, options.font_size_px);
+            try writeSvg(allocator, stderr, options.font_path, text, output_path, options.font_size_px);
         } else {
-            try printTextGlyphs(stdout, face, text);
+            var loaded = try loadFaceOrExit(allocator, stderr, options.font_path);
+            defer loaded.deinit(allocator);
+            if (!options.quiet) {
+                try printFaceInfo(stdout, options.font_path, loaded.face);
+            }
+            try printTextGlyphs(stdout, loaded.face, text);
+        }
+    } else {
+        var loaded = try loadFaceOrExit(allocator, stderr, options.font_path);
+        defer loaded.deinit(allocator);
+        if (!options.quiet) {
+            try printFaceInfo(stdout, options.font_path, loaded.face);
         }
     }
     try stdout.flush();
+}
+
+fn loadFaceOrExit(allocator: std.mem.Allocator, stderr: *std.Io.Writer, font_path: []const u8) !LoadedFace {
+    const font_data = std.fs.cwd().readFileAlloc(allocator, font_path, 256 * 1024 * 1024) catch |err| {
+        try stderr.print("error: failed to read font file '{s}': {s}\n", .{ font_path, @errorName(err) });
+        try stderr.flush();
+        std.process.exit(1);
+    };
+    errdefer allocator.free(font_data);
+
+    const face = zfr.Face.init(allocator, font_data) catch |err| {
+        allocator.free(font_data);
+        try stderr.print("error: failed to parse font file '{s}': {s}\n", .{ font_path, @errorName(err) });
+        try stderr.flush();
+        std.process.exit(1);
+    };
+
+    return .{ .data = font_data, .face = face };
 }
 
 fn parseArgs(args: []const []const u8) CliError!CliOptions {
@@ -205,14 +226,15 @@ fn printTextGlyphs(writer: *std.Io.Writer, face: zfr.Face, text: []const u8) !vo
 fn writeSvg(
     allocator: std.mem.Allocator,
     stderr: *std.Io.Writer,
-    face: zfr.Face,
+    font_path: []const u8,
     text: []const u8,
     output_path: []const u8,
     font_size_px: f64,
 ) !void {
-    const renderer = zfr.SvgRenderer.init();
-    const svg = renderer.renderTextWithOptions(allocator, face, text, .{
-        .font_size_px = font_size_px,
+    const svg = zfr.renderToSvg(allocator, font_path, text, .{
+        .render = .{
+            .font_size_px = font_size_px,
+        },
     }) catch |err| {
         try stderr.print("error: failed to render SVG: {s}\n", .{@errorName(err)});
         try stderr.flush();

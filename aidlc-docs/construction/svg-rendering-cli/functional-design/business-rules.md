@@ -14,6 +14,8 @@
 - SVG output dimensions are derived from actual glyph bounds plus margin.
 - Text advance remains included in horizontal bounds when advance exceeds visible outline bounds.
 - CLI metadata output is suppressed when `--output` is used.
+- `renderToSvg` owns file loading and returns an allocated SVG buffer owned by the caller.
+- CLI SVG output must use the same high-level API exposed to library users.
 
 ## Deferred Rules
 

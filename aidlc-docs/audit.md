@@ -314,6 +314,21 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 
 ---
 
+## Unit 3 High-Level SVG API - Implemented
+**Timestamp**: 2026-05-09T11:39:08Z
+**User Input**: "よし、次に進もう"
+**AI Response**: "Added `renderToSvg` high-level API for file loading, parsing, shaping, and SVG rendering. Routed CLI SVG output through the same API."
+**Verification**:
+- `zig fmt src/font_rendering_service.zig src/root.zig src/main.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text SVG --output /tmp/zig-font-renderer-service.svg --font-size 96`
+- `sed -n '1,5p' /tmp/zig-font-renderer-service.svg`
+- `wc -c /tmp/zig-font-renderer-service.svg`
+**Context**: Construction Phase - Unit 3 - High-level API increment for US-6.
+
+---
+
 ## Refactoring - Named Font Constants
 **Timestamp**: 2026-05-09T10:02:50Z
 **User Input**: "いったんここでリファクタリング。ソースコードを見ると、マジックナンバーを多用している。Zigのcomptimeを活用して、定数に名前を付けて。"

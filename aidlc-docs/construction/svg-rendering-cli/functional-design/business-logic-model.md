@@ -17,6 +17,13 @@ The current increment renders shaped text as SVG paths for simple TrueType `glyf
 9. Scale raw FUnit path coordinates into a pixel-sized SVG group transform.
 10. Write a complete SVG document.
 
+## High-Level API Flow
+
+1. Read font bytes from a font path.
+2. Parse `Face`.
+3. Render text to SVG with `SvgRenderer`.
+4. Return an owned SVG buffer to the caller.
+
 ## Deferred Logic
 
 - Point-matched composite glyph expansion.
