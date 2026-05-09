@@ -1,3 +1,4 @@
 /references
 .zig-cache/
 zig-out/
+.agents/
