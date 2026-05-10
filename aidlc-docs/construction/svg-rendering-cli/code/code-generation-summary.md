@@ -21,7 +21,8 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Parses CFF INDEX data and Top DICT `CharStrings` offsets.
   - Retrieves CFF Type 2 charstrings by glyph ID.
   - Emits SVG path commands for basic Type 2 moveto, lineto, and rrcurveto operators.
-  - Returns `UnsupportedCffOperator` for Type 2 subroutines and advanced operators.
+  - Expands Type 2 `callsubr` and `callgsubr` with standard CFF subroutine bias.
+  - Returns `UnsupportedCffOperator` for advanced Type 2 operators that are not yet implemented.
   - Emits SVG path commands with bounds-based width, height, viewBox, and scaled group transform.
   - Supports glyph fill color, optional background color, and custom margin.
   - Rejects SVG color strings that can break attribute syntax.
@@ -103,10 +104,16 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed; TrueType SVG rendering still works after CFF foundation changes.
 - Command: `wc -c /tmp/zig-font-renderer-cff-foundation-regression.svg`
 - Result: `523 /tmp/zig-font-renderer-cff-foundation-regression.svg`
+- Command: `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff-subr-a.svg --font-size 96`
+- Result: Passed; generated visible SVG from OTF/CFF via Type 2 subroutine expansion.
+- Command: `sed -n '1,8p' /tmp/zig-font-renderer-cff-subr-a.svg`
+- Result: Passed; generated SVG contains a CFF-derived `<path>`.
+- Command: `wc -c /tmp/zig-font-renderer-cff-subr-a.svg /tmp/zig-font-renderer-cff-subr-regression.svg`
+- Result: `378 /tmp/zig-font-renderer-cff-subr-a.svg`, `523 /tmp/zig-font-renderer-cff-subr-regression.svg`
 
 ## Known Limitations
 
 - Point-matched composite glyphs are not implemented.
-- CFF subroutines and advanced Type 2 operators are not implemented.
+- Advanced Type 2 operators beyond basic lines, curves, and subr calls are not implemented.
 - CFF2 outlines are not implemented.
 - Complex shaping remains incomplete.

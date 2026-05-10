@@ -475,3 +475,19 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - CFF charstring foundation. CFF local/global subroutines and CFF2 outlines remain pending.
 
 ---
+
+## Unit 3 CFF Subroutine Expansion - Implemented
+**Timestamp**: 2026-05-10T01:59:42Z
+**User Input**: "ロードマップに従って、次の作業を進めて"
+**AI Response**: "Implemented CFF local and global Type 2 subroutine expansion with standard subroutine bias and bounded recursion. Verified visible SVG output from NimbusSans-Regular.otf."
+**Verification**:
+- `zig fmt src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff-subr-a.svg --font-size 96`
+- `sed -n '1,8p' /tmp/zig-font-renderer-cff-subr-a.svg`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-cff-subr-regression.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-subr-a.svg /tmp/zig-font-renderer-cff-subr-regression.svg`
+**Context**: Construction Phase - Unit 3 - CFF subroutine-backed Type 2 outline rendering. Advanced Type 2 operators and CFF2 remain pending.
+
+---

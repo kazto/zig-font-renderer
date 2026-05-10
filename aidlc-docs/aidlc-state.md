@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-04-27T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Unit 3: SVG Rendering & CLI - CFF Charstring Foundation Review
+- **Current Stage**: CONSTRUCTION - Unit 3: SVG Rendering & CLI - CFF Subroutine Expansion Review
 
 ## Execution Plan Summary
 - **Total Stages**: 14 (Total workflow stages including those executed/skipped)
@@ -45,13 +45,14 @@
 - [x] Unit 3: Code Generation - COMPOSITE TRANSFORMS (2026-05-09)
 - [x] Unit 3: Code Generation - CFF UNSUPPORTED HANDLING (2026-05-09)
 - [x] Unit 3: Code Generation - CFF CHARSTRING FOUNDATION (2026-05-10)
+- [x] Unit 3: Code Generation - CFF SUBROUTINE EXPANSION (2026-05-10)
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 3: SVG Rendering & CLI - CFF Charstring Foundation Review
-- **Last Completed**: Unit 3: CFF Charstring Foundation Code Generation
-- **Next Stage**: Unit 3: CFF Subroutine Expansion or Unit 2: GSUB/GPOS Review
-- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, and initial GSUB/GPOS lookup handling with checked OpenType Layout offsets; SVG output supports TrueType outlines, styling, transformed composites, high-level `renderToSvg`, CFF INDEX/CharStrings parsing, and basic Type 2 path operators; CFF subroutines, CFF2, and full shaping remain pending
+- **Current Stage**: Unit 3: SVG Rendering & CLI - CFF Subroutine Expansion Review
+- **Last Completed**: Unit 3: CFF Subroutine Expansion Code Generation
+- **Next Stage**: Unit 3: Additional Type 2 Operators or Unit 2: GSUB/GPOS Review
+- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, and initial GSUB/GPOS lookup handling with checked OpenType Layout offsets; SVG output supports TrueType outlines, styling, transformed composites, high-level `renderToSvg`, CFF INDEX/CharStrings parsing, basic Type 2 path operators, and CFF local/global subroutine expansion; CFF2 and advanced Type 2 operators remain pending

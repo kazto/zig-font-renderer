@@ -28,7 +28,10 @@ const Cff = struct {
     const index_count_size = 2;
     const index_off_size_offset = 2;
     const top_dict_charstrings_operator = 17;
+    const top_dict_private_operator = 18;
+    const private_subrs_operator = 19;
     const operand_stack_max = 48;
+    const max_subr_depth = 16;
 };
 
 const Type2 = struct {
@@ -65,6 +68,27 @@ const CffIndex = struct {
     offsets_offset: usize,
     object_data_offset: usize,
     end_offset: usize,
+};
+
+const CffContext = struct {
+    cff: []const u8,
+    charstrings: CffIndex,
+    global_subrs: CffIndex,
+    local_subrs: ?CffIndex,
+};
+
+const TopDictInfo = struct {
+    charstrings_offset: ?usize = null,
+    private_size: ?usize = null,
+    private_offset: ?usize = null,
+};
+
+const Type2State = struct {
+    stack: [Cff.operand_stack_max]i32 = undefined,
+    stack_len: usize = 0,
+    x: i32 = 0,
+    y: i32 = 0,
+    has_current_point: bool = false,
 };
 
 const Head = struct {
@@ -547,22 +571,20 @@ fn appendContourPath(writer: std.ArrayList(u8).Writer, contour: []const Point, t
 }
 
 fn appendCffGlyphPath(writer: std.ArrayList(u8).Writer, cff: []const u8, glyph_id: u16, transform: Transform) SvgError!void {
-    const charstring = try getCffCharString(cff, glyph_id);
+    const context = try parseCffContext(cff);
+    const charstring = try getCffCharString(context, glyph_id);
     if (charstring.len == 0) return;
 
     try writer.print("    <path d=\"", .{});
-    try appendType2CharStringPath(writer, charstring, transform);
+    try appendType2CharStringPath(writer, charstring, transform, context);
     try writer.print("\"/>\n", .{});
 }
 
-fn getCffCharString(cff: []const u8, glyph_id: u16) SvgError![]const u8 {
-    const charstrings_offset = try getCffCharStringsOffset(cff);
-    if (charstrings_offset >= cff.len) return font_parser.ParserError.InvalidTable;
-    const charstrings = try readCffIndex(cff[charstrings_offset..]);
-    return getCffIndexObject(charstrings, glyph_id);
+fn getCffCharString(context: CffContext, glyph_id: u16) SvgError![]const u8 {
+    return getCffIndexObject(context.charstrings, glyph_id);
 }
 
-fn getCffCharStringsOffset(cff: []const u8) SvgError!usize {
+fn parseCffContext(cff: []const u8) SvgError!CffContext {
     if (cff.len < Cff.header_min_size) return font_parser.ParserError.InvalidTable;
     const header_size = cff[Cff.header_size_offset];
     if (header_size > cff.len) return font_parser.ParserError.InvalidTable;
@@ -575,13 +597,35 @@ fn getCffCharStringsOffset(cff: []const u8) SvgError!usize {
     const string_index = try readCffIndex(cff[offset..]);
     offset += string_index.end_offset;
     const global_subr_index = try readCffIndex(cff[offset..]);
-    _ = global_subr_index;
 
     const top_dict = try getCffIndexObject(top_dict_index, 0);
-    return try readCffTopDictCharStringsOffset(top_dict);
+    const top_dict_info = try readCffTopDictInfo(top_dict);
+    const charstrings_offset = top_dict_info.charstrings_offset orelse return font_parser.ParserError.MissingMandatoryTable;
+    if (charstrings_offset >= cff.len) return font_parser.ParserError.InvalidTable;
+    const charstrings = try readCffIndex(cff[charstrings_offset..]);
+
+    var local_subrs: ?CffIndex = null;
+    if (top_dict_info.private_size) |private_size| {
+        const private_offset = top_dict_info.private_offset orelse return font_parser.ParserError.InvalidTable;
+        if (private_offset + private_size > cff.len) return font_parser.ParserError.InvalidTable;
+        const private_dict = cff[private_offset .. private_offset + private_size];
+        if (try readCffPrivateSubrsOffset(private_dict)) |subrs_offset| {
+            const absolute_subrs_offset = private_offset + subrs_offset;
+            if (absolute_subrs_offset >= cff.len) return font_parser.ParserError.InvalidTable;
+            local_subrs = try readCffIndex(cff[absolute_subrs_offset..]);
+        }
+    }
+
+    return .{
+        .cff = cff,
+        .charstrings = charstrings,
+        .global_subrs = global_subr_index,
+        .local_subrs = local_subrs,
+    };
 }
 
-fn readCffTopDictCharStringsOffset(dict: []const u8) SvgError!usize {
+fn readCffTopDictInfo(dict: []const u8) SvgError!TopDictInfo {
+    var result = TopDictInfo{};
     var stack: [Cff.operand_stack_max]i32 = undefined;
     var stack_len: usize = 0;
     var offset: usize = 0;
@@ -599,6 +643,45 @@ fn readCffTopDictCharStringsOffset(dict: []const u8) SvgError!usize {
                 if (stack_len == 0) return font_parser.ParserError.InvalidTable;
                 const value = stack[stack_len - 1];
                 if (value < 0) return font_parser.ParserError.InvalidTable;
+                result.charstrings_offset = @intCast(value);
+            } else if (byte == Cff.top_dict_private_operator) {
+                if (stack_len < 2) return font_parser.ParserError.InvalidTable;
+                const private_size = stack[stack_len - 2];
+                const private_offset = stack[stack_len - 1];
+                if (private_size < 0 or private_offset < 0) return font_parser.ParserError.InvalidTable;
+                result.private_size = @intCast(private_size);
+                result.private_offset = @intCast(private_offset);
+            }
+            stack_len = 0;
+            continue;
+        }
+
+        const operand = try readCffDictOperand(dict, &offset);
+        if (stack_len >= stack.len) return font_parser.ParserError.InvalidTable;
+        stack[stack_len] = operand;
+        stack_len += 1;
+    }
+    return result;
+}
+
+fn readCffPrivateSubrsOffset(dict: []const u8) SvgError!?usize {
+    var stack: [Cff.operand_stack_max]i32 = undefined;
+    var stack_len: usize = 0;
+    var offset: usize = 0;
+    while (offset < dict.len) {
+        const byte = dict[offset];
+        if (isCffDictOperator(byte)) {
+            offset += 1;
+            if (byte == 12) {
+                if (offset >= dict.len) return font_parser.ParserError.InvalidTable;
+                offset += 1;
+                stack_len = 0;
+                continue;
+            }
+            if (byte == Cff.private_subrs_operator) {
+                if (stack_len == 0) return font_parser.ParserError.InvalidTable;
+                const value = stack[stack_len - 1];
+                if (value < 0) return font_parser.ParserError.InvalidTable;
                 return @intCast(value);
             }
             stack_len = 0;
@@ -610,102 +693,123 @@ fn readCffTopDictCharStringsOffset(dict: []const u8) SvgError!usize {
         stack[stack_len] = operand;
         stack_len += 1;
     }
-    return font_parser.ParserError.MissingMandatoryTable;
+    return null;
 }
 
-fn appendType2CharStringPath(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform) SvgError!void {
-    var stack: [Cff.operand_stack_max]i32 = undefined;
-    var stack_len: usize = 0;
+fn appendType2CharStringPath(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext) SvgError!void {
+    var state = Type2State{};
+    try executeType2CharString(writer, charstring, transform, context, &state, 0);
+}
+
+fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext, state: *Type2State, depth: u8) SvgError!void {
+    if (depth > Cff.max_subr_depth) return SvgError.UnsupportedCffOperator;
     var offset: usize = 0;
-    var x: i32 = 0;
-    var y: i32 = 0;
-    var has_current_point = false;
 
     while (offset < charstring.len) {
         const byte = charstring[offset];
         if (isType2Number(byte)) {
             const number = try readType2Number(charstring, &offset);
-            if (stack_len >= stack.len) return font_parser.ParserError.InvalidTable;
-            stack[stack_len] = number;
-            stack_len += 1;
+            if (state.stack_len >= state.stack.len) return font_parser.ParserError.InvalidTable;
+            state.stack[state.stack_len] = number;
+            state.stack_len += 1;
             continue;
         }
 
         offset += 1;
         switch (byte) {
-            Type2.hstem, Type2.vstem, Type2.hstemhm, Type2.vstemhm => stack_len = 0,
+            Type2.hstem, Type2.vstem, Type2.hstemhm, Type2.vstemhm => state.stack_len = 0,
             Type2.rmoveto => {
-                if (stack_len < 2) return font_parser.ParserError.InvalidTable;
-                x += stack[stack_len - 2];
-                y += stack[stack_len - 1];
-                const point = transform.apply(x, y);
+                if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+                state.x += state.stack[state.stack_len - 2];
+                state.y += state.stack[state.stack_len - 1];
+                const point = transform.apply(state.x, state.y);
                 try writer.print("M {d:.2} {d:.2} ", .{ point.x, point.y });
-                has_current_point = true;
-                stack_len = 0;
+                state.has_current_point = true;
+                state.stack_len = 0;
             },
             Type2.hmoveto => {
-                if (stack_len < 1) return font_parser.ParserError.InvalidTable;
-                x += stack[stack_len - 1];
-                const point = transform.apply(x, y);
+                if (state.stack_len < 1) return font_parser.ParserError.InvalidTable;
+                state.x += state.stack[state.stack_len - 1];
+                const point = transform.apply(state.x, state.y);
                 try writer.print("M {d:.2} {d:.2} ", .{ point.x, point.y });
-                has_current_point = true;
-                stack_len = 0;
+                state.has_current_point = true;
+                state.stack_len = 0;
             },
             Type2.vmoveto => {
-                if (stack_len < 1) return font_parser.ParserError.InvalidTable;
-                y += stack[stack_len - 1];
-                const point = transform.apply(x, y);
+                if (state.stack_len < 1) return font_parser.ParserError.InvalidTable;
+                state.y += state.stack[state.stack_len - 1];
+                const point = transform.apply(state.x, state.y);
                 try writer.print("M {d:.2} {d:.2} ", .{ point.x, point.y });
-                has_current_point = true;
-                stack_len = 0;
+                state.has_current_point = true;
+                state.stack_len = 0;
             },
             Type2.rlineto => {
-                if (!has_current_point or stack_len < 2 or (stack_len % 2) != 0) return font_parser.ParserError.InvalidTable;
+                if (!state.has_current_point or state.stack_len < 2 or (state.stack_len % 2) != 0) return font_parser.ParserError.InvalidTable;
                 var index: usize = 0;
-                while (index < stack_len) : (index += 2) {
-                    x += stack[index];
-                    y += stack[index + 1];
-                    const point = transform.apply(x, y);
+                while (index < state.stack_len) : (index += 2) {
+                    state.x += state.stack[index];
+                    state.y += state.stack[index + 1];
+                    const point = transform.apply(state.x, state.y);
                     try writer.print("L {d:.2} {d:.2} ", .{ point.x, point.y });
                 }
-                stack_len = 0;
+                state.stack_len = 0;
             },
             Type2.hlineto, Type2.vlineto => {
-                if (!has_current_point or stack_len == 0) return font_parser.ParserError.InvalidTable;
+                if (!state.has_current_point or state.stack_len == 0) return font_parser.ParserError.InvalidTable;
                 var horizontal = byte == Type2.hlineto;
-                for (stack[0..stack_len]) |value| {
-                    if (horizontal) x += value else y += value;
-                    const point = transform.apply(x, y);
+                for (state.stack[0..state.stack_len]) |value| {
+                    if (horizontal) state.x += value else state.y += value;
+                    const point = transform.apply(state.x, state.y);
                     try writer.print("L {d:.2} {d:.2} ", .{ point.x, point.y });
                     horizontal = !horizontal;
                 }
-                stack_len = 0;
+                state.stack_len = 0;
             },
             Type2.rrcurveto => {
-                if (!has_current_point or stack_len < 6 or (stack_len % 6) != 0) return font_parser.ParserError.InvalidTable;
+                if (!state.has_current_point or state.stack_len < 6 or (state.stack_len % 6) != 0) return font_parser.ParserError.InvalidTable;
                 var index: usize = 0;
-                while (index < stack_len) : (index += 6) {
-                    const c1x = x + stack[index];
-                    const c1y = y + stack[index + 1];
-                    const c2x = c1x + stack[index + 2];
-                    const c2y = c1y + stack[index + 3];
-                    x = c2x + stack[index + 4];
-                    y = c2y + stack[index + 5];
+                while (index < state.stack_len) : (index += 6) {
+                    const c1x = state.x + state.stack[index];
+                    const c1y = state.y + state.stack[index + 1];
+                    const c2x = c1x + state.stack[index + 2];
+                    const c2y = c1y + state.stack[index + 3];
+                    state.x = c2x + state.stack[index + 4];
+                    state.y = c2y + state.stack[index + 5];
                     const c1 = transform.apply(c1x, c1y);
                     const c2 = transform.apply(c2x, c2y);
-                    const end = transform.apply(x, y);
+                    const end = transform.apply(state.x, state.y);
                     try writer.print("C {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} ", .{ c1.x, c1.y, c2.x, c2.y, end.x, end.y });
                 }
-                stack_len = 0;
+                state.stack_len = 0;
             },
+            Type2.callsubr => try executeCffSubroutine(writer, transform, context, context.local_subrs, state, depth + 1),
+            Type2.callgsubr => try executeCffSubroutine(writer, transform, context, context.global_subrs, state, depth + 1),
+            Type2.return_op => return,
             Type2.endchar => {
                 try writer.print("Z ", .{});
                 return;
             },
-            Type2.callsubr, Type2.callgsubr, Type2.return_op, Type2.escape, Type2.hintmask, Type2.cntrmask, Type2.rcurveline, Type2.rlinecurve, Type2.vvcurveto, Type2.hhcurveto, Type2.vhcurveto, Type2.hvcurveto => return SvgError.UnsupportedCffOperator,
+            Type2.escape, Type2.hintmask, Type2.cntrmask, Type2.rcurveline, Type2.rlinecurve, Type2.vvcurveto, Type2.hhcurveto, Type2.vhcurveto, Type2.hvcurveto => return SvgError.UnsupportedCffOperator,
             else => return SvgError.UnsupportedCffOperator,
         }
     }
+}
+
+fn executeCffSubroutine(writer: std.ArrayList(u8).Writer, transform: Transform, context: CffContext, maybe_subrs: ?CffIndex, state: *Type2State, depth: u8) SvgError!void {
+    const subrs = maybe_subrs orelse return SvgError.UnsupportedCffOperator;
+    if (state.stack_len == 0) return font_parser.ParserError.InvalidTable;
+    const raw_index = state.stack[state.stack_len - 1];
+    state.stack_len -= 1;
+    const biased_index = raw_index + cffSubrBias(subrs.count);
+    if (biased_index < 0 or biased_index > std.math.maxInt(u16)) return font_parser.ParserError.InvalidTable;
+    const subr = try getCffIndexObject(subrs, @intCast(biased_index));
+    try executeType2CharString(writer, subr, transform, context, state, depth);
+}
+
+fn cffSubrBias(count: u16) i32 {
+    if (count < 1240) return 107;
+    if (count < 33900) return 1131;
+    return 32768;
 }
 
 fn glyphRange(face: font_parser.Face, glyph_id: u16) SvgError!GlyphRange {
@@ -944,10 +1048,24 @@ test "CFF INDEX reads object slices" {
     try std.testing.expectEqualSlices(u8, "C", try getCffIndexObject(index, 1));
 }
 
+test "CFF subroutine bias follows Type 2 thresholds" {
+    try std.testing.expectEqual(@as(i32, 107), cffSubrBias(0));
+    try std.testing.expectEqual(@as(i32, 107), cffSubrBias(1239));
+    try std.testing.expectEqual(@as(i32, 1131), cffSubrBias(1240));
+    try std.testing.expectEqual(@as(i32, 32768), cffSubrBias(33900));
+}
+
 test "Type2 charstring emits moveto and lines" {
     var output = std.ArrayList(u8).empty;
     defer output.deinit(std.testing.allocator);
     const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
     const charstring = [_]u8{
         139,           139,           Type2.rmoveto,
         189,           139,           139,
@@ -955,7 +1073,7 @@ test "Type2 charstring emits moveto and lines" {
         Type2.rlineto, Type2.endchar,
     };
 
-    try appendType2CharStringPath(writer, &charstring, Transform{});
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
     try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 L 50.00 50.00 L 0.00 50.00 Z ", output.items);
 }
 
