@@ -94,6 +94,12 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Bound subroutine recursion depth.
   - Verify visible SVG output from an OTF/CFF font.
 
+- [x] Step 15: Add common advanced Type 2 operators
+  - Skip Type 2 hint masks while preserving charstring stream alignment.
+  - Support `hhcurveto`, `vvcurveto`, `hvcurveto`, and `vhcurveto`.
+  - Support `rcurveline` and `rlinecurve`.
+  - Verify multiple CFF glyphs from an OTF font render to visible SVG.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
@@ -105,6 +111,7 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] SVG output can be styled with fill, background, and margin controls.
 - [x] CFF charstrings can be reached and basic Type 2 operators can be converted to SVG path commands.
 - [x] CFF subroutine-backed glyphs can be expanded for basic Type 2 outlines.
+- [x] Common CFF Type 2 curve operators and hint masks are handled.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
 - [x] CFF2 and full typography remain explicitly deferred.

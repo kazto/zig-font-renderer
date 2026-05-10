@@ -88,6 +88,7 @@ const Type2State = struct {
     stack_len: usize = 0,
     x: i32 = 0,
     y: i32 = 0,
+    hint_count: usize = 0,
     has_current_point: bool = false,
 };
 
@@ -717,7 +718,19 @@ fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []const 
 
         offset += 1;
         switch (byte) {
-            Type2.hstem, Type2.vstem, Type2.hstemhm, Type2.vstemhm => state.stack_len = 0,
+            Type2.hstem, Type2.vstem, Type2.hstemhm, Type2.vstemhm => {
+                const width_operands: usize = if ((state.stack_len % 2) == 1) 1 else 0;
+                state.hint_count += (state.stack_len - width_operands) / 2;
+                state.stack_len = 0;
+            },
+            Type2.hintmask, Type2.cntrmask => {
+                const width_operands: usize = if ((state.stack_len % 2) == 1) 1 else 0;
+                state.hint_count += (state.stack_len - width_operands) / 2;
+                state.stack_len = 0;
+                const mask_len = (state.hint_count + 7) / 8;
+                if (offset + mask_len > charstring.len) return font_parser.ParserError.InvalidTable;
+                offset += mask_len;
+            },
             Type2.rmoveto => {
                 if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
                 state.x += state.stack[state.stack_len - 2];
@@ -769,17 +782,67 @@ fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []const 
                 if (!state.has_current_point or state.stack_len < 6 or (state.stack_len % 6) != 0) return font_parser.ParserError.InvalidTable;
                 var index: usize = 0;
                 while (index < state.stack_len) : (index += 6) {
-                    const c1x = state.x + state.stack[index];
-                    const c1y = state.y + state.stack[index + 1];
-                    const c2x = c1x + state.stack[index + 2];
-                    const c2y = c1y + state.stack[index + 3];
-                    state.x = c2x + state.stack[index + 4];
-                    state.y = c2y + state.stack[index + 5];
-                    const c1 = transform.apply(c1x, c1y);
-                    const c2 = transform.apply(c2x, c2y);
-                    const end = transform.apply(state.x, state.y);
-                    try writer.print("C {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} ", .{ c1.x, c1.y, c2.x, c2.y, end.x, end.y });
+                    try emitType2Curve(writer, transform, state, state.stack[index], state.stack[index + 1], state.stack[index + 2], state.stack[index + 3], state.stack[index + 4], state.stack[index + 5]);
                 }
+                state.stack_len = 0;
+            },
+            Type2.rcurveline => {
+                if (!state.has_current_point or state.stack_len < 8 or ((state.stack_len - 2) % 6) != 0) return font_parser.ParserError.InvalidTable;
+                var index: usize = 0;
+                while (index + 2 < state.stack_len) : (index += 6) {
+                    try emitType2Curve(writer, transform, state, state.stack[index], state.stack[index + 1], state.stack[index + 2], state.stack[index + 3], state.stack[index + 4], state.stack[index + 5]);
+                }
+                state.x += state.stack[state.stack_len - 2];
+                state.y += state.stack[state.stack_len - 1];
+                const point = transform.apply(state.x, state.y);
+                try writer.print("L {d:.2} {d:.2} ", .{ point.x, point.y });
+                state.stack_len = 0;
+            },
+            Type2.rlinecurve => {
+                if (!state.has_current_point or state.stack_len < 8 or ((state.stack_len - 6) % 2) != 0) return font_parser.ParserError.InvalidTable;
+                var index: usize = 0;
+                while (index + 6 < state.stack_len) : (index += 2) {
+                    state.x += state.stack[index];
+                    state.y += state.stack[index + 1];
+                    const point = transform.apply(state.x, state.y);
+                    try writer.print("L {d:.2} {d:.2} ", .{ point.x, point.y });
+                }
+                try emitType2Curve(writer, transform, state, state.stack[index], state.stack[index + 1], state.stack[index + 2], state.stack[index + 3], state.stack[index + 4], state.stack[index + 5]);
+                state.stack_len = 0;
+            },
+            Type2.hhcurveto => {
+                if (!state.has_current_point or state.stack_len < 4) return font_parser.ParserError.InvalidTable;
+                var index: usize = 0;
+                var dy1: i32 = 0;
+                if ((state.stack_len % 4) == 1) {
+                    dy1 = state.stack[0];
+                    index = 1;
+                }
+                if (((state.stack_len - index) % 4) != 0) return font_parser.ParserError.InvalidTable;
+                while (index < state.stack_len) : (index += 4) {
+                    try emitType2Curve(writer, transform, state, state.stack[index], dy1, state.stack[index + 1], state.stack[index + 2], state.stack[index + 3], 0);
+                    dy1 = 0;
+                }
+                state.stack_len = 0;
+            },
+            Type2.vvcurveto => {
+                if (!state.has_current_point or state.stack_len < 4) return font_parser.ParserError.InvalidTable;
+                var index: usize = 0;
+                var dx1: i32 = 0;
+                if ((state.stack_len % 4) == 1) {
+                    dx1 = state.stack[0];
+                    index = 1;
+                }
+                if (((state.stack_len - index) % 4) != 0) return font_parser.ParserError.InvalidTable;
+                while (index < state.stack_len) : (index += 4) {
+                    try emitType2Curve(writer, transform, state, dx1, state.stack[index], state.stack[index + 1], state.stack[index + 2], 0, state.stack[index + 3]);
+                    dx1 = 0;
+                }
+                state.stack_len = 0;
+            },
+            Type2.hvcurveto, Type2.vhcurveto => {
+                if (!state.has_current_point or state.stack_len < 4) return font_parser.ParserError.InvalidTable;
+                try emitType2AlternatingCurve(writer, transform, state, byte == Type2.hvcurveto);
                 state.stack_len = 0;
             },
             Type2.callsubr => try executeCffSubroutine(writer, transform, context, context.local_subrs, state, depth + 1),
@@ -789,9 +852,51 @@ fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []const 
                 try writer.print("Z ", .{});
                 return;
             },
-            Type2.escape, Type2.hintmask, Type2.cntrmask, Type2.rcurveline, Type2.rlinecurve, Type2.vvcurveto, Type2.hhcurveto, Type2.vhcurveto, Type2.hvcurveto => return SvgError.UnsupportedCffOperator,
+            Type2.escape => return SvgError.UnsupportedCffOperator,
             else => return SvgError.UnsupportedCffOperator,
         }
+    }
+}
+
+fn emitType2Curve(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State, dx1: i32, dy1: i32, dx2: i32, dy2: i32, dx3: i32, dy3: i32) SvgError!void {
+    const c1x = state.x + dx1;
+    const c1y = state.y + dy1;
+    const c2x = c1x + dx2;
+    const c2y = c1y + dy2;
+    state.x = c2x + dx3;
+    state.y = c2y + dy3;
+    const c1 = transform.apply(c1x, c1y);
+    const c2 = transform.apply(c2x, c2y);
+    const end = transform.apply(state.x, state.y);
+    try writer.print("C {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} ", .{ c1.x, c1.y, c2.x, c2.y, end.x, end.y });
+}
+
+fn emitType2AlternatingCurve(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State, starts_horizontal: bool) SvgError!void {
+    var index: usize = 0;
+    var horizontal = starts_horizontal;
+    while (index < state.stack_len) {
+        const remaining = state.stack_len - index;
+        if (remaining < 4) return font_parser.ParserError.InvalidTable;
+        if (horizontal) {
+            const dx1 = state.stack[index];
+            const dx2 = state.stack[index + 1];
+            const dy2 = state.stack[index + 2];
+            const dy3 = state.stack[index + 3];
+            index += 4;
+            const dx3: i32 = if (state.stack_len - index == 1) state.stack[index] else 0;
+            if (state.stack_len - index == 1) index += 1;
+            try emitType2Curve(writer, transform, state, dx1, 0, dx2, dy2, dx3, dy3);
+        } else {
+            const dy1 = state.stack[index];
+            const dx2 = state.stack[index + 1];
+            const dy2 = state.stack[index + 2];
+            const dx3 = state.stack[index + 3];
+            index += 4;
+            const dy3: i32 = if (state.stack_len - index == 1) state.stack[index] else 0;
+            if (state.stack_len - index == 1) index += 1;
+            try emitType2Curve(writer, transform, state, 0, dy1, dx2, dy2, dx3, dy3);
+        }
+        horizontal = !horizontal;
     }
 }
 

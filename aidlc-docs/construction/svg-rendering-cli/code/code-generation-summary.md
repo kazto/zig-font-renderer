@@ -22,6 +22,8 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Retrieves CFF Type 2 charstrings by glyph ID.
   - Emits SVG path commands for basic Type 2 moveto, lineto, and rrcurveto operators.
   - Expands Type 2 `callsubr` and `callgsubr` with standard CFF subroutine bias.
+  - Skips Type 2 `hintmask`/`cntrmask` data using the active stem count.
+  - Emits SVG cubic paths for common compact Type 2 curve operators.
   - Returns `UnsupportedCffOperator` for advanced Type 2 operators that are not yet implemented.
   - Emits SVG path commands with bounds-based width, height, viewBox, and scaled group transform.
   - Supports glyph fill color, optional background color, and custom margin.
@@ -110,10 +112,18 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed; generated SVG contains a CFF-derived `<path>`.
 - Command: `wc -c /tmp/zig-font-renderer-cff-subr-a.svg /tmp/zig-font-renderer-cff-subr-regression.svg`
 - Result: `378 /tmp/zig-font-renderer-cff-subr-a.svg`, `523 /tmp/zig-font-renderer-cff-subr-regression.svg`
+- Command: `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text B --output /tmp/zig-font-renderer-cff-op-B.svg --font-size 96`
+- Result: Passed.
+- Command: `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text S --output /tmp/zig-font-renderer-cff-op-S.svg --font-size 96`
+- Result: Passed.
+- Command: `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text g --output /tmp/zig-font-renderer-cff-op-g.svg --font-size 96`
+- Result: Passed.
+- Command: `wc -c /tmp/zig-font-renderer-cff-op-A.svg /tmp/zig-font-renderer-cff-op-B.svg /tmp/zig-font-renderer-cff-op-S.svg /tmp/zig-font-renderer-cff-op-g.svg /tmp/zig-font-renderer-cff-op-O.svg /tmp/zig-font-renderer-type2-regression.svg`
+- Result: Passed; all generated SVG files are non-empty.
 
 ## Known Limitations
 
 - Point-matched composite glyphs are not implemented.
-- Advanced Type 2 operators beyond basic lines, curves, and subr calls are not implemented.
+- Some advanced Type 2 operators beyond common compact curves are not implemented.
 - CFF2 outlines are not implemented.
 - Complex shaping remains incomplete.

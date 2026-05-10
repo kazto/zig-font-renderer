@@ -26,6 +26,8 @@
 - CFF Top DICT `Private` and Private DICT `Subrs` offsets are resolved for local subroutines.
 - Basic Type 2 `rmoveto`, `hmoveto`, `vmoveto`, `rlineto`, `hlineto`, `vlineto`, `rrcurveto`, and `endchar` operators emit SVG path commands.
 - Type 2 `callsubr` and `callgsubr` expand local/global CFF subroutines with bounded recursion.
+- Type 2 `hintmask` and `cntrmask` bytes are skipped according to the active stem hint count.
+- Common Type 2 compact curve operators `hhcurveto`, `vvcurveto`, `hvcurveto`, `vhcurveto`, `rcurveline`, and `rlinecurve` emit SVG path commands.
 - Unsupported Type 2 operators return `UnsupportedCffOperator`.
 
 ## Deferred Rules

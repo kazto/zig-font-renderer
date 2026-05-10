@@ -491,3 +491,20 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - CFF subroutine-backed Type 2 outline rendering. Advanced Type 2 operators and CFF2 remain pending.
 
 ---
+
+## Unit 3 CFF Type 2 Operators - Implemented
+**Timestamp**: 2026-05-10T03:31:06Z
+**User Input**: "ロードマップに従って、次の作業を進めて"
+**AI Response**: "Added Type 2 hint mask skipping and common compact curve operators (`hhcurveto`, `vvcurveto`, `hvcurveto`, `vhcurveto`, `rcurveline`, and `rlinecurve`). Verified multiple NimbusSans-Regular.otf glyphs render to SVG."
+**Verification**:
+- `zig fmt src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text B --output /tmp/zig-font-renderer-cff-op-B.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text S --output /tmp/zig-font-renderer-cff-op-S.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text g --output /tmp/zig-font-renderer-cff-op-g.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-type2-regression.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-op-A.svg /tmp/zig-font-renderer-cff-op-B.svg /tmp/zig-font-renderer-cff-op-S.svg /tmp/zig-font-renderer-cff-op-g.svg /tmp/zig-font-renderer-cff-op-O.svg /tmp/zig-font-renderer-type2-regression.svg`
+**Context**: Construction Phase - Unit 3 - Common CFF Type 2 operator support. CFF2 and less common Type 2 operators remain pending.
+
+---
