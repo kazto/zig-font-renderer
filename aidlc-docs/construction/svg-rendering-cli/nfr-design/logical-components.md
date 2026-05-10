@@ -9,6 +9,7 @@
 - `validateSvgColor`: Internal SVG attribute value guard for fill and background.
 - `appendGlyphPath`: Internal glyph-to-path converter.
 - `appendCompositeGlyphPaths`: Internal composite glyph expander for XY-offset components.
+- `cff_outline.appendGlyphPath`: CFF Type 2 outline-to-SVG path converter.
 - `glyphRange`: Internal `loca` resolver and CFF/CFF2 unsupported-outline detector.
 - `textBounds`: Internal shaped text bounds calculator.
 - `glyphBounds`: Internal glyph header bounds reader.
@@ -24,5 +25,5 @@
 
 - Uses `ShapeEngine.shapeText`.
 - Uses `Face.requireTable` for `head`, `loca`, and `glyf`.
-- Uses `Face.getTable` to detect `CFF ` and `CFF2` outline tables before `glyf`-specific rendering.
+- Uses `Face.getTable` to route `CFF ` outlines to `src/cff_outline.zig` and detect unsupported `CFF2` outline tables before `glyf`-specific rendering.
 - Exposed through `src/root.zig`.

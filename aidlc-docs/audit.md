@@ -508,3 +508,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - Common CFF Type 2 operator support. CFF2 and less common Type 2 operators remain pending.
 
 ---
+
+## Refactoring - CFF Outline Module Split
+**Timestamp**: 2026-05-10T03:45:40Z
+**User Input**: "do it"
+**AI Response**: "Extracted the CFF INDEX, Top DICT, Type 2 charstring, subroutine, and CFF path emission logic from `src/svg_renderer.zig` into `src/cff_outline.zig`, leaving the SVG renderer responsible for document layout and TrueType glyph routing."
+**Verification**:
+- `zig fmt src/svg_renderer.zig src/cff_outline.zig`
+- `zig build test`
+- `zig build`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text S --output /tmp/zig-font-renderer-cff-split-s.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-cff-split-ttf.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-split-s.svg /tmp/zig-font-renderer-cff-split-ttf.svg`
+**Context**: Construction Phase - Unit 3 - Refactoring to reduce `src/svg_renderer.zig` size and isolate CFF outline responsibilities.
+
+---
