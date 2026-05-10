@@ -18,6 +18,11 @@ const Cff = struct {
 };
 
 const Type2 = struct {
+    const escaped_flex = 35;
+    const escaped_hflex = 34;
+    const escaped_hflex1 = 36;
+    const escaped_flex1 = 37;
+
     const hstem = 1;
     const vstem = 3;
     const vmoveto = 4;
@@ -379,7 +384,19 @@ fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []const 
                 try writer.print("Z ", .{});
                 return;
             },
-            Type2.escape => return CffError.UnsupportedCffOperator,
+            Type2.escape => {
+                if (offset >= charstring.len) return font_parser.ParserError.InvalidTable;
+                const escaped_operator = charstring[offset];
+                offset += 1;
+                switch (escaped_operator) {
+                    Type2.escaped_flex => try emitType2Flex(writer, transform, state),
+                    Type2.escaped_hflex => try emitType2HFlex(writer, transform, state),
+                    Type2.escaped_hflex1 => try emitType2HFlex1(writer, transform, state),
+                    Type2.escaped_flex1 => try emitType2Flex1(writer, transform, state),
+                    else => return CffError.UnsupportedCffOperator,
+                }
+                state.stack_len = 0;
+            },
             else => return CffError.UnsupportedCffOperator,
         }
     }
@@ -396,6 +413,40 @@ fn emitType2Curve(writer: std.ArrayList(u8).Writer, transform: Transform, state:
     const c2 = transform.apply(c2x, c2y);
     const end = transform.apply(state.x, state.y);
     try writer.print("C {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} ", .{ c1.x, c1.y, c2.x, c2.y, end.x, end.y });
+}
+
+fn emitType2Flex(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
+    if (!state.has_current_point or state.stack_len != 13) return font_parser.ParserError.InvalidTable;
+    try emitType2Curve(writer, transform, state, state.stack[0], state.stack[1], state.stack[2], state.stack[3], state.stack[4], state.stack[5]);
+    try emitType2Curve(writer, transform, state, state.stack[6], state.stack[7], state.stack[8], state.stack[9], state.stack[10], state.stack[11]);
+}
+
+fn emitType2HFlex(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
+    if (!state.has_current_point or state.stack_len != 7) return font_parser.ParserError.InvalidTable;
+    try emitType2Curve(writer, transform, state, state.stack[0], 0, state.stack[1], state.stack[2], state.stack[3], 0);
+    try emitType2Curve(writer, transform, state, state.stack[4], 0, state.stack[5], -state.stack[2], state.stack[6], 0);
+}
+
+fn emitType2HFlex1(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
+    if (!state.has_current_point or state.stack_len != 9) return font_parser.ParserError.InvalidTable;
+    const dy6 = -(state.stack[1] + state.stack[3] + state.stack[7]);
+    try emitType2Curve(writer, transform, state, state.stack[0], state.stack[1], state.stack[2], state.stack[3], state.stack[4], 0);
+    try emitType2Curve(writer, transform, state, state.stack[5], 0, state.stack[6], state.stack[7], state.stack[8], dy6);
+}
+
+fn emitType2Flex1(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
+    if (!state.has_current_point or state.stack_len != 11) return font_parser.ParserError.InvalidTable;
+    const dx_sum = state.stack[0] + state.stack[2] + state.stack[4] + state.stack[6] + state.stack[8];
+    const dy_sum = state.stack[1] + state.stack[3] + state.stack[5] + state.stack[7] + state.stack[9];
+    const dx6: i32 = if (absI32(dx_sum) > absI32(dy_sum)) state.stack[10] else -dx_sum;
+    const dy6: i32 = if (absI32(dx_sum) > absI32(dy_sum)) -dy_sum else state.stack[10];
+
+    try emitType2Curve(writer, transform, state, state.stack[0], state.stack[1], state.stack[2], state.stack[3], state.stack[4], state.stack[5]);
+    try emitType2Curve(writer, transform, state, state.stack[6], state.stack[7], state.stack[8], state.stack[9], dx6, dy6);
+}
+
+fn absI32(value: i32) i32 {
+    return if (value < 0) -value else value;
 }
 
 fn emitType2AlternatingCurve(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State, starts_horizontal: bool) CffError!void {
@@ -612,4 +663,99 @@ test "Type2 charstring emits moveto and lines" {
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
     try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 L 50.00 50.00 L 0.00 50.00 Z ", output.items);
+}
+
+test "Type2 hflex emits two cubic curves" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
+    const charstring = [_]u8{
+        139,           139,          Type2.rmoveto,
+        149,           159,          169,
+        179,           189,          199,
+        209,           Type2.escape, Type2.escaped_hflex,
+        Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 0.00 30.00 30.00 70.00 30.00 C 120.00 30.00 180.00 0.00 250.00 0.00 Z ", output.items);
+}
+
+test "Type2 flex emits two cubic curves" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
+    const charstring = [_]u8{
+        139,           139,          Type2.rmoveto,
+        149,           139,          159,
+        139,           169,          139,
+        179,           139,          189,
+        139,           199,          139,
+        139,           Type2.escape, Type2.escaped_flex,
+        Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 0.00 30.00 0.00 60.00 0.00 C 100.00 0.00 150.00 0.00 210.00 0.00 Z ", output.items);
+}
+
+test "Type2 hflex1 balances final y delta" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
+    const charstring = [_]u8{
+        139,          139,                  Type2.rmoveto,
+        149,          144,                  159,
+        144,          169,                  179,
+        189,          144,                  199,
+        Type2.escape, Type2.escaped_hflex1, Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 5.00 30.00 10.00 60.00 10.00 C 100.00 10.00 150.00 15.00 210.00 0.00 Z ", output.items);
+}
+
+test "Type2 flex1 chooses final axis delta" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
+    const charstring = [_]u8{
+        139,                 139,           Type2.rmoveto,
+        149,                 144,           149,
+        144,                 149,           144,
+        149,                 144,           149,
+        144,                 139,           Type2.escape,
+        Type2.escaped_flex1, Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 5.00 20.00 10.00 30.00 15.00 C 40.00 20.00 50.00 25.00 50.00 0.00 Z ", output.items);
 }

@@ -24,7 +24,8 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Expands Type 2 `callsubr` and `callgsubr` with standard CFF subroutine bias.
   - Skips Type 2 `hintmask`/`cntrmask` data using the active stem count.
   - Emits SVG cubic paths for common compact Type 2 curve operators.
-  - Returns `UnsupportedCffOperator` for advanced Type 2 operators that are not yet implemented.
+  - Emits SVG cubic paths for escaped Type 2 flex operators.
+  - Returns `UnsupportedCffOperator` for remaining Type 2 operators that are not yet implemented.
   - Emits SVG path commands with bounds-based width, height, viewBox, and scaled group transform.
   - Supports glyph fill color, optional background color, and custom margin.
   - Rejects SVG color strings that can break attribute syntax.
@@ -124,6 +125,6 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 ## Known Limitations
 
 - Point-matched composite glyphs are not implemented.
-- Some advanced Type 2 operators beyond common compact curves are not implemented.
+- Some uncommon Type 2 operators beyond compact curves and flex operators are not implemented.
 - CFF2 outlines are not implemented.
 - Complex shaping remains incomplete.

@@ -28,6 +28,7 @@
 - Type 2 `callsubr` and `callgsubr` expand local/global CFF subroutines with bounded recursion.
 - Type 2 `hintmask` and `cntrmask` bytes are skipped according to the active stem hint count.
 - Common Type 2 compact curve operators `hhcurveto`, `vvcurveto`, `hvcurveto`, `vhcurveto`, `rcurveline`, and `rlinecurve` emit SVG path commands.
+- Type 2 escaped flex operators `hflex`, `flex`, `hflex1`, and `flex1` emit two SVG cubic path commands.
 - Unsupported Type 2 operators return `UnsupportedCffOperator`.
 
 ## Deferred Rules

@@ -523,3 +523,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - Refactoring to reduce `src/svg_renderer.zig` size and isolate CFF outline responsibilities.
 
 ---
+
+## Unit 3 CFF Flex Operators - Implemented
+**Timestamp**: 2026-05-10T03:50:02Z
+**User Input**: "ロードマップに従って、次の作業を進めて"
+**AI Response**: "Added escaped Type 2 flex operator support for `hflex`, `flex`, `hflex1`, and `flex1`, emitting each as SVG cubic curve pairs while keeping remaining escaped operators explicitly unsupported."
+**Verification**:
+- `zig fmt src/cff_outline.zig`
+- `zig build test`
+- `zig build`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text flex --output /tmp/zig-font-renderer-cff-flex.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-flex-regression.ttf.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-flex.svg /tmp/zig-font-renderer-flex-regression.ttf.svg`
+**Context**: Construction Phase - Unit 3 - CFF Type 2 flex operator support. CFF2 and uncommon Type 2 operators remain pending.
+
+---

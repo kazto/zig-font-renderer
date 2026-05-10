@@ -100,6 +100,12 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Support `rcurveline` and `rlinecurve`.
   - Verify multiple CFF glyphs from an OTF font render to visible SVG.
 
+- [x] Step 16: Add Type 2 flex operators
+  - Decode escaped Type 2 `hflex`, `flex`, `hflex1`, and `flex1` operators.
+  - Emit each flex operator as two SVG cubic curves.
+  - Preserve explicit unsupported errors for remaining escaped operators.
+  - Verify CFF and TrueType SVG generation still succeeds.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
@@ -112,6 +118,7 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] CFF charstrings can be reached and basic Type 2 operators can be converted to SVG path commands.
 - [x] CFF subroutine-backed glyphs can be expanded for basic Type 2 outlines.
 - [x] Common CFF Type 2 curve operators and hint masks are handled.
+- [x] Type 2 flex operators are emitted as cubic SVG paths.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
 - [x] CFF2 and full typography remain explicitly deferred.
