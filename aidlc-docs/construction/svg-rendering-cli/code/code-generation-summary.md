@@ -18,7 +18,10 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Decodes simple TrueType `glyf` contours.
   - Expands composite TrueType glyphs when components use XY offsets.
   - Applies composite uniform scale, separate XY scale, and 2x2 transforms to emitted path coordinates.
-  - Detects CFF/CFF2 outlines and returns `UnsupportedCffOutlines` until charstring decoding exists.
+  - Parses CFF INDEX data and Top DICT `CharStrings` offsets.
+  - Retrieves CFF Type 2 charstrings by glyph ID.
+  - Emits SVG path commands for basic Type 2 moveto, lineto, and rrcurveto operators.
+  - Returns `UnsupportedCffOperator` for Type 2 subroutines and advanced operators.
   - Emits SVG path commands with bounds-based width, height, viewBox, and scaled group transform.
   - Supports glyph fill color, optional background color, and custom margin.
   - Rejects SVG color strings that can break attribute syntax.
@@ -94,9 +97,16 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed; TrueType SVG rendering still works after CFF unsupported detection.
 - Command: `wc -c /tmp/zig-font-renderer-cff-regression.svg`
 - Result: `1838 /tmp/zig-font-renderer-cff-regression.svg`
+- Command: `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff-a.svg --font-size 96`
+- Result: Expected current limitation; CFF parsing reaches Type 2 charstring execution and reports `UnsupportedCffOperator` for subroutine-backed outlines.
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-cff-foundation-regression.svg --font-size 96`
+- Result: Passed; TrueType SVG rendering still works after CFF foundation changes.
+- Command: `wc -c /tmp/zig-font-renderer-cff-foundation-regression.svg`
+- Result: `523 /tmp/zig-font-renderer-cff-foundation-regression.svg`
 
 ## Known Limitations
 
 - Point-matched composite glyphs are not implemented.
-- CFF charstring outlines are not implemented.
+- CFF subroutines and advanced Type 2 operators are not implemented.
+- CFF2 outlines are not implemented.
 - Complex shaping remains incomplete.

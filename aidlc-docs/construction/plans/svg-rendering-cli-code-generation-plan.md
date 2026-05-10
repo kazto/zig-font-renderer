@@ -80,6 +80,13 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Return `UnsupportedCffOutlines` instead of generic missing-table errors.
   - Keep CFF charstring outline decoding deferred.
 
+- [x] Step 13: Add CFF charstring foundation
+  - Parse CFF INDEX structures.
+  - Read Top DICT `CharStrings` offset.
+  - Retrieve per-glyph Type 2 charstrings by glyph ID.
+  - Emit SVG for basic Type 2 moveto, lineto, and rrcurveto operators.
+  - Return `UnsupportedCffOperator` for subroutines and advanced Type 2 operators.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
@@ -89,7 +96,7 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] SVG output is sized from actual rendered glyph bounds.
 - [x] High-level API is available for one-call SVG rendering.
 - [x] SVG output can be styled with fill, background, and margin controls.
-- [x] CFF/CFF2 SVG attempts fail with an explicit unsupported-outline error.
+- [x] CFF charstrings can be reached and basic Type 2 operators can be converted to SVG path commands.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
-- [x] CFF and full typography remain explicitly deferred.
+- [x] CFF subroutines, CFF2, and full typography remain explicitly deferred.

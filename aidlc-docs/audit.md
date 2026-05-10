@@ -460,3 +460,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 2 - GSUB/GPOS shaping extension hardening.
 
 ---
+
+## Unit 3 CFF Charstring Foundation - Implemented
+**Timestamp**: 2026-05-10T01:52:25Z
+**User Input**: "ロードマップに従って、次の作業を進めて"
+**AI Response**: "Started the roadmap CFF charstring increment by adding CFF INDEX parsing, Top DICT CharStrings lookup, per-glyph Type 2 charstring retrieval, and basic Type 2 path emission for moveto, lineto, and rrcurveto. Real OTF/CFF fonts now progress to explicit `UnsupportedCffOperator` for subroutine-backed outlines."
+**Verification**:
+- `zig fmt src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff-a.svg --font-size 96`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-cff-foundation-regression.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-foundation-regression.svg`
+**Context**: Construction Phase - Unit 3 - CFF charstring foundation. CFF local/global subroutines and CFF2 outlines remain pending.
+
+---

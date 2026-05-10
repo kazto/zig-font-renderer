@@ -22,9 +22,12 @@
 - CLI metadata output is suppressed when `--output` is used.
 - `renderToSvg` owns file loading and returns an allocated SVG buffer owned by the caller.
 - CLI SVG output must use the same high-level API exposed to library users.
-- CFF/CFF2 outline fonts return `UnsupportedCffOutlines` until charstring outline decoding is implemented.
+- CFF `CharStrings` INDEX data can be resolved by glyph ID.
+- Basic Type 2 `rmoveto`, `hmoveto`, `vmoveto`, `rlineto`, `hlineto`, `vlineto`, `rrcurveto`, and `endchar` operators emit SVG path commands.
+- Unsupported Type 2 operators return `UnsupportedCffOperator`.
 
 ## Deferred Rules
 
 - Point-matched composite components return `UnsupportedCompositeGlyph`.
-- CFF charstring outlines are not rendered.
+- CFF local/global subroutines are not expanded.
+- CFF2 outlines are not rendered.
