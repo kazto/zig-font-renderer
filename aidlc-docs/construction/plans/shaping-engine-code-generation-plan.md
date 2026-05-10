@@ -1,49 +1,62 @@
-# Code Generation Plan - Unit 2: Shaping Engine
+# Code Generation Plan - Unit 2: GSUB/GPOS Shaping Extension
 
-This plan covers the first incremental implementation for Unit 2. It intentionally implements US-2 basic shaping before GSUB/GPOS complexity.
+This plan covers the implementation of OpenType Layout features (GSUB and GPOS) in the Shaping Engine. It prioritizes common features like ligatures and kerning over complete OpenType spec coverage.
 
 ## Unit Context
 
-- **Unit**: Shaping Engine
-- **Primary story**: US-2 - ラテン文字と日本語の基本シェイピング
-- **Deferred story**: US-3 - カーニングと合字のサポート (GSUB/GPOS)
-- **Dependency**: Unit 1 `Face` parser API
+- **Unit**: Shaping Engine (Unit 2 Extension)
+- **Primary story**: US-3 - カーニングと合字のサポート
+- **Dependencies**: Unit 1 `Face`
 - **Application code paths**:
   - `src/shaper.zig`
-  - `src/root.zig`
-  - `src/main.zig`
 
 ## Execution Checklist
 
-- [x] Step 1: Add `src/shaper.zig`
-  - Define `ShapeEngine`, `ShapedGlyph`, `ShapedText`, and `ShapeError`.
+- [x] Step 1: Define OpenType Layout Common Table formats
+  - Define `ScriptList`, `FeatureList`, and `LookupList` structures.
+  - Implement parsing for `Coverage` and `ClassDefinition` tables.
+  - Add `TableTags` for `GSUB` and `GPOS`.
 
-- [x] Step 2: Implement basic UTF-8 text shaping
-  - Convert UTF-8 codepoints to glyph IDs through `Face.getGlyphInfo`.
-  - Assign monotonically increasing cluster indexes.
-  - Accumulate horizontal pen positions in raw FUnits.
+- [x] Step 2: Implement GSUB Basic Engine
+  - Implement `GSUB` header parsing.
+  - Implement `Script`, `LangSys`, and `Feature` lookup.
+  - Implement `Lookup` dispatching.
+  - Implement GSUB Lookup Type 1: Single Substitution.
 
-- [x] Step 3: Export Shaping Engine API
-  - Re-export Unit 2 public types from `src/root.zig`.
+- [x] Step 3: Implement GPOS Basic Engine
+  - Implement `GPOS` header parsing.
+  - Implement ValueRecord decoding.
+  - Implement GPOS Lookup Type 1: Single Adjustment.
+  - Implement GPOS Lookup Type 2: Pair Adjustment (Format 1 and 2).
 
-- [x] Step 4: Wire CLI text inspection through Shaping Engine
-  - Use `ShapeEngine.shapeText` for `--text` glyph display.
-  - Display cluster, codepoint, glyph ID, x offset, x advance, and total advance.
+- [x] Step 4: Integrate GSUB/GPOS into `ShapeEngine.shapeText`
+  - Update `shapeText` to load GSUB/GPOS tables.
+  - Apply GSUB substitutions before GPOS adjustments.
+  - Handle glyph record updates (substitution might change glyph IDs).
+  - Apply GPOS offsets and advances to `ShapedGlyph`.
 
-- [x] Step 5: Add focused tests and verification
-  - Add invalid UTF-8 coverage for `ShapeEngine`.
-  - Run `zig build test`, `zig build`, and real-font CLI smoke tests.
+- [x] Step 5: Add GSUB Lookup Type 4: Ligature Substitution
+  - Implement ligature substitution (e.g., 'f' + 'i' -> 'fi').
+  - Handle glyph clustering for ligatures.
 
-- [x] Step 6: Add legacy kerning support
-  - Parse legacy `kern` table version 0.
-  - Support horizontal format 0 pair adjustment subtables.
-  - Apply pair adjustment to the previous glyph's `x_advance`.
-  - Recompute glyph `x_offset` and `total_advance` after kerning.
+- [x] Step 6: Verification
+  - Add unit tests for GSUB Single/Ligature substitution.
+  - Add unit tests for GPOS Single/Pair adjustment.
+  - Run `zig build test`.
+  - Verify with a font that supports GSUB/GPOS (e.g., DejaVuSans).
+
+- [x] Step 7: Hardening and fallback preservation
+  - Validate OpenType Layout offset slices before dereferencing them.
+  - Preserve legacy `kern` fallback when a GPOS table exists but no GPOS adjustment is applied.
+  - Add focused tests for checked slicing and GPOS adjustment detection.
 
 ## Completion Criteria
 
-- [x] Unit 2 basic shaping API exists.
-- [x] CLI uses the shaping API for text glyph display.
-- [x] Existing parser tests still pass.
-- [x] Legacy `kern` format 0 pair adjustment is supported.
-- [x] GSUB/GPOS remains explicitly deferred.
+- [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
+- [x] Single glyph substitutions (GSUB Type 1) are applied.
+- [x] Ligature substitutions (GSUB Type 4) are applied, correctly merging multiple glyphs.
+- [x] Single glyph adjustments (GPOS Type 1) are applied.
+- [x] Pair adjustments (GPOS Type 2) are applied, correctly adjusting advances between glyphs.
+- [x] `ShapedGlyph` records reflect substitutions and adjustments.
+- [x] Legacy `kern` table still works as a fallback if GPOS is missing or produces no adjustment.
+- [x] Existing parser and SVG rendering tests pass.

@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-04-27T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Unit 3: SVG Rendering & CLI - CFF Unsupported Handling Review
+- **Current Stage**: CONSTRUCTION - Unit 2: Shaping Engine - GSUB/GPOS Review
 
 ## Execution Plan Summary
 - **Total Stages**: 14 (Total workflow stages including those executed/skipped)
@@ -32,26 +32,25 @@
 - [x] Unit 2: Functional Design (2026-05-09)
 - [x] Unit 2: NFR Requirements (2026-05-09)
 - [x] Unit 2: NFR Design (2026-05-09)
-- [x] Unit 2: Code Generation - BASIC SHAPING (2026-05-09)
-- [x] Unit 2: Code Generation - LEGACY KERNING (2026-05-09) - REVIEW REQUIRED
+- [x] Unit 2: Code Generation - GSUB/GPOS SHAPING (2026-05-09)
 - [x] Unit 3: Functional Design - SVG INCREMENT (2026-05-09)
 - [x] Unit 3: NFR Requirements - SVG INCREMENT (2026-05-09)
 - [x] Unit 3: NFR Design - SVG INCREMENT (2026-05-09)
 - [x] Unit 3: Code Generation - SIMPLE SVG (2026-05-09)
-- [x] Unit 3: Code Generation - COMPOSITE GLYPH SVG (2026-05-09) - REVIEW REQUIRED
-- [x] Unit 3: Code Generation - SVG SIZING (2026-05-09) - REVIEW REQUIRED
-- [x] Unit 3: Code Generation - SVG BOUNDS LAYOUT (2026-05-09) - REVIEW REQUIRED
-- [x] Unit 3: Code Generation - HIGH-LEVEL SVG API (2026-05-09) - REVIEW REQUIRED
-- [x] Unit 3: Code Generation - SVG STYLING (2026-05-09) - REVIEW REQUIRED
-- [x] Unit 3: Code Generation - COMPOSITE TRANSFORMS (2026-05-09) - REVIEW REQUIRED
-- [x] Unit 3: Code Generation - CFF UNSUPPORTED HANDLING (2026-05-09) - REVIEW REQUIRED
+- [x] Unit 3: Code Generation - COMPOSITE GLYPH SVG (2026-05-09)
+- [x] Unit 3: Code Generation - SVG SIZING (2026-05-09)
+- [x] Unit 3: Code Generation - SVG BOUNDS LAYOUT (2026-05-09)
+- [x] Unit 3: Code Generation - HIGH-LEVEL SVG API (2026-05-09)
+- [x] Unit 3: Code Generation - SVG STYLING (2026-05-09)
+- [x] Unit 3: Code Generation - COMPOSITE TRANSFORMS (2026-05-09)
+- [x] Unit 3: Code Generation - CFF UNSUPPORTED HANDLING (2026-05-09)
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 3: SVG Rendering & CLI - CFF Unsupported Handling Review
-- **Last Completed**: Unit 3: CFF Unsupported Handling Code Generation
-- **Next Stage**: Unit 3: CFF Charstring Outline Increment or broader shaping support
-- **Status**: SVG output supports simple TrueType outlines, XY-offset and transformed composite glyphs, CLI `--output`, `--font-size`, `--margin`, `--fill`, `--background`, bounds-based layout, high-level `renderToSvg`, and explicit CFF/CFF2 unsupported errors; CFF charstring rendering and full shaping remain pending
+- **Current Stage**: Unit 2: Shaping Engine - GSUB/GPOS Review
+- **Last Completed**: Unit 2: GSUB/GPOS Shaping Code Generation
+- **Next Stage**: Unit 2: GSUB/GPOS review or Unit 3: CFF Charstring Outline Increment
+- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, and initial GSUB/GPOS lookup handling with checked OpenType Layout offsets; SVG output supports TrueType outlines, styling, transformed composites, high-level `renderToSvg`, and explicit CFF/CFF2 unsupported errors

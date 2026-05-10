@@ -9,11 +9,13 @@
 - `x_advance` is the glyph horizontal advance width in raw FUnits.
 - If a legacy horizontal `kern` format 0 pair exists, the pair value is added to the left glyph's `x_advance`.
 - `kern_adjustment` records the pair adjustment applied to the glyph.
-- `y_offset` and `y_advance` remain 0 in this increment.
+- GSUB Single Substitution and Ligature Substitution may replace glyph IDs before positioning.
+- GPOS Single Adjustment and Pair Adjustment may modify glyph offsets and advances.
+- Legacy `kern` remains a fallback when GPOS is absent or does not apply an adjustment.
 - Cluster indexes follow input codepoint order.
 
 ## Deferred Rules
 
-- Ligature clusters may span multiple input codepoints after GSUB support is added.
-- GPOS pair positioning may further modify offsets and advances after GPOS support is added.
 - Complex script reordering is not applied.
+- Full OpenType script/language/feature selection is not applied.
+- Bidirectional text and vertical layout are not applied.

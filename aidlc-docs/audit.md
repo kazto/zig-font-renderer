@@ -388,3 +388,75 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - CFF unsupported handling. CFF charstring outline decoding remains pending.
 
 ---
+
+## Session Continuity - Status Check
+**Timestamp**: 2026-05-09T13:00:00Z
+**User Input**: "AIDLCにしたがい、現在の状況を確認して"
+**AI Response**: "Displayed welcome back message and current status summary. Created session-continuity-questions.md for next step selection."
+**Context**: User requested status check according to AIDLC workflow.
+
+---
+
+## Session Continuity - Step Selection
+**Timestamp**: 2026-05-09T13:05:00Z
+**User Input**: "回答した"
+**AI Response**: "Read session-continuity-questions.md. User chose Option B: Extend Unit 2 - Full GSUB/GPOS shaping support. Initiating planning for Unit 2 extension."
+**Context**: User selected next step for the project.
+
+---
+
+## Code Generation Planning - Unit 2 GSUB/GPOS Extension
+**Timestamp**: 2026-05-09T13:10:00Z
+**User Input**: N/A
+**AI Response**: "Created aidlc-docs/construction/plans/shaping-engine-code-generation-plan.md for GSUB/GPOS support."
+**Context**: Initiating Construction Phase - Unit 2 Code Generation Part 1.
+
+---
+
+## Code Generation - Unit 2 GSUB/GPOS Extension - Start
+**Timestamp**: 2026-05-09T13:15:00Z
+**User Input**: "承認"
+**AI Response**: "User approved the code generation plan for Unit 2 extension. Starting implementation of Common Table Formats."
+**Context**: Construction Phase - Unit 2 Code Generation Part 2.
+
+---
+
+## Fix - ArrayList Initialization
+**Timestamp**: 2026-05-09T13:20:00Z
+**User Input**: N/A
+**AI Response**: "Fixed ArrayList(ShapedGlyph) initialization in shaper.zig."
+**Context**: Bug fix during Unit 2 Code Generation.
+
+---
+
+## Fix - ArrayList Initialization (Unmanaged style)
+**Timestamp**: 2026-05-09T13:25:00Z
+**User Input**: N/A
+**AI Response**: "Switched to Unmanaged ArrayList style (.empty) to match project conventions and fixed compilation errors."
+**Context**: Bug fix during Unit 2 Code Generation.
+
+---
+
+## Refactoring - Named Layout Constants
+**Timestamp**: 2026-05-09T13:30:00Z
+**User Input**: "リファクタリング。マジックナンバーを使わず、変数に名前を付けて。"
+**AI Response**: "Refactored GSUB, GPOS, Coverage, ClassDef, and main CLI magic numbers into named compile-time constants."
+**Context**: Cross-unit source refactoring for Unit 2 extension.
+
+---
+
+## Unit 2 GSUB/GPOS Hardening - Implemented
+**Timestamp**: 2026-05-10T01:44:11Z
+**User Input**: "作業を進めて"
+**AI Response**: "Reviewed the in-progress GSUB/GPOS implementation, added checked OpenType Layout offset slicing, removed a provisional ligature count expression, and preserved legacy `kern` fallback when a GPOS table exists but produces no adjustment."
+**Verification**:
+- `zig fmt src/shaper.zig src/main.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --quiet`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-gpos-av.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-gpos-av.svg`
+**Context**: Construction Phase - Unit 2 - GSUB/GPOS shaping extension hardening.
+
+---

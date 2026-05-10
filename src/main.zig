@@ -33,12 +33,16 @@ const LoadedFace = struct {
     }
 };
 
+const stdout_buffer_size = 4096;
+const stderr_buffer_size = 256;
+const max_font_file_size = 256 * 1024 * 1024;
+
 pub fn main() !void {
-    var stdout_buffer: [4096]u8 = undefined;
+    var stdout_buffer: [stdout_buffer_size]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    var stderr_buffer: [256]u8 = undefined;
+    var stderr_buffer: [stderr_buffer_size]u8 = undefined;
     var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
     const stderr = &stderr_writer.interface;
 
@@ -89,7 +93,7 @@ pub fn main() !void {
 }
 
 fn loadFaceOrExit(allocator: std.mem.Allocator, stderr: *std.Io.Writer, font_path: []const u8) !LoadedFace {
-    const font_data = std.fs.cwd().readFileAlloc(allocator, font_path, 256 * 1024 * 1024) catch |err| {
+    const font_data = std.fs.cwd().readFileAlloc(allocator, font_path, max_font_file_size) catch |err| {
         try stderr.print("error: failed to read font file '{s}': {s}\n", .{ font_path, @errorName(err) });
         try stderr.flush();
         std.process.exit(1);
