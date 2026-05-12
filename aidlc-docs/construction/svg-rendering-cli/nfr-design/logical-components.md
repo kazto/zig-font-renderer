@@ -10,6 +10,10 @@
 - `appendGlyphPath`: Internal glyph-to-path converter.
 - `appendCompositeGlyphPaths`: Internal composite glyph expander for XY-offset components.
 - `cff_outline.appendGlyphPath`: CFF Type 2 outline-to-SVG path converter.
+- `cff_types`: Shared CFF error, transform, INDEX, context, and Type 2 state definitions.
+- `cff_index`: CFF INDEX and DICT operand parsing helpers.
+- `cff_context`: CFF Top DICT, Private DICT, FDArray, and FDSelect resolution.
+- `type2_charstring`: Type 2 charstring execution and SVG path emission.
 - `glyphRange`: Internal `loca` resolver and CFF/CFF2 unsupported-outline detector.
 - `textBounds`: Internal shaped text bounds calculator.
 - `glyphBounds`: Internal glyph header bounds reader.

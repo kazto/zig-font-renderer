@@ -583,3 +583,35 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - CID-keyed CFF local subroutine selection. CFF2 remains pending.
 
 ---
+
+## Refactoring - CFF Module Split
+**Timestamp**: 2026-05-12T04:21:07Z
+**User Input**: "その通りに実行して"
+**AI Response**: "Split the large `src/cff_outline.zig` implementation into focused CFF modules: shared types, INDEX/DICT parsing, context/FDSelect resolution, and Type 2 charstring execution. Kept `src/cff_outline.zig` as a thin public facade."
+**Verification**:
+- `zig fmt src/cff_outline.zig src/cff_types.zig src/cff_index.zig src/cff_context.zig src/type2_charstring.zig`
+- `zig build test`
+- `zig build`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff-split-refactor-a.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text S --output /tmp/zig-font-renderer-cff-split-refactor-s.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-cff-split-refactor-ttf.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-split-refactor-s.svg /tmp/zig-font-renderer-cff-split-refactor-a.svg /tmp/zig-font-renderer-cff-split-refactor-ttf.svg`
+**Context**: Construction Phase - Unit 3 - Source organization refactoring to reduce `src/cff_outline.zig` size and isolate CFF parser/executor responsibilities.
+
+---
+
+## Refactoring - CFF Magic Number Naming
+**Timestamp**: 2026-05-12T04:52:26Z
+**User Input**: "リファクタリング。先ほど作られたソースにはマジックナンバーが散見される。意味のある変数に置き換えて。"
+**AI Response**: "Replaced CFF module split magic numbers with named constants for INDEX offsets, DICT operand encodings, FDSelect layout, Type 2 operand counts, boolean values, deltas, and subroutine bias thresholds."
+**Verification**:
+- `zig fmt src/cff_types.zig src/cff_index.zig src/cff_context.zig src/type2_charstring.zig`
+- `zig build test`
+- `zig build`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff-magic-refactor-a.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text S --output /tmp/zig-font-renderer-cff-magic-refactor-s.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-cff-magic-refactor-ttf.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-magic-refactor-a.svg /tmp/zig-font-renderer-cff-magic-refactor-s.svg /tmp/zig-font-renderer-cff-magic-refactor-ttf.svg`
+**Context**: Construction Phase - Unit 3 - Readability refactoring for the newly split CFF parser and Type 2 executor modules.
+
+---

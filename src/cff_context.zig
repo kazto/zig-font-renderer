@@ -1,0 +1,213 @@
+const font_parser = @import("font_parser.zig");
+const binary_reader = @import("binary_reader.zig");
+const cff_index = @import("cff_index.zig");
+const types = @import("cff_types.zig");
+
+const Cff = types.Cff;
+pub const CffContext = types.CffContext;
+pub const CffIndex = types.CffIndex;
+const TopDictInfo = types.TopDictInfo;
+const CffError = types.CffError;
+const readU16 = binary_reader.readU16;
+const readCffIndex = cff_index.readCffIndex;
+const getCffIndexObject = cff_index.getCffIndexObject;
+const isCffDictOperator = cff_index.isCffDictOperator;
+const readCffDictOperand = cff_index.readCffDictOperand;
+
+const first_top_dict_index = 0;
+const stack_empty = 0;
+const top_dict_single_operand_count = 1;
+const top_dict_private_operand_count = 2;
+const fd_select_format_offset = 0;
+const fd_select_format0_header_size = 1;
+const fd_select_format3_header_size = 3;
+const fd_select_format3_min_size = 5;
+const fd_select_format3_range_count_offset = 1;
+const fd_select_format3_range_size = 3;
+const fd_select_format3_fd_index_offset = 2;
+const fd_select_format3_next_range_offset = 3;
+const fd_select_format3_sentinel_size = 2;
+
+pub fn parseCffContext(cff: []const u8) CffError!CffContext {
+    if (cff.len < Cff.header_min_size) return font_parser.ParserError.InvalidTable;
+    const header_size = cff[Cff.header_size_offset];
+    if (header_size > cff.len) return font_parser.ParserError.InvalidTable;
+
+    var offset: usize = header_size;
+    const name_index = try readCffIndex(cff[offset..]);
+    offset += name_index.end_offset;
+    const top_dict_index = try readCffIndex(cff[offset..]);
+    offset += top_dict_index.end_offset;
+    const string_index = try readCffIndex(cff[offset..]);
+    offset += string_index.end_offset;
+    const global_subr_index = try readCffIndex(cff[offset..]);
+
+    const top_dict = try getCffIndexObject(top_dict_index, first_top_dict_index);
+    const top_dict_info = try readCffTopDictInfo(top_dict);
+    const charstrings_offset = top_dict_info.charstrings_offset orelse return font_parser.ParserError.MissingMandatoryTable;
+    if (charstrings_offset >= cff.len) return font_parser.ParserError.InvalidTable;
+    const charstrings = try readCffIndex(cff[charstrings_offset..]);
+
+    var local_subrs: ?CffIndex = null;
+    if (top_dict_info.private_size) |private_size| {
+        const private_offset = top_dict_info.private_offset orelse return font_parser.ParserError.InvalidTable;
+        if (private_offset + private_size > cff.len) return font_parser.ParserError.InvalidTable;
+        const private_dict = cff[private_offset .. private_offset + private_size];
+        if (try readCffPrivateSubrsOffset(private_dict)) |subrs_offset| {
+            const absolute_subrs_offset = private_offset + subrs_offset;
+            if (absolute_subrs_offset >= cff.len) return font_parser.ParserError.InvalidTable;
+            local_subrs = try readCffIndex(cff[absolute_subrs_offset..]);
+        }
+    }
+
+    return .{
+        .cff = cff,
+        .charstrings = charstrings,
+        .global_subrs = global_subr_index,
+        .local_subrs = local_subrs,
+        .fd_array_offset = top_dict_info.fd_array_offset,
+        .fd_select_offset = top_dict_info.fd_select_offset,
+    };
+}
+
+pub fn readCffTopDictInfo(dict: []const u8) CffError!TopDictInfo {
+    var result = TopDictInfo{};
+    var stack: [Cff.operand_stack_max]i32 = undefined;
+    var stack_len: usize = 0;
+    var offset: usize = 0;
+    while (offset < dict.len) {
+        const byte = dict[offset];
+        if (isCffDictOperator(byte)) {
+            offset += 1;
+            if (byte == Cff.dict_escape_operator) {
+                if (offset >= dict.len) return font_parser.ParserError.InvalidTable;
+                const escaped_operator = dict[offset];
+                offset += 1;
+                if (escaped_operator == Cff.top_dict_fd_array_escaped_operator) {
+                    if (stack_len < top_dict_single_operand_count) return font_parser.ParserError.InvalidTable;
+                    const value = stack[stack_len - top_dict_single_operand_count];
+                    if (value < 0) return font_parser.ParserError.InvalidTable;
+                    result.fd_array_offset = @intCast(value);
+                } else if (escaped_operator == Cff.top_dict_fd_select_escaped_operator) {
+                    if (stack_len < top_dict_single_operand_count) return font_parser.ParserError.InvalidTable;
+                    const value = stack[stack_len - top_dict_single_operand_count];
+                    if (value < 0) return font_parser.ParserError.InvalidTable;
+                    result.fd_select_offset = @intCast(value);
+                }
+                stack_len = stack_empty;
+                continue;
+            }
+            if (byte == Cff.top_dict_charstrings_operator) {
+                if (stack_len < top_dict_single_operand_count) return font_parser.ParserError.InvalidTable;
+                const value = stack[stack_len - top_dict_single_operand_count];
+                if (value < 0) return font_parser.ParserError.InvalidTable;
+                result.charstrings_offset = @intCast(value);
+            } else if (byte == Cff.top_dict_private_operator) {
+                if (stack_len < top_dict_private_operand_count) return font_parser.ParserError.InvalidTable;
+                const private_size = stack[stack_len - top_dict_private_operand_count];
+                const private_offset = stack[stack_len - top_dict_single_operand_count];
+                if (private_size < 0 or private_offset < 0) return font_parser.ParserError.InvalidTable;
+                result.private_size = @intCast(private_size);
+                result.private_offset = @intCast(private_offset);
+            }
+            stack_len = stack_empty;
+            continue;
+        }
+
+        const operand = try readCffDictOperand(dict, &offset);
+        if (stack_len >= stack.len) return font_parser.ParserError.InvalidTable;
+        stack[stack_len] = operand;
+        stack_len += 1;
+    }
+    return result;
+}
+
+pub fn readCffPrivateSubrsOffset(dict: []const u8) CffError!?usize {
+    var stack: [Cff.operand_stack_max]i32 = undefined;
+    var stack_len: usize = 0;
+    var offset: usize = 0;
+    while (offset < dict.len) {
+        const byte = dict[offset];
+        if (isCffDictOperator(byte)) {
+            offset += 1;
+            if (byte == Cff.dict_escape_operator) {
+                if (offset >= dict.len) return font_parser.ParserError.InvalidTable;
+                offset += 1;
+                stack_len = stack_empty;
+                continue;
+            }
+            if (byte == Cff.private_subrs_operator) {
+                if (stack_len < top_dict_single_operand_count) return font_parser.ParserError.InvalidTable;
+                const value = stack[stack_len - top_dict_single_operand_count];
+                if (value < 0) return font_parser.ParserError.InvalidTable;
+                return @intCast(value);
+            }
+            stack_len = stack_empty;
+            continue;
+        }
+
+        const operand = try readCffDictOperand(dict, &offset);
+        if (stack_len >= stack.len) return font_parser.ParserError.InvalidTable;
+        stack[stack_len] = operand;
+        stack_len += 1;
+    }
+    return null;
+}
+
+pub fn getCffGlyphLocalSubrs(context: CffContext, glyph_id: u16) CffError!?CffIndex {
+    if (context.fd_array_offset == null and context.fd_select_offset == null) return context.local_subrs;
+    const fd_array_offset = context.fd_array_offset orelse return context.local_subrs;
+    const fd_select_offset = context.fd_select_offset orelse return context.local_subrs;
+    if (fd_array_offset >= context.cff.len or fd_select_offset >= context.cff.len) return font_parser.ParserError.InvalidTable;
+
+    const fd_index = try readCffFdSelect(context.cff[fd_select_offset..], glyph_id, context.charstrings.count);
+    const fd_array = try readCffIndex(context.cff[fd_array_offset..]);
+    const font_dict = try getCffIndexObject(fd_array, fd_index);
+    const font_dict_info = try readCffTopDictInfo(font_dict);
+    const private_size = font_dict_info.private_size orelse return null;
+    const private_offset = font_dict_info.private_offset orelse return font_parser.ParserError.InvalidTable;
+    if (private_offset + private_size > context.cff.len) return font_parser.ParserError.InvalidTable;
+
+    const private_dict = context.cff[private_offset .. private_offset + private_size];
+    const subrs_offset = (try readCffPrivateSubrsOffset(private_dict)) orelse return null;
+    const absolute_subrs_offset = private_offset + subrs_offset;
+    if (absolute_subrs_offset >= context.cff.len) return font_parser.ParserError.InvalidTable;
+    return try readCffIndex(context.cff[absolute_subrs_offset..]);
+}
+
+pub fn readCffFdSelect(data: []const u8, glyph_id: u16, glyph_count: u16) CffError!u16 {
+    if (glyph_id >= glyph_count or data.len == stack_empty) return font_parser.ParserError.InvalidTable;
+    return switch (data[fd_select_format_offset]) {
+        Cff.fd_select_format_0 => readCffFdSelectFormat0(data, glyph_id, glyph_count),
+        Cff.fd_select_format_3 => readCffFdSelectFormat3(data, glyph_id),
+        else => font_parser.ParserError.InvalidTable,
+    };
+}
+
+pub fn readCffFdSelectFormat0(data: []const u8, glyph_id: u16, glyph_count: u16) CffError!u16 {
+    if (data.len < fd_select_format0_header_size + @as(usize, glyph_count)) return font_parser.ParserError.InvalidTable;
+    return data[fd_select_format0_header_size + @as(usize, glyph_id)];
+}
+
+pub fn readCffFdSelectFormat3(data: []const u8, glyph_id: u16) CffError!u16 {
+    if (data.len < fd_select_format3_min_size) return font_parser.ParserError.InvalidTable;
+    const range_count = try readU16(data, fd_select_format3_range_count_offset);
+    const sentinel_offset = fd_select_format3_header_size + @as(usize, range_count) * fd_select_format3_range_size;
+    if (sentinel_offset + fd_select_format3_sentinel_size > data.len) return font_parser.ParserError.InvalidTable;
+
+    var offset: usize = fd_select_format3_header_size;
+    var range_index: usize = 0;
+    while (range_index < range_count) : (range_index += 1) {
+        const first = try readU16(data, offset);
+        const fd_index = data[offset + fd_select_format3_fd_index_offset];
+        const next = if (range_index + 1 == range_count)
+            try readU16(data, sentinel_offset)
+        else
+            try readU16(data, offset + fd_select_format3_next_range_offset);
+        if (first > next) return font_parser.ParserError.InvalidTable;
+        if (glyph_id >= first and glyph_id < next) return fd_index;
+        offset += fd_select_format3_range_size;
+    }
+
+    return font_parser.ParserError.InvalidTable;
+}
