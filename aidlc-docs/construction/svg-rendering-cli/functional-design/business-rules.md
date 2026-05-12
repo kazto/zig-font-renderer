@@ -24,6 +24,7 @@
 - CLI SVG output must use the same high-level API exposed to library users.
 - CFF `CharStrings` INDEX data can be resolved by glyph ID.
 - CFF Top DICT `Private` and Private DICT `Subrs` offsets are resolved for local subroutines.
+- CID-keyed CFF glyphs resolve glyph-specific Font DICT local subroutines through `FDArray` and `FDSelect`.
 - Basic Type 2 `rmoveto`, `hmoveto`, `vmoveto`, `rlineto`, `hlineto`, `vlineto`, `rrcurveto`, and `endchar` operators emit SVG path commands.
 - Type 2 `callsubr` and `callgsubr` expand local/global CFF subroutines with bounded recursion.
 - Type 2 `hintmask` and `cntrmask` bytes are skipped according to the active stem hint count.

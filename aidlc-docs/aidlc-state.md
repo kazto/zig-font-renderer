@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-04-27T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Unit 3: SVG Rendering & CLI - CFF Calculation Operators Review
+- **Current Stage**: CONSTRUCTION - Unit 3: SVG Rendering & CLI - CFF FDSelect Review
 
 ## Execution Plan Summary
 - **Total Stages**: 14 (Total workflow stages including those executed/skipped)
@@ -51,13 +51,14 @@
 - [x] Unit 3: Code Generation - CFF FLEX OPERATORS (2026-05-10)
 - [x] Cross-Unit Refactoring - BINARY READER EXTRACTION (2026-05-12)
 - [x] Unit 3: Code Generation - CFF CALCULATION OPERATORS (2026-05-12)
+- [x] Unit 3: Code Generation - CFF FDSELECT LOCAL SUBRS (2026-05-12)
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 3: SVG Rendering & CLI - CFF Calculation Operators Review
-- **Last Completed**: Unit 3: CFF Calculation Operators Code Generation
+- **Current Stage**: Unit 3: SVG Rendering & CLI - CFF FDSelect Review
+- **Last Completed**: Unit 3: CFF FDSelect Local Subrs Code Generation
 - **Next Stage**: Unit 3: Remaining Type 2 Operators/CFF2 or Unit 2: GSUB/GPOS Review
-- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, and initial GSUB/GPOS lookup handling with checked OpenType Layout offsets; SVG output supports TrueType outlines, styling, transformed composites, high-level `renderToSvg`, and CFF outline rendering through the extracted `src/cff_outline.zig` module including common Type 2 curves, flex operators, and escaped calculation/stack operators; repeated big-endian integer readers have been centralized in `src/binary_reader.zig`; CFF2 and uncommon non-calculation Type 2 operators remain pending
+- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, and initial GSUB/GPOS lookup handling with checked OpenType Layout offsets; SVG output supports TrueType outlines, styling, transformed composites, high-level `renderToSvg`, and CFF outline rendering through the extracted `src/cff_outline.zig` module including common Type 2 curves, flex operators, escaped calculation/stack operators, and CID-keyed CFF FDSelect local subr selection; repeated big-endian integer readers have been centralized in `src/binary_reader.zig`; CFF2 and uncommon non-calculation Type 2 operators remain pending

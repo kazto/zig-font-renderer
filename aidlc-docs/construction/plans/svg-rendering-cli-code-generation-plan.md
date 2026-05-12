@@ -112,6 +112,12 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Keep non-calculation escaped operators explicitly unsupported.
   - Verify CFF and TrueType SVG generation still succeeds.
 
+- [x] Step 18: Add CID-keyed CFF local subroutine selection
+  - Read Top DICT `FDArray` and `FDSelect` offsets.
+  - Support FDSelect formats 0 and 3.
+  - Resolve glyph-specific Font DICT `Private` and local `Subrs` offsets.
+  - Verify CFF and TrueType SVG generation still succeeds.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
@@ -123,6 +129,7 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] SVG output can be styled with fill, background, and margin controls.
 - [x] CFF charstrings can be reached and basic Type 2 operators can be converted to SVG path commands.
 - [x] CFF subroutine-backed glyphs can be expanded for basic Type 2 outlines.
+- [x] CID-keyed CFF glyphs can select glyph-specific local subroutines via FDSelect.
 - [x] Common CFF Type 2 curve operators and hint masks are handled.
 - [x] Type 2 flex operators are emitted as cubic SVG paths.
 - [x] Type 2 calculation and stack operators can feed subsequent drawing operands.

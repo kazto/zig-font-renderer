@@ -25,6 +25,7 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Applies composite uniform scale, separate XY scale, and 2x2 transforms to emitted path coordinates.
   - Parses CFF INDEX data and Top DICT `CharStrings` offsets.
   - Retrieves CFF Type 2 charstrings by glyph ID.
+  - Resolves CID-keyed CFF `FDArray`/`FDSelect` data for glyph-specific local subroutines.
   - Emits SVG path commands for basic Type 2 moveto, lineto, and rrcurveto operators.
   - Expands Type 2 `callsubr` and `callgsubr` with standard CFF subroutine bias.
   - Skips Type 2 `hintmask`/`cntrmask` data using the active stem count.

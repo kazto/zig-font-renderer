@@ -568,3 +568,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - CFF Type 2 calculation and stack operator support. CFF2 and uncommon non-calculation Type 2 operators remain pending.
 
 ---
+
+## Unit 3 CFF FDSelect Local Subrs - Implemented
+**Timestamp**: 2026-05-12T04:11:32Z
+**User Input**: "do next"
+**AI Response**: "Added CID-keyed CFF support for Top DICT `FDArray`/`FDSelect`, FDSelect formats 0 and 3, and glyph-specific Font DICT local subroutine resolution."
+**Verification**:
+- `zig fmt src/cff_outline.zig`
+- `zig build test`
+- `zig build`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text CID --output /tmp/zig-font-renderer-cff-fdselect-cff.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-cff-fdselect-ttf.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-fdselect-cff.svg /tmp/zig-font-renderer-cff-fdselect-ttf.svg`
+**Context**: Construction Phase - Unit 3 - CID-keyed CFF local subroutine selection. CFF2 remains pending.
+
+---

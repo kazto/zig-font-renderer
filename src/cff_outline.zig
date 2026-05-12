@@ -17,7 +17,11 @@ const Cff = struct {
     const index_off_size_offset = 2;
     const top_dict_charstrings_operator = 17;
     const top_dict_private_operator = 18;
+    const top_dict_fd_array_escaped_operator = 36;
+    const top_dict_fd_select_escaped_operator = 37;
     const private_subrs_operator = 19;
+    const fd_select_format_0 = 0;
+    const fd_select_format_3 = 3;
     const operand_stack_max = 48;
     const max_subr_depth = 16;
 };
@@ -111,13 +115,17 @@ const CffContext = struct {
     cff: []const u8,
     charstrings: CffIndex,
     global_subrs: CffIndex,
-    local_subrs: ?CffIndex,
+    local_subrs: ?CffIndex = null,
+    fd_array_offset: ?usize = null,
+    fd_select_offset: ?usize = null,
 };
 
 const TopDictInfo = struct {
     charstrings_offset: ?usize = null,
     private_size: ?usize = null,
     private_offset: ?usize = null,
+    fd_array_offset: ?usize = null,
+    fd_select_offset: ?usize = null,
 };
 
 const Type2State = struct {
@@ -134,9 +142,10 @@ pub fn appendGlyphPath(writer: std.ArrayList(u8).Writer, cff: []const u8, glyph_
     const context = try parseCffContext(cff);
     const charstring = try getCffCharString(context, glyph_id);
     if (charstring.len == 0) return;
+    const local_subrs = try getCffGlyphLocalSubrs(context, glyph_id);
 
     try writer.print("    <path d=\"", .{});
-    try appendType2CharStringPath(writer, charstring, transform, context);
+    try appendType2CharStringPathWithSubrs(writer, charstring, transform, context, local_subrs);
     try writer.print("\"/>\n", .{});
 }
 
@@ -181,6 +190,8 @@ fn parseCffContext(cff: []const u8) CffError!CffContext {
         .charstrings = charstrings,
         .global_subrs = global_subr_index,
         .local_subrs = local_subrs,
+        .fd_array_offset = top_dict_info.fd_array_offset,
+        .fd_select_offset = top_dict_info.fd_select_offset,
     };
 }
 
@@ -195,7 +206,19 @@ fn readCffTopDictInfo(dict: []const u8) CffError!TopDictInfo {
             offset += 1;
             if (byte == 12) {
                 if (offset >= dict.len) return font_parser.ParserError.InvalidTable;
+                const escaped_operator = dict[offset];
                 offset += 1;
+                if (escaped_operator == Cff.top_dict_fd_array_escaped_operator) {
+                    if (stack_len == 0) return font_parser.ParserError.InvalidTable;
+                    const value = stack[stack_len - 1];
+                    if (value < 0) return font_parser.ParserError.InvalidTable;
+                    result.fd_array_offset = @intCast(value);
+                } else if (escaped_operator == Cff.top_dict_fd_select_escaped_operator) {
+                    if (stack_len == 0) return font_parser.ParserError.InvalidTable;
+                    const value = stack[stack_len - 1];
+                    if (value < 0) return font_parser.ParserError.InvalidTable;
+                    result.fd_select_offset = @intCast(value);
+                }
                 stack_len = 0;
                 continue;
             }
@@ -256,12 +279,74 @@ fn readCffPrivateSubrsOffset(dict: []const u8) CffError!?usize {
     return null;
 }
 
-fn appendType2CharStringPath(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext) CffError!void {
-    var state = Type2State{};
-    try executeType2CharString(writer, charstring, transform, context, &state, 0);
+fn getCffGlyphLocalSubrs(context: CffContext, glyph_id: u16) CffError!?CffIndex {
+    if (context.fd_array_offset == null and context.fd_select_offset == null) return context.local_subrs;
+    const fd_array_offset = context.fd_array_offset orelse return context.local_subrs;
+    const fd_select_offset = context.fd_select_offset orelse return context.local_subrs;
+    if (fd_array_offset >= context.cff.len or fd_select_offset >= context.cff.len) return font_parser.ParserError.InvalidTable;
+
+    const fd_index = try readCffFdSelect(context.cff[fd_select_offset..], glyph_id, context.charstrings.count);
+    const fd_array = try readCffIndex(context.cff[fd_array_offset..]);
+    const font_dict = try getCffIndexObject(fd_array, fd_index);
+    const font_dict_info = try readCffTopDictInfo(font_dict);
+    const private_size = font_dict_info.private_size orelse return null;
+    const private_offset = font_dict_info.private_offset orelse return font_parser.ParserError.InvalidTable;
+    if (private_offset + private_size > context.cff.len) return font_parser.ParserError.InvalidTable;
+
+    const private_dict = context.cff[private_offset .. private_offset + private_size];
+    const subrs_offset = (try readCffPrivateSubrsOffset(private_dict)) orelse return null;
+    const absolute_subrs_offset = private_offset + subrs_offset;
+    if (absolute_subrs_offset >= context.cff.len) return font_parser.ParserError.InvalidTable;
+    return try readCffIndex(context.cff[absolute_subrs_offset..]);
 }
 
-fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext, state: *Type2State, depth: u8) CffError!void {
+fn readCffFdSelect(data: []const u8, glyph_id: u16, glyph_count: u16) CffError!u16 {
+    if (glyph_id >= glyph_count or data.len == 0) return font_parser.ParserError.InvalidTable;
+    return switch (data[0]) {
+        Cff.fd_select_format_0 => readCffFdSelectFormat0(data, glyph_id, glyph_count),
+        Cff.fd_select_format_3 => readCffFdSelectFormat3(data, glyph_id),
+        else => font_parser.ParserError.InvalidTable,
+    };
+}
+
+fn readCffFdSelectFormat0(data: []const u8, glyph_id: u16, glyph_count: u16) CffError!u16 {
+    if (data.len < 1 + @as(usize, glyph_count)) return font_parser.ParserError.InvalidTable;
+    return data[1 + @as(usize, glyph_id)];
+}
+
+fn readCffFdSelectFormat3(data: []const u8, glyph_id: u16) CffError!u16 {
+    if (data.len < 5) return font_parser.ParserError.InvalidTable;
+    const range_count = try readU16(data, 1);
+    const sentinel_offset = 3 + @as(usize, range_count) * 3;
+    if (sentinel_offset + 2 > data.len) return font_parser.ParserError.InvalidTable;
+
+    var offset: usize = 3;
+    var range_index: usize = 0;
+    while (range_index < range_count) : (range_index += 1) {
+        const first = try readU16(data, offset);
+        const fd_index = data[offset + 2];
+        const next = if (range_index + 1 == range_count)
+            try readU16(data, sentinel_offset)
+        else
+            try readU16(data, offset + 3);
+        if (first > next) return font_parser.ParserError.InvalidTable;
+        if (glyph_id >= first and glyph_id < next) return fd_index;
+        offset += 3;
+    }
+
+    return font_parser.ParserError.InvalidTable;
+}
+
+fn appendType2CharStringPath(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext) CffError!void {
+    try appendType2CharStringPathWithSubrs(writer, charstring, transform, context, context.local_subrs);
+}
+
+fn appendType2CharStringPathWithSubrs(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext, local_subrs: ?CffIndex) CffError!void {
+    var state = Type2State{};
+    try executeType2CharString(writer, charstring, transform, context, local_subrs, &state, 0);
+}
+
+fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext, local_subrs: ?CffIndex, state: *Type2State, depth: u8) CffError!void {
     if (depth > Cff.max_subr_depth) return CffError.UnsupportedCffOperator;
     var offset: usize = 0;
 
@@ -404,7 +489,7 @@ fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []const 
                 try emitType2AlternatingCurve(writer, transform, state, byte == Type2.hvcurveto);
                 state.stack_len = 0;
             },
-            Type2.callsubr => try executeCffSubroutine(writer, transform, context, context.local_subrs, state, depth + 1),
+            Type2.callsubr => try executeCffSubroutine(writer, transform, context, local_subrs, state, depth + 1),
             Type2.callgsubr => try executeCffSubroutine(writer, transform, context, context.global_subrs, state, depth + 1),
             Type2.return_op => return,
             Type2.endchar => {
@@ -713,7 +798,7 @@ fn executeCffSubroutine(writer: std.ArrayList(u8).Writer, transform: Transform, 
     const biased_index = raw_index + cffSubrBias(subrs.count);
     if (biased_index < 0 or biased_index > std.math.maxInt(u16)) return font_parser.ParserError.InvalidTable;
     const subr = try getCffIndexObject(subrs, @intCast(biased_index));
-    try executeType2CharString(writer, subr, transform, context, state, depth);
+    try executeType2CharString(writer, subr, transform, context, maybe_subrs, state, depth);
 }
 
 fn cffSubrBias(count: u16) i32 {
@@ -853,6 +938,46 @@ test "CFF subroutine bias follows Type 2 thresholds" {
     try std.testing.expectEqual(@as(i32, 107), cffSubrBias(1239));
     try std.testing.expectEqual(@as(i32, 1131), cffSubrBias(1240));
     try std.testing.expectEqual(@as(i32, 32768), cffSubrBias(33900));
+}
+
+test "CFF top dict reads FDArray and FDSelect offsets" {
+    const dict = [_]u8{
+        189, Type2.escape, Cff.top_dict_fd_array_escaped_operator,
+        199, Type2.escape, Cff.top_dict_fd_select_escaped_operator,
+    };
+    const info = try readCffTopDictInfo(&dict);
+    try std.testing.expectEqual(@as(?usize, 50), info.fd_array_offset);
+    try std.testing.expectEqual(@as(?usize, 60), info.fd_select_offset);
+}
+
+test "CFF FDSelect format 0 maps glyph IDs" {
+    const fd_select = [_]u8{ Cff.fd_select_format_0, 2, 4, 2 };
+
+    try std.testing.expectEqual(@as(u16, 2), try readCffFdSelect(&fd_select, 0, 3));
+    try std.testing.expectEqual(@as(u16, 4), try readCffFdSelect(&fd_select, 1, 3));
+    try std.testing.expectEqual(@as(u16, 2), try readCffFdSelect(&fd_select, 2, 3));
+    try std.testing.expectError(font_parser.ParserError.InvalidTable, readCffFdSelect(&fd_select, 3, 3));
+}
+
+test "CFF FDSelect format 3 maps glyph ranges" {
+    const fd_select = [_]u8{
+        Cff.fd_select_format_3,
+        0,
+        2,
+        0,
+        0,
+        1,
+        0,
+        3,
+        2,
+        0,
+        5,
+    };
+
+    try std.testing.expectEqual(@as(u16, 1), try readCffFdSelect(&fd_select, 0, 5));
+    try std.testing.expectEqual(@as(u16, 1), try readCffFdSelect(&fd_select, 2, 5));
+    try std.testing.expectEqual(@as(u16, 2), try readCffFdSelect(&fd_select, 3, 5));
+    try std.testing.expectEqual(@as(u16, 2), try readCffFdSelect(&fd_select, 4, 5));
 }
 
 test "Type2 charstring emits moveto and lines" {
