@@ -553,3 +553,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Cross-unit refactoring to remove duplicated binary read helpers while preserving parser-compatible `InvalidTable` propagation.
 
 ---
+
+## Unit 3 CFF Calculation Operators - Implemented
+**Timestamp**: 2026-05-12T04:07:05Z
+**User Input**: "do it"
+**AI Response**: "Added escaped Type 2 arithmetic, boolean, transient storage, conditional, and stack manipulation operators so uncommon CFF charstrings can compute operands before drawing. Kept remaining non-calculation escaped operators explicitly unsupported."
+**Verification**:
+- `zig fmt src/cff_outline.zig`
+- `zig build test`
+- `zig build`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text math --output /tmp/zig-font-renderer-type2-calc-cff.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-type2-calc-ttf.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-type2-calc-cff.svg /tmp/zig-font-renderer-type2-calc-ttf.svg`
+**Context**: Construction Phase - Unit 3 - CFF Type 2 calculation and stack operator support. CFF2 and uncommon non-calculation Type 2 operators remain pending.
+
+---

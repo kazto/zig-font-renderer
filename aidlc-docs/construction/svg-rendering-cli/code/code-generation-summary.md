@@ -30,6 +30,7 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Skips Type 2 `hintmask`/`cntrmask` data using the active stem count.
   - Emits SVG cubic paths for common compact Type 2 curve operators.
   - Emits SVG cubic paths for escaped Type 2 flex operators.
+  - Evaluates escaped Type 2 arithmetic, boolean, storage, conditional, and stack manipulation operators.
   - Returns `UnsupportedCffOperator` for remaining Type 2 operators that are not yet implemented.
   - Emits SVG path commands with bounds-based width, height, viewBox, and scaled group transform.
   - Supports glyph fill color, optional background color, and custom margin.

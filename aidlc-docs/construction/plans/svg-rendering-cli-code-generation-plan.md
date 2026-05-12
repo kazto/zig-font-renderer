@@ -106,6 +106,12 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Preserve explicit unsupported errors for remaining escaped operators.
   - Verify CFF and TrueType SVG generation still succeeds.
 
+- [x] Step 17: Add Type 2 calculation and stack operators
+  - Decode common escaped Type 2 arithmetic, boolean, storage, conditional, and stack manipulation operators.
+  - Preserve deterministic behavior for `random` and integer-only evaluation for calculation operators.
+  - Keep non-calculation escaped operators explicitly unsupported.
+  - Verify CFF and TrueType SVG generation still succeeds.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
@@ -119,6 +125,7 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] CFF subroutine-backed glyphs can be expanded for basic Type 2 outlines.
 - [x] Common CFF Type 2 curve operators and hint masks are handled.
 - [x] Type 2 flex operators are emitted as cubic SVG paths.
+- [x] Type 2 calculation and stack operators can feed subsequent drawing operands.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
 - [x] CFF2 and full typography remain explicitly deferred.

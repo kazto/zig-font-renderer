@@ -23,6 +23,27 @@ const Cff = struct {
 };
 
 const Type2 = struct {
+    const escaped_dotsection = 0;
+    const escaped_and = 3;
+    const escaped_or = 4;
+    const escaped_not = 5;
+    const escaped_abs = 9;
+    const escaped_add = 10;
+    const escaped_sub = 11;
+    const escaped_div = 12;
+    const escaped_neg = 14;
+    const escaped_eq = 15;
+    const escaped_drop = 18;
+    const escaped_put = 20;
+    const escaped_get = 21;
+    const escaped_ifelse = 22;
+    const escaped_random = 23;
+    const escaped_mul = 24;
+    const escaped_sqrt = 26;
+    const escaped_dup = 27;
+    const escaped_exch = 28;
+    const escaped_index = 29;
+    const escaped_roll = 30;
     const escaped_flex = 35;
     const escaped_hflex = 34;
     const escaped_hflex1 = 36;
@@ -101,6 +122,7 @@ const TopDictInfo = struct {
 
 const Type2State = struct {
     stack: [Cff.operand_stack_max]i32 = undefined,
+    transient: [32]i32 = [_]i32{0} ** 32,
     stack_len: usize = 0,
     x: i32 = 0,
     y: i32 = 0,
@@ -394,13 +416,33 @@ fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []const 
                 const escaped_operator = charstring[offset];
                 offset += 1;
                 switch (escaped_operator) {
+                    Type2.escaped_dotsection => state.stack_len = 0,
+                    Type2.escaped_and => try executeType2And(state),
+                    Type2.escaped_or => try executeType2Or(state),
+                    Type2.escaped_not => try executeType2Not(state),
+                    Type2.escaped_abs => try executeType2Abs(state),
+                    Type2.escaped_add => try executeType2Add(state),
+                    Type2.escaped_sub => try executeType2Sub(state),
+                    Type2.escaped_div => try executeType2Div(state),
+                    Type2.escaped_neg => try executeType2Neg(state),
+                    Type2.escaped_eq => try executeType2Eq(state),
+                    Type2.escaped_drop => try executeType2Drop(state),
+                    Type2.escaped_put => try executeType2Put(state),
+                    Type2.escaped_get => try executeType2Get(state),
+                    Type2.escaped_ifelse => try executeType2IfElse(state),
+                    Type2.escaped_random => try executeType2Random(state),
+                    Type2.escaped_mul => try executeType2Mul(state),
+                    Type2.escaped_sqrt => try executeType2Sqrt(state),
+                    Type2.escaped_dup => try executeType2Dup(state),
+                    Type2.escaped_exch => try executeType2Exch(state),
+                    Type2.escaped_index => try executeType2Index(state),
+                    Type2.escaped_roll => try executeType2Roll(state),
                     Type2.escaped_flex => try emitType2Flex(writer, transform, state),
                     Type2.escaped_hflex => try emitType2HFlex(writer, transform, state),
                     Type2.escaped_hflex1 => try emitType2HFlex1(writer, transform, state),
                     Type2.escaped_flex1 => try emitType2Flex1(writer, transform, state),
                     else => return CffError.UnsupportedCffOperator,
                 }
-                state.stack_len = 0;
             },
             else => return CffError.UnsupportedCffOperator,
         }
@@ -420,16 +462,194 @@ fn emitType2Curve(writer: std.ArrayList(u8).Writer, transform: Transform, state:
     try writer.print("C {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} ", .{ c1.x, c1.y, c2.x, c2.y, end.x, end.y });
 }
 
+fn executeType2And(state: *Type2State) CffError!void {
+    if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+    const rhs = popType2Stack(state);
+    const lhs = popType2Stack(state);
+    try pushType2Stack(state, if (lhs != 0 and rhs != 0) 1 else 0);
+}
+
+fn executeType2Or(state: *Type2State) CffError!void {
+    if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+    const rhs = popType2Stack(state);
+    const lhs = popType2Stack(state);
+    try pushType2Stack(state, if (lhs != 0 or rhs != 0) 1 else 0);
+}
+
+fn executeType2Not(state: *Type2State) CffError!void {
+    if (state.stack_len < 1) return font_parser.ParserError.InvalidTable;
+    state.stack[state.stack_len - 1] = if (state.stack[state.stack_len - 1] == 0) 1 else 0;
+}
+
+fn executeType2Abs(state: *Type2State) CffError!void {
+    if (state.stack_len < 1) return font_parser.ParserError.InvalidTable;
+    const value = state.stack[state.stack_len - 1];
+    if (value == std.math.minInt(i32)) return font_parser.ParserError.InvalidTable;
+    state.stack[state.stack_len - 1] = if (value < 0) -value else value;
+}
+
+fn executeType2Add(state: *Type2State) CffError!void {
+    if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+    const rhs = popType2Stack(state);
+    const lhs = popType2Stack(state);
+    try pushType2Stack(state, try checkedAdd(lhs, rhs));
+}
+
+fn executeType2Sub(state: *Type2State) CffError!void {
+    if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+    const rhs = popType2Stack(state);
+    const lhs = popType2Stack(state);
+    try pushType2Stack(state, try checkedSub(lhs, rhs));
+}
+
+fn executeType2Div(state: *Type2State) CffError!void {
+    if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+    const rhs = popType2Stack(state);
+    const lhs = popType2Stack(state);
+    if (rhs == 0) return font_parser.ParserError.InvalidTable;
+    try pushType2Stack(state, @divTrunc(lhs, rhs));
+}
+
+fn executeType2Neg(state: *Type2State) CffError!void {
+    if (state.stack_len < 1) return font_parser.ParserError.InvalidTable;
+    const value = state.stack[state.stack_len - 1];
+    if (value == std.math.minInt(i32)) return font_parser.ParserError.InvalidTable;
+    state.stack[state.stack_len - 1] = -value;
+}
+
+fn executeType2Eq(state: *Type2State) CffError!void {
+    if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+    const rhs = popType2Stack(state);
+    const lhs = popType2Stack(state);
+    try pushType2Stack(state, if (lhs == rhs) 1 else 0);
+}
+
+fn executeType2Drop(state: *Type2State) CffError!void {
+    if (state.stack_len < 1) return font_parser.ParserError.InvalidTable;
+    _ = popType2Stack(state);
+}
+
+fn executeType2Put(state: *Type2State) CffError!void {
+    if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+    const index = popType2Stack(state);
+    const value = popType2Stack(state);
+    if (index < 0 or index >= state.transient.len) return font_parser.ParserError.InvalidTable;
+    state.transient[@intCast(index)] = value;
+}
+
+fn executeType2Get(state: *Type2State) CffError!void {
+    if (state.stack_len < 1) return font_parser.ParserError.InvalidTable;
+    const index = popType2Stack(state);
+    if (index < 0 or index >= state.transient.len) return font_parser.ParserError.InvalidTable;
+    try pushType2Stack(state, state.transient[@intCast(index)]);
+}
+
+fn executeType2IfElse(state: *Type2State) CffError!void {
+    if (state.stack_len < 4) return font_parser.ParserError.InvalidTable;
+    const value2 = popType2Stack(state);
+    const value1 = popType2Stack(state);
+    const s2 = popType2Stack(state);
+    const s1 = popType2Stack(state);
+    try pushType2Stack(state, if (value1 <= value2) s1 else s2);
+}
+
+fn executeType2Random(state: *Type2State) CffError!void {
+    try pushType2Stack(state, 1);
+}
+
+fn executeType2Mul(state: *Type2State) CffError!void {
+    if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+    const rhs = popType2Stack(state);
+    const lhs = popType2Stack(state);
+    try pushType2Stack(state, try checkedMul(lhs, rhs));
+}
+
+fn executeType2Sqrt(state: *Type2State) CffError!void {
+    if (state.stack_len < 1) return font_parser.ParserError.InvalidTable;
+    const value = state.stack[state.stack_len - 1];
+    if (value < 0) return font_parser.ParserError.InvalidTable;
+    state.stack[state.stack_len - 1] = @intFromFloat(@sqrt(@as(f64, @floatFromInt(value))));
+}
+
+fn executeType2Dup(state: *Type2State) CffError!void {
+    if (state.stack_len < 1) return font_parser.ParserError.InvalidTable;
+    try pushType2Stack(state, state.stack[state.stack_len - 1]);
+}
+
+fn executeType2Exch(state: *Type2State) CffError!void {
+    if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+    const last = state.stack_len - 1;
+    const previous = state.stack_len - 2;
+    const tmp = state.stack[last];
+    state.stack[last] = state.stack[previous];
+    state.stack[previous] = tmp;
+}
+
+fn executeType2Index(state: *Type2State) CffError!void {
+    if (state.stack_len < 1) return font_parser.ParserError.InvalidTable;
+    const raw_index = popType2Stack(state);
+    const index: usize = if (raw_index < 0) 0 else @intCast(raw_index);
+    if (index >= state.stack_len) return font_parser.ParserError.InvalidTable;
+    try pushType2Stack(state, state.stack[state.stack_len - 1 - index]);
+}
+
+fn executeType2Roll(state: *Type2State) CffError!void {
+    if (state.stack_len < 2) return font_parser.ParserError.InvalidTable;
+    const j = popType2Stack(state);
+    const raw_n = popType2Stack(state);
+    if (raw_n < 0) return font_parser.ParserError.InvalidTable;
+    const n: usize = @intCast(raw_n);
+    if (n == 0) return;
+    if (n > state.stack_len) return font_parser.ParserError.InvalidTable;
+
+    const base = state.stack_len - n;
+    const rotation = @mod(j, raw_n);
+    var steps: usize = @intCast(rotation);
+    while (steps > 0) : (steps -= 1) {
+        const last = state.stack[state.stack_len - 1];
+        var index = state.stack_len - 1;
+        while (index > base) : (index -= 1) {
+            state.stack[index] = state.stack[index - 1];
+        }
+        state.stack[base] = last;
+    }
+}
+
+fn popType2Stack(state: *Type2State) i32 {
+    state.stack_len -= 1;
+    return state.stack[state.stack_len];
+}
+
+fn pushType2Stack(state: *Type2State, value: i32) CffError!void {
+    if (state.stack_len >= state.stack.len) return font_parser.ParserError.InvalidTable;
+    state.stack[state.stack_len] = value;
+    state.stack_len += 1;
+}
+
+fn checkedAdd(lhs: i32, rhs: i32) CffError!i32 {
+    return std.math.add(i32, lhs, rhs) catch font_parser.ParserError.InvalidTable;
+}
+
+fn checkedSub(lhs: i32, rhs: i32) CffError!i32 {
+    return std.math.sub(i32, lhs, rhs) catch font_parser.ParserError.InvalidTable;
+}
+
+fn checkedMul(lhs: i32, rhs: i32) CffError!i32 {
+    return std.math.mul(i32, lhs, rhs) catch font_parser.ParserError.InvalidTable;
+}
+
 fn emitType2Flex(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
     if (!state.has_current_point or state.stack_len != 13) return font_parser.ParserError.InvalidTable;
     try emitType2Curve(writer, transform, state, state.stack[0], state.stack[1], state.stack[2], state.stack[3], state.stack[4], state.stack[5]);
     try emitType2Curve(writer, transform, state, state.stack[6], state.stack[7], state.stack[8], state.stack[9], state.stack[10], state.stack[11]);
+    state.stack_len = 0;
 }
 
 fn emitType2HFlex(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
     if (!state.has_current_point or state.stack_len != 7) return font_parser.ParserError.InvalidTable;
     try emitType2Curve(writer, transform, state, state.stack[0], 0, state.stack[1], state.stack[2], state.stack[3], 0);
     try emitType2Curve(writer, transform, state, state.stack[4], 0, state.stack[5], -state.stack[2], state.stack[6], 0);
+    state.stack_len = 0;
 }
 
 fn emitType2HFlex1(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
@@ -437,6 +657,7 @@ fn emitType2HFlex1(writer: std.ArrayList(u8).Writer, transform: Transform, state
     const dy6 = -(state.stack[1] + state.stack[3] + state.stack[7]);
     try emitType2Curve(writer, transform, state, state.stack[0], state.stack[1], state.stack[2], state.stack[3], state.stack[4], 0);
     try emitType2Curve(writer, transform, state, state.stack[5], 0, state.stack[6], state.stack[7], state.stack[8], dy6);
+    state.stack_len = 0;
 }
 
 fn emitType2Flex1(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
@@ -448,6 +669,7 @@ fn emitType2Flex1(writer: std.ArrayList(u8).Writer, transform: Transform, state:
 
     try emitType2Curve(writer, transform, state, state.stack[0], state.stack[1], state.stack[2], state.stack[3], state.stack[4], state.stack[5]);
     try emitType2Curve(writer, transform, state, state.stack[6], state.stack[7], state.stack[8], state.stack[9], dx6, dy6);
+    state.stack_len = 0;
 }
 
 fn absI32(value: i32) i32 {
@@ -653,6 +875,77 @@ test "Type2 charstring emits moveto and lines" {
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
     try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 L 50.00 50.00 L 0.00 50.00 Z ", output.items);
+}
+
+test "Type2 escaped arithmetic operators feed drawing operands" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
+    const charstring = [_]u8{
+        139,               139,               Type2.rmoveto,
+        149,               159,               Type2.escape,
+        Type2.escaped_add, 141,               142,
+        Type2.escape,      Type2.escaped_mul, Type2.rlineto,
+        Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 30.00 6.00 Z ", output.items);
+}
+
+test "Type2 escaped storage and conditional operators feed drawing operands" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
+    const charstring = [_]u8{
+        139,                  139,           Type2.rmoveto,
+        181,                  139,           Type2.escape,
+        Type2.escaped_put,    139,           Type2.escape,
+        Type2.escaped_get,    140,           141,
+        140,                  141,           Type2.escape,
+        Type2.escaped_ifelse, Type2.escape,  Type2.escaped_add,
+        139,                  Type2.rlineto, Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 43.00 0.00 Z ", output.items);
+}
+
+test "Type2 escaped stack manipulation operators" {
+    var state = Type2State{};
+    state.stack[0] = 10;
+    state.stack[1] = 20;
+    state.stack[2] = 30;
+    state.stack_len = 3;
+
+    try executeType2Dup(&state);
+    try std.testing.expectEqualSlices(i32, &[_]i32{ 10, 20, 30, 30 }, state.stack[0..state.stack_len]);
+
+    try executeType2Exch(&state);
+    try std.testing.expectEqualSlices(i32, &[_]i32{ 10, 20, 30, 30 }, state.stack[0..state.stack_len]);
+
+    try pushType2Stack(&state, 2);
+    try executeType2Index(&state);
+    try std.testing.expectEqualSlices(i32, &[_]i32{ 10, 20, 30, 30, 20 }, state.stack[0..state.stack_len]);
+
+    try pushType2Stack(&state, 3);
+    try pushType2Stack(&state, 1);
+    try executeType2Roll(&state);
+    try std.testing.expectEqualSlices(i32, &[_]i32{ 10, 20, 20, 30, 30 }, state.stack[0..state.stack_len]);
 }
 
 test "Type2 hflex emits two cubic curves" {
