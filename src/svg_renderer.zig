@@ -1,7 +1,12 @@
 const std = @import("std");
+const binary_reader = @import("binary_reader.zig");
 const cff_outline = @import("cff_outline.zig");
 const font_parser = @import("font_parser.zig");
 const shaper = @import("shaper.zig");
+
+const readU16 = binary_reader.readU16;
+const readI16 = binary_reader.readI16;
+const readU32 = binary_reader.readU32;
 
 pub const SvgError = font_parser.ParserError || shaper.ShapeError || cff_outline.CffError || error{
     InvalidSvgColor,
@@ -557,21 +562,6 @@ fn midpoint(a: i16, b: i16) i32 {
 fn readF2Dot14(data: []const u8, offset: usize) font_parser.ParserError!f64 {
     const raw = try readI16(data, offset);
     return @as(f64, @floatFromInt(raw)) / @as(f64, @floatFromInt(CompositeGlyph.f2dot14_one));
-}
-
-fn readU16(data: []const u8, offset: usize) font_parser.ParserError!u16 {
-    if (offset + 2 > data.len) return font_parser.ParserError.InvalidTable;
-    return std.mem.readInt(u16, data[offset..][0..2], .big);
-}
-
-fn readI16(data: []const u8, offset: usize) font_parser.ParserError!i16 {
-    if (offset + 2 > data.len) return font_parser.ParserError.InvalidTable;
-    return std.mem.readInt(i16, data[offset..][0..2], .big);
-}
-
-fn readU32(data: []const u8, offset: usize) font_parser.ParserError!u32 {
-    if (offset + 4 > data.len) return font_parser.ParserError.InvalidTable;
-    return std.mem.readInt(u32, data[offset..][0..4], .big);
 }
 
 test "midpoint uses integer midpoint" {

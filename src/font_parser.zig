@@ -1,4 +1,10 @@
 const std = @import("std");
+const binary_reader = @import("binary_reader.zig");
+
+const readU16 = binary_reader.readU16;
+const readI16 = binary_reader.readI16;
+const readU32 = binary_reader.readU32;
+const tagToU32 = binary_reader.tagToU32;
 
 const Sfnt = struct {
     const header_size = 12;
@@ -377,25 +383,6 @@ fn validateRange(data: []const u8, offset: u32, length: u32) ParserError!void {
     const start = @as(usize, offset);
     const len = @as(usize, length);
     if (start > data.len or len > data.len - start) return ParserError.TableOutOfBounds;
-}
-
-fn readU16(data: []const u8, offset: usize) ParserError!u16 {
-    if (offset + 2 > data.len) return ParserError.InvalidTable;
-    return std.mem.readInt(u16, data[offset..][0..2], .big);
-}
-
-fn readI16(data: []const u8, offset: usize) ParserError!i16 {
-    if (offset + 2 > data.len) return ParserError.InvalidTable;
-    return std.mem.readInt(i16, data[offset..][0..2], .big);
-}
-
-fn readU32(data: []const u8, offset: usize) ParserError!u32 {
-    if (offset + 4 > data.len) return ParserError.InvalidTable;
-    return std.mem.readInt(u32, data[offset..][0..4], .big);
-}
-
-fn tagToU32(tag: [4]u8) u32 {
-    return std.mem.readInt(u32, &tag, .big);
 }
 
 fn wrapU16(value: i32) u16 {

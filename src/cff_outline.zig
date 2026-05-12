@@ -1,5 +1,10 @@
 const std = @import("std");
+const binary_reader = @import("binary_reader.zig");
 const font_parser = @import("font_parser.zig");
+
+const readU16 = binary_reader.readU16;
+const readI16 = binary_reader.readI16;
+const readI32 = binary_reader.readI32;
 
 pub const CffError = font_parser.ParserError || std.mem.Allocator.Error || error{
     UnsupportedCffOperator,
@@ -607,21 +612,6 @@ fn isType2Number(byte: u8) bool {
 
 fn readType2Number(data: []const u8, offset: *usize) font_parser.ParserError!i32 {
     return readCffDictOperand(data, offset);
-}
-
-fn readU16(data: []const u8, offset: usize) font_parser.ParserError!u16 {
-    if (offset + 2 > data.len) return font_parser.ParserError.InvalidTable;
-    return std.mem.readInt(u16, data[offset..][0..2], .big);
-}
-
-fn readI16(data: []const u8, offset: usize) font_parser.ParserError!i16 {
-    if (offset + 2 > data.len) return font_parser.ParserError.InvalidTable;
-    return std.mem.readInt(i16, data[offset..][0..2], .big);
-}
-
-fn readI32(data: []const u8, offset: usize) font_parser.ParserError!i32 {
-    if (offset + 4 > data.len) return font_parser.ParserError.InvalidTable;
-    return std.mem.readInt(i32, data[offset..][0..4], .big);
 }
 
 test "CFF INDEX reads object slices" {

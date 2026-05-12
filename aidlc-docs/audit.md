@@ -538,3 +538,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - CFF Type 2 flex operator support. CFF2 and uncommon Type 2 operators remain pending.
 
 ---
+
+## Refactoring - Binary Reader Extraction
+**Timestamp**: 2026-05-12T03:57:36Z
+**User Input**: "continue"
+**AI Response**: "Scanned source-wide duplicated big-endian integer readers and extracted shared `readU16`, `readI16`, `readU32`, `readI32`, and `tagToU32` helpers into `src/binary_reader.zig`. Updated the font parser, shaper, SVG renderer, and CFF outline modules to use the shared reader."
+**Verification**:
+- `zig fmt src/binary_reader.zig src/font_parser.zig src/shaper.zig src/svg_renderer.zig src/cff_outline.zig`
+- `zig build test`
+- `zig build`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text flex --output /tmp/zig-font-renderer-reader-refactor-cff.svg --font-size 96`
+- `./zig-out/bin/zig_font_renderer --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-reader-refactor-ttf.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-reader-refactor-cff.svg /tmp/zig-font-renderer-reader-refactor-ttf.svg`
+**Context**: Cross-unit refactoring to remove duplicated binary read helpers while preserving parser-compatible `InvalidTable` propagation.
+
+---

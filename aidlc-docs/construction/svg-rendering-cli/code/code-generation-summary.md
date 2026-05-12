@@ -10,6 +10,11 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 
 ## Application Code
 
+- Created `src/binary_reader.zig`
+  - Provides shared big-endian `readU16`, `readI16`, `readU32`, and `readI32` helpers.
+  - Provides `tagToU32` for four-byte SFNT tags.
+  - Returns `InvalidTable` on out-of-range reads for parser-compatible error propagation.
+
 - Created `src/svg_renderer.zig`
   - Defines `SvgRenderer` and `SvgError`.
   - Defines `RenderOptions` for SVG sizing.

@@ -1,5 +1,9 @@
 const std = @import("std");
+const binary_reader = @import("binary_reader.zig");
 const font_parser = @import("font_parser.zig");
+
+const readU16 = binary_reader.readU16;
+const readI16 = binary_reader.readI16;
 
 const TableTags = struct {
     const kern = "kern".*;
@@ -636,16 +640,6 @@ fn lookupKernFormat0(subtable: []const u8, left: u16, right: u16) font_parser.Pa
     }
 
     return 0;
-}
-
-fn readU16(data: []const u8, offset: usize) font_parser.ParserError!u16 {
-    if (offset + 2 > data.len) return font_parser.ParserError.InvalidTable;
-    return std.mem.readInt(u16, data[offset..][0..2], .big);
-}
-
-fn readI16(data: []const u8, offset: usize) font_parser.ParserError!i16 {
-    if (offset + 2 > data.len) return font_parser.ParserError.InvalidTable;
-    return std.mem.readInt(i16, data[offset..][0..2], .big);
 }
 
 fn sliceFrom(data: []const u8, offset: usize) font_parser.ParserError![]const u8 {
