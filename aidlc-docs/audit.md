@@ -615,3 +615,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 3 - Readability refactoring for the newly split CFF parser and Type 2 executor modules.
 
 ---
+
+## Unit 2 OpenType Layout Selection Options - Implemented
+**Timestamp**: 2026-05-12T05:10:01Z
+**User Input**: "do it"
+**AI Response**: "Added `ShapeOptions` and `shapeTextWithOptions` so callers can constrain GSUB/GPOS lookup application by script, language, and feature tags. Shared ScriptList/LangSys/FeatureList lookup index collection between GSUB and GPOS while preserving default `shapeText` behavior."
+**Verification**:
+- `zig fmt src/shaper.zig src/root.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-shape-options-av.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-shape-options-av.svg`
+**Context**: Construction Phase - Unit 2 - GSUB/GPOS selection groundwork before adding more lookup types. Automatic script/language detection, full feature default policy, complex script shaping, bidi, and vertical layout remain pending.
+
+---

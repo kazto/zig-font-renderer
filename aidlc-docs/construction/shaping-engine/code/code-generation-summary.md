@@ -6,7 +6,7 @@
 
 ## Scope
 
-Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, and initial GSUB/GPOS layout handling.
+Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, and caller-provided OpenType Layout script/language/feature selection.
 
 ## Application Code
 
@@ -16,12 +16,14 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, and
   - Implements legacy `kern` table version 0 horizontal format 0 pair adjustment.
   - Implements initial GSUB Single Substitution and Ligature Substitution.
   - Implements initial GPOS Single Adjustment and Pair Adjustment.
+  - Adds `ShapeOptions` and `shapeTextWithOptions` for caller-selected script, language, and feature tags.
+  - Shares ScriptList/LangSys/FeatureList lookup index collection between GSUB and GPOS.
   - Validates OpenType Layout offset slices before dereferencing them.
   - Preserves legacy `kern` fallback when GPOS is absent or does not apply an adjustment.
-  - Adds invalid UTF-8, coverage/class definition, GSUB, GPOS adjustment detection, checked slicing, and kern format 0 lookup test coverage.
+  - Adds invalid UTF-8, coverage/class definition, GSUB, GPOS adjustment detection, OpenType Layout lookup selection, checked slicing, and kern format 0 lookup test coverage.
 
 - Modified `src/root.zig`
-  - Re-exports Unit 2 shaping types.
+  - Re-exports Unit 2 shaping types and `ShapeOptions`.
 
 - Modified `src/main.zig`
   - Routes `--text` glyph display through `ShapeEngine`.
@@ -47,8 +49,14 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, and
 - Result: Passed; SVG generation still works with GSUB/GPOS shaping path.
 - Command: `wc -c /tmp/zig-font-renderer-gpos-av.svg`
 - Result: `523 /tmp/zig-font-renderer-gpos-av.svg`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
+- Result: Passed after adding OpenType Layout selection.
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-shape-options-av.svg --font-size 96`
+- Result: Passed after adding OpenType Layout selection.
+- Command: `wc -c /tmp/zig-font-renderer-shape-options-av.svg`
+- Result: `523 /tmp/zig-font-renderer-shape-options-av.svg`
 
 ## Known Limitations
 
 - Complex script shaping, bidirectional text, and vertical layout are not implemented.
-- Full OpenType feature selection and script-specific shaping are not implemented.
+- Automatic script/language detection and full feature default policy are not implemented.

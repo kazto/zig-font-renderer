@@ -5,6 +5,8 @@ const font_parser = @import("font_parser.zig");
 const readU16 = binary_reader.readU16;
 const readI16 = binary_reader.readI16;
 
+const LayoutError = font_parser.ParserError || std.mem.Allocator.Error;
+
 const TableTags = struct {
     const kern = "kern".*;
     const gsub = "GSUB".*;
@@ -12,11 +14,23 @@ const TableTags = struct {
 };
 
 const OtLayout = struct {
+    const default_script_tag = "DFLT".*;
+    const latin_script_tag = "latn".*;
+    const required_feature_none = 0xffff;
+
     const header_min_size = 10;
     const script_list_offset = 4;
     const feature_list_offset = 6;
     const lookup_list_offset = 8;
 
+    const script_default_lang_sys_offset = 0;
+    const script_lang_sys_count_offset = 2;
+    const script_lang_sys_records_offset = 4;
+    const script_lang_sys_record_size = 6;
+    const script_lang_sys_tag_offset = 0;
+    const script_lang_sys_offset_offset = 4;
+
+    const lang_sys_required_feature_index_offset = 2;
     const lang_sys_feature_count_offset = 4;
     const lang_sys_feature_indices_offset = 6;
     const feature_data_lookup_count_offset = 2;
@@ -53,6 +67,96 @@ const OtLayout = struct {
         return null;
     }
 
+    fn findLangSysOffset(script_data: []const u8, tag: [4]u8) font_parser.ParserError!?u16 {
+        if (script_data.len < script_lang_sys_records_offset) return font_parser.ParserError.InvalidTable;
+        const count = try readU16(script_data, script_lang_sys_count_offset);
+        if (script_lang_sys_records_offset + @as(usize, count) * script_lang_sys_record_size > script_data.len) return font_parser.ParserError.InvalidTable;
+
+        for (0..count) |i| {
+            const offset = script_lang_sys_records_offset + i * script_lang_sys_record_size;
+            if (std.mem.eql(u8, script_data[offset + script_lang_sys_tag_offset ..][0..4], &tag)) {
+                return try readU16(script_data, offset + script_lang_sys_offset_offset);
+            }
+        }
+        return null;
+    }
+
+    fn getFeatureRecordOffset(feature_list: []const u8, feature_index: u16) font_parser.ParserError!usize {
+        if (feature_list.len < feature_list_count_offset + 2) return font_parser.ParserError.InvalidTable;
+        const feature_count = try readU16(feature_list, feature_list_count_offset);
+        if (feature_index >= feature_count) return font_parser.ParserError.InvalidTable;
+        const feature_offset = feature_list_count_offset + 2 + @as(usize, feature_index) * feature_record_size;
+        if (feature_offset + feature_record_size > feature_list.len) return font_parser.ParserError.InvalidTable;
+        return feature_offset;
+    }
+
+    fn featureMatches(feature_list: []const u8, feature_index: u16, selected_tags: ?[]const [4]u8) font_parser.ParserError!bool {
+        const tags = selected_tags orelse return true;
+        const feature_record_offset = try getFeatureRecordOffset(feature_list, feature_index);
+        const feature_tag = feature_list[feature_record_offset + feature_tag_offset ..][0..4];
+        for (tags) |tag| {
+            if (std.mem.eql(u8, feature_tag, &tag)) return true;
+        }
+        return false;
+    }
+
+    fn appendLookupIndicesForFeature(feature_list: []const u8, feature_index: u16, lookup_indices: *std.ArrayList(u16), allocator: std.mem.Allocator) LayoutError!void {
+        const feature_record_offset = try getFeatureRecordOffset(feature_list, feature_index);
+        const feature_data_off = try readU16(feature_list, feature_record_offset + feature_offset_offset);
+        const feature_data = try sliceFrom(feature_list, feature_data_off);
+        const lookup_count = try readU16(feature_data, feature_data_lookup_count_offset);
+
+        for (0..lookup_count) |i| {
+            const lookup_index = try readU16(feature_data, feature_data_lookup_indices_offset + i * 2);
+            try lookup_indices.append(allocator, lookup_index);
+        }
+    }
+
+    fn collectLookupIndices(allocator: std.mem.Allocator, data: []const u8, options: ShapeOptions) LayoutError!std.ArrayList(u16) {
+        var result = std.ArrayList(u16).empty;
+        errdefer result.deinit(allocator);
+
+        if (data.len < header_min_size) return font_parser.ParserError.InvalidTable;
+
+        const script_list_off = try readU16(data, script_list_offset);
+        const feature_list_off = try readU16(data, feature_list_offset);
+        const script_list_data = try sliceFrom(data, script_list_off);
+        const feature_list_data = try sliceFrom(data, feature_list_off);
+
+        const script_off_val = if (options.script_tag) |script_tag|
+            try findScriptOffset(script_list_data, script_tag)
+        else blk: {
+            var script_off = try findScriptOffset(script_list_data, default_script_tag);
+            if (script_off == null) script_off = try findScriptOffset(script_list_data, latin_script_tag);
+            break :blk script_off;
+        };
+        const actual_script_off = script_off_val orelse return result;
+        const script_data = try sliceFrom(script_list_data, actual_script_off);
+
+        const lang_sys_off_val = if (options.language_tag) |language_tag|
+            try findLangSysOffset(script_data, language_tag)
+        else
+            null;
+        const lang_sys_off = lang_sys_off_val orelse try readU16(script_data, script_default_lang_sys_offset);
+        if (lang_sys_off == 0) return result;
+
+        const lang_sys_data = try sliceFrom(script_data, lang_sys_off);
+        const required_feature_index = try readU16(lang_sys_data, lang_sys_required_feature_index_offset);
+        if (required_feature_index != required_feature_none) {
+            try appendLookupIndicesForFeature(feature_list_data, required_feature_index, &result, allocator);
+        }
+
+        const feature_count = try readU16(lang_sys_data, lang_sys_feature_count_offset);
+        for (0..feature_count) |i| {
+            const feature_index = try readU16(lang_sys_data, lang_sys_feature_indices_offset + i * 2);
+            if (try featureMatches(feature_list_data, feature_index, options.feature_tags)) {
+                try appendLookupIndicesForFeature(feature_list_data, feature_index, &result, allocator);
+            }
+        }
+
+        return result;
+    }
+
     fn getLookupOffset(data: []const u8, index: u16) font_parser.ParserError!u16 {
         if (data.len < lookup_list_header_size) return font_parser.ParserError.InvalidTable;
         const count = try readU16(data, lookup_list_count_offset);
@@ -83,40 +187,17 @@ const Gsub = struct {
     const lig_comp_count_offset = 2;
     const lig_comp_ids_offset = 4;
 
-    fn apply(allocator: std.mem.Allocator, face: font_parser.Face, glyphs: *std.ArrayList(ShapedGlyph)) font_parser.ParserError!void {
+    fn apply(allocator: std.mem.Allocator, face: font_parser.Face, glyphs: *std.ArrayList(ShapedGlyph), options: ShapeOptions) LayoutError!void {
         const data = face.getTable(TableTags.gsub) orelse return;
         if (data.len < OtLayout.header_min_size) return font_parser.ParserError.InvalidTable;
 
-        const script_list_off = try readU16(data, OtLayout.script_list_offset);
-        const feature_list_off = try readU16(data, OtLayout.feature_list_offset);
         const lookup_list_off = try readU16(data, OtLayout.lookup_list_offset);
-        const script_list_data = try sliceFrom(data, script_list_off);
-        const feature_list_data = try sliceFrom(data, feature_list_off);
         const lookup_list_data = try sliceFrom(data, lookup_list_off);
 
-        var script_off_val = try OtLayout.findScriptOffset(script_list_data, "DFLT".*);
-        if (script_off_val == null) {
-            script_off_val = try OtLayout.findScriptOffset(script_list_data, "latn".*);
-        }
-        const actual_script_off = script_off_val orelse return;
-        const script_data = try sliceFrom(script_list_data, actual_script_off);
-        const default_lang_sys_off = try readU16(script_data, 0);
-        if (default_lang_sys_off == 0) return;
-
-        const lang_sys_data = try sliceFrom(script_data, default_lang_sys_off);
-        const feature_count = try readU16(lang_sys_data, OtLayout.lang_sys_feature_count_offset);
-
-        for (0..feature_count) |i| {
-            const feature_index = try readU16(lang_sys_data, OtLayout.lang_sys_feature_indices_offset + i * 2);
-            const feature_offset = OtLayout.feature_list_count_offset + 2 + @as(usize, feature_index) * OtLayout.feature_record_size;
-            const feature_data_off = try readU16(feature_list_data, feature_offset + OtLayout.feature_offset_offset);
-            const feature_data = try sliceFrom(feature_list_data, feature_data_off);
-            const lookup_count = try readU16(feature_data, OtLayout.feature_data_lookup_count_offset);
-
-            for (0..lookup_count) |j| {
-                const lookup_index = try readU16(feature_data, OtLayout.feature_data_lookup_indices_offset + j * 2);
-                try applyLookup(allocator, face, lookup_list_data, lookup_index, glyphs);
-            }
+        var lookup_indices = try OtLayout.collectLookupIndices(allocator, data, options);
+        defer lookup_indices.deinit(allocator);
+        for (lookup_indices.items) |lookup_index| {
+            try applyLookup(allocator, face, lookup_list_data, lookup_index, glyphs);
         }
     }
 
@@ -291,40 +372,17 @@ const Gpos = struct {
     const pair_record_gid2_offset = 0;
     const pair_record_values_offset = 2;
 
-    fn apply(allocator: std.mem.Allocator, face: font_parser.Face, glyphs: []ShapedGlyph) font_parser.ParserError!void {
+    fn apply(allocator: std.mem.Allocator, face: font_parser.Face, glyphs: []ShapedGlyph, options: ShapeOptions) LayoutError!void {
         const data = face.getTable(TableTags.gpos) orelse return;
         if (data.len < OtLayout.header_min_size) return font_parser.ParserError.InvalidTable;
 
-        const script_list_off = try readU16(data, OtLayout.script_list_offset);
-        const feature_list_off = try readU16(data, OtLayout.feature_list_offset);
         const lookup_list_off = try readU16(data, OtLayout.lookup_list_offset);
-        const script_list_data = try sliceFrom(data, script_list_off);
-        const feature_list_data = try sliceFrom(data, feature_list_off);
         const lookup_list_data = try sliceFrom(data, lookup_list_off);
 
-        var script_off_val = try OtLayout.findScriptOffset(script_list_data, "DFLT".*);
-        if (script_off_val == null) {
-            script_off_val = try OtLayout.findScriptOffset(script_list_data, "latn".*);
-        }
-        const actual_script_off = script_off_val orelse return;
-        const script_data = try sliceFrom(script_list_data, actual_script_off);
-        const default_lang_sys_off = try readU16(script_data, 0);
-        if (default_lang_sys_off == 0) return;
-
-        const lang_sys_data = try sliceFrom(script_data, default_lang_sys_off);
-        const feature_count = try readU16(lang_sys_data, OtLayout.lang_sys_feature_count_offset);
-
-        for (0..feature_count) |i| {
-            const feature_index = try readU16(lang_sys_data, OtLayout.lang_sys_feature_indices_offset + i * 2);
-            const feature_offset = OtLayout.feature_list_count_offset + 2 + @as(usize, feature_index) * OtLayout.feature_record_size;
-            const feature_data_off = try readU16(feature_list_data, feature_offset + OtLayout.feature_offset_offset);
-            const feature_data = try sliceFrom(feature_list_data, feature_data_off);
-            const lookup_count = try readU16(feature_data, OtLayout.feature_data_lookup_count_offset);
-
-            for (0..lookup_count) |j| {
-                const lookup_index = try readU16(feature_data, OtLayout.feature_data_lookup_indices_offset + j * 2);
-                try applyLookup(allocator, face, lookup_list_data, lookup_index, glyphs);
-            }
+        var lookup_indices = try OtLayout.collectLookupIndices(allocator, data, options);
+        defer lookup_indices.deinit(allocator);
+        for (lookup_indices.items) |lookup_index| {
+            try applyLookup(allocator, face, lookup_list_data, lookup_index, glyphs);
         }
     }
 
@@ -455,6 +513,12 @@ pub const ShapeError = font_parser.ParserError || std.mem.Allocator.Error || err
     InvalidUtf8,
 };
 
+pub const ShapeOptions = struct {
+    script_tag: ?[4]u8 = null,
+    language_tag: ?[4]u8 = null,
+    feature_tags: ?[]const [4]u8 = null,
+};
+
 pub const ShapedGlyph = struct {
     codepoint: u21,
     glyph_id: u16,
@@ -489,6 +553,16 @@ pub const ShapeEngine = struct {
         face: font_parser.Face,
         text: []const u8,
     ) ShapeError!ShapedText {
+        return self.shapeTextWithOptions(allocator, face, text, .{});
+    }
+
+    pub fn shapeTextWithOptions(
+        self: ShapeEngine,
+        allocator: std.mem.Allocator,
+        face: font_parser.Face,
+        text: []const u8,
+        options: ShapeOptions,
+    ) ShapeError!ShapedText {
         _ = self;
 
         var view = std.unicode.Utf8View.init(text) catch return ShapeError.InvalidUtf8;
@@ -515,7 +589,7 @@ pub const ShapeEngine = struct {
         }
 
         // 1. GSUB substitutions
-        try Gsub.apply(allocator, face, &glyphs);
+        try Gsub.apply(allocator, face, &glyphs, options);
 
         // Update metrics for potentially new glyph IDs from GSUB
         for (glyphs.items) |*glyph| {
@@ -526,7 +600,7 @@ pub const ShapeEngine = struct {
         }
 
         // 2. GPOS positioning
-        try Gpos.apply(allocator, face, glyphs.items);
+        try Gpos.apply(allocator, face, glyphs.items, options);
         const gpos_adjusted = hasGposAdjustment(glyphs.items);
 
         // 3. Fallback to legacy kern if GPOS did not provide adjustments.
@@ -833,6 +907,88 @@ test "detects whether GPOS changed positioning" {
         .kern_adjustment = 0,
     }};
     try std.testing.expect(hasGposAdjustment(&adjusted));
+}
+
+test "OpenType layout lookup collection filters by feature tag" {
+    var data = [_]u8{0} ** 90;
+    writeU16(&data, OtLayout.script_list_offset, 10);
+    writeU16(&data, OtLayout.feature_list_offset, 34);
+    writeU16(&data, OtLayout.lookup_list_offset, 80);
+
+    writeU16(&data, 10, 1);
+    data[12..16].* = OtLayout.default_script_tag;
+    writeU16(&data, 16, 8);
+
+    writeU16(&data, 18, 4);
+    writeU16(&data, 20, 0);
+    writeU16(&data, 22, 0);
+    writeU16(&data, 24, OtLayout.required_feature_none);
+    writeU16(&data, 26, 2);
+    writeU16(&data, 28, 0);
+    writeU16(&data, 30, 1);
+
+    writeU16(&data, 34, 2);
+    data[36..40].* = "liga".*;
+    writeU16(&data, 40, 14);
+    data[42..46].* = "kern".*;
+    writeU16(&data, 46, 24);
+
+    writeU16(&data, 48, 0);
+    writeU16(&data, 50, 1);
+    writeU16(&data, 52, 7);
+    writeU16(&data, 58, 0);
+    writeU16(&data, 60, 1);
+    writeU16(&data, 62, 11);
+
+    var selected = [_][4]u8{"kern".*};
+    var lookup_indices = try OtLayout.collectLookupIndices(std.testing.allocator, &data, .{ .feature_tags = &selected });
+    defer lookup_indices.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), lookup_indices.items.len);
+    try std.testing.expectEqual(@as(u16, 11), lookup_indices.items[0]);
+}
+
+test "OpenType layout lookup collection can choose non-default language" {
+    var data = [_]u8{0} ** 96;
+    writeU16(&data, OtLayout.script_list_offset, 10);
+    writeU16(&data, OtLayout.feature_list_offset, 48);
+    writeU16(&data, OtLayout.lookup_list_offset, 90);
+
+    writeU16(&data, 10, 1);
+    data[12..16].* = OtLayout.latin_script_tag;
+    writeU16(&data, 16, 8);
+
+    writeU16(&data, 18, 0);
+    writeU16(&data, 20, 1);
+    data[22..26].* = "TRK ".*;
+    writeU16(&data, 26, 18);
+
+    writeU16(&data, 36, 0);
+    writeU16(&data, 38, OtLayout.required_feature_none);
+    writeU16(&data, 40, 1);
+    writeU16(&data, 42, 1);
+
+    writeU16(&data, 48, 2);
+    data[50..54].* = "liga".*;
+    writeU16(&data, 54, 14);
+    data[56..60].* = "kern".*;
+    writeU16(&data, 60, 20);
+
+    writeU16(&data, 62, 0);
+    writeU16(&data, 64, 1);
+    writeU16(&data, 66, 3);
+    writeU16(&data, 68, 0);
+    writeU16(&data, 70, 1);
+    writeU16(&data, 72, 5);
+
+    var lookup_indices = try OtLayout.collectLookupIndices(std.testing.allocator, &data, .{
+        .script_tag = "latn".*,
+        .language_tag = "TRK ".*,
+    });
+    defer lookup_indices.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), lookup_indices.items.len);
+    try std.testing.expectEqual(@as(u16, 5), lookup_indices.items[0]);
 }
 
 test "shape engine rejects invalid utf8" {

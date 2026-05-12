@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-04-27T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Unit 3: SVG Rendering & CLI - CFF Magic Number Refactor Review
+- **Current Stage**: CONSTRUCTION - Unit 2: Shaping Engine - OpenType Layout Selection Review
 
 ## Execution Plan Summary
 - **Total Stages**: 14 (Total workflow stages including those executed/skipped)
@@ -54,13 +54,14 @@
 - [x] Unit 3: Code Generation - CFF FDSELECT LOCAL SUBRS (2026-05-12)
 - [x] Unit 3: Refactoring - CFF MODULE SPLIT (2026-05-12)
 - [x] Unit 3: Refactoring - CFF MAGIC NUMBER NAMING (2026-05-12)
+- [x] Unit 2: Code Generation - OPENTYPE LAYOUT SELECTION OPTIONS (2026-05-12)
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 3: SVG Rendering & CLI - CFF Magic Number Refactor Review
-- **Last Completed**: Unit 3: CFF Magic Number Naming Refactoring
-- **Next Stage**: Unit 3: Remaining Type 2 Operators/CFF2 or Unit 2: GSUB/GPOS Review
-- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, and initial GSUB/GPOS lookup handling with checked OpenType Layout offsets; SVG output supports TrueType outlines, styling, transformed composites, high-level `renderToSvg`, and CFF outline rendering through split CFF modules for shared types, INDEX/DICT parsing, CFF context/FDSelect resolution, and Type 2 charstring execution; repeated big-endian integer readers have been centralized in `src/binary_reader.zig`; CFF parsing/execution magic numbers are now named constants for INDEX/DICT/FDSelect/Type 2 operand semantics; CFF2 and uncommon non-calculation Type 2 operators remain pending
+- **Current Stage**: Unit 2: Shaping Engine - OpenType Layout Selection Review
+- **Last Completed**: Unit 2: OpenType Layout Selection Options
+- **Next Stage**: Unit 2: Additional GSUB/GPOS Lookup Support or Unit 3: Remaining Type 2 Operators/CFF2
+- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, initial GSUB/GPOS lookup handling with checked OpenType Layout offsets, and caller-provided OpenType script/language/feature selection options; SVG output supports TrueType outlines, styling, transformed composites, high-level `renderToSvg`, and CFF outline rendering through split CFF modules for shared types, INDEX/DICT parsing, CFF context/FDSelect resolution, and Type 2 charstring execution; repeated big-endian integer readers have been centralized in `src/binary_reader.zig`; CFF parsing/execution magic numbers are now named constants for INDEX/DICT/FDSelect/Type 2 operand semantics; CFF2 and uncommon non-calculation Type 2 operators remain pending

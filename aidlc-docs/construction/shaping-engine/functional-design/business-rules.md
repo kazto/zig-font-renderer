@@ -11,11 +11,12 @@
 - `kern_adjustment` records the pair adjustment applied to the glyph.
 - GSUB Single Substitution and Ligature Substitution may replace glyph IDs before positioning.
 - GPOS Single Adjustment and Pair Adjustment may modify glyph offsets and advances.
+- Callers may constrain OpenType Layout lookup application with explicit script, language, and feature tags.
 - Legacy `kern` remains a fallback when GPOS is absent or does not apply an adjustment.
 - Cluster indexes follow input codepoint order.
 
 ## Deferred Rules
 
 - Complex script reordering is not applied.
-- Full OpenType script/language/feature selection is not applied.
+- Automatic script/language detection and feature default policy beyond caller-provided tags are not applied.
 - Bidirectional text and vertical layout are not applied.
