@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-04-27T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Unit 2: Shaping Engine - OpenType Layout Selection Review
+- **Current Stage**: CONSTRUCTION - Unit 2: Shaping Engine - Additional Lookup Review
 
 ## Execution Plan Summary
 - **Total Stages**: 14 (Total workflow stages including those executed/skipped)
@@ -55,13 +55,22 @@
 - [x] Unit 3: Refactoring - CFF MODULE SPLIT (2026-05-12)
 - [x] Unit 3: Refactoring - CFF MAGIC NUMBER NAMING (2026-05-12)
 - [x] Unit 2: Code Generation - OPENTYPE LAYOUT SELECTION OPTIONS (2026-05-12)
+- [x] Unit 2: Functional Design - ADVANCED GSUB/GPOS (2026-05-12)
+- [x] Unit 2: NFR Requirements - ADVANCED GSUB/GPOS (2026-05-12)
+- [x] Unit 2: NFR Design - ADVANCED GSUB/GPOS (2026-05-12)
+- [x] Unit 2: Code Generation - ADVANCED GSUB/GPOS (2026-05-12)
+
+- [x] Unit 2: Functional Design - ADDITIONAL LOOKUPS (2026-05-12)
+- [x] Unit 2: NFR Requirements - ADDITIONAL LOOKUPS (2026-05-12)
+- [x] Unit 2: NFR Design - ADDITIONAL LOOKUPS (2026-05-12)
+- [x] Unit 2: Code Generation - ADDITIONAL LOOKUPS (2026-05-12)
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 2: Shaping Engine - OpenType Layout Selection Review
-- **Last Completed**: Unit 2: OpenType Layout Selection Options
-- **Next Stage**: Unit 2: Additional GSUB/GPOS Lookup Support or Unit 3: Remaining Type 2 Operators/CFF2
-- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, initial GSUB/GPOS lookup handling with checked OpenType Layout offsets, and caller-provided OpenType script/language/feature selection options; SVG output supports TrueType outlines, styling, transformed composites, high-level `renderToSvg`, and CFF outline rendering through split CFF modules for shared types, INDEX/DICT parsing, CFF context/FDSelect resolution, and Type 2 charstring execution; repeated big-endian integer readers have been centralized in `src/binary_reader.zig`; CFF parsing/execution magic numbers are now named constants for INDEX/DICT/FDSelect/Type 2 operand semantics; CFF2 and uncommon non-calculation Type 2 operators remain pending
+- **Current Stage**: Unit 2: Shaping Engine - Additional Lookup Review
+- **Last Completed**: Unit 2: Additional GSUB/GPOS Lookup Code Generation
+- **Next Stage**: Unit 2: Script-specific shaping polish or Unit 3: Remaining Type 2 Operators/CFF2
+- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, GSUB/GPOS lookup handling (Single, Alternate, Ligature, Contextual Format 3, Chained Contextual Format 3, Single/Pair Adjustment, Mark-to-Base, Mark-to-Ligature, and Mark-to-Mark) at the tested scope, checked OpenType Layout offsets, and caller-provided selection options; SVG output supports TrueType and CFF outlines with styling and transforms; CFF support includes subroutines, flex, calculation operators, and CID-keyed local subroutine resolution. GSUB contextual/chained Formats 1/2, advanced glyph stream length changes during contextual sub-lookups, automatic script/language detection, complex script reordering, bidirectional text, vertical layout, CFF2, and targeted visual verification for advanced GPOS placement remain pending.

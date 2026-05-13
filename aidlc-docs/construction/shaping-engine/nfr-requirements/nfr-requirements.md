@@ -14,6 +14,8 @@
 - Parser errors from Unit 1 must propagate without being hidden.
 - Malformed `kern` tables must fail with a parser table error rather than reading past bounds.
 - Malformed GSUB/GPOS offsets must fail with a parser table error rather than panicking.
+- Recursive GSUB lookups must be depth-limited to prevent infinite loops and stack overflow.
+- GPOS anchor and mark-class indices must be validated against table bounds.
 
 ## Security
 

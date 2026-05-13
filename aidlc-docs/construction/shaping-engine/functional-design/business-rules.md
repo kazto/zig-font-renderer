@@ -11,6 +11,12 @@
 - `kern_adjustment` records the pair adjustment applied to the glyph.
 - GSUB Single Substitution and Ligature Substitution may replace glyph IDs before positioning.
 - GPOS Single Adjustment and Pair Adjustment may modify glyph offsets and advances.
+- GPOS Mark-to-Base Attachment (Type 4) aligns mark anchors with base anchors and zeroes mark advances.
+- GPOS Mark-to-Ligature Attachment (Type 5) aligns mark anchors with ligature component anchors and zeroes mark advances.
+- GPOS Mark-to-Mark Attachment (Type 6) aligns stacked mark anchors and zeroes attaching mark advances.
+- GSUB Alternate Substitution (Type 3) replaces covered glyphs with the first alternate glyph.
+- GSUB Contextual Substitution (Type 5 Format 3) applies lookups to input sequences based on coverage context.
+- GSUB Chained Contextual Substitution (Type 6 Format 3) applies lookups to input sequences based on surrounding coverage-based backtrack and lookahead glyphs.
 - Callers may constrain OpenType Layout lookup application with explicit script, language, and feature tags.
 - Legacy `kern` remains a fallback when GPOS is absent or does not apply an adjustment.
 - Cluster indexes follow input codepoint order.

@@ -630,3 +630,12 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 **Context**: Construction Phase - Unit 2 - GSUB/GPOS selection groundwork before adding more lookup types. Automatic script/language detection, full feature default policy, complex script shaping, bidi, and vertical layout remain pending.
 
 ---
+
+## Additional GSUB/GPOS Lookup Review
+**Timestamp**: 2026-05-13T00:00:00Z
+**User Input**: "もしかすると、他エージェントの作業結果が混ざってしまったかもしれない。変更内容を確認して。"
+**AI Response**: "Reviewed the uncommitted advanced lookup changes, identified duplicated approval-style audit entries as likely mixed agent output, and retained only a single normalized review record. Source changes were not reverted; documentation claims were aligned with the implementation scope."
+**Verification**:
+- `zig build test`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Additional GSUB/GPOS lookup review. Current code covers GSUB Type 3, GSUB Type 5 Format 3, GSUB Type 6 Format 3, GPOS Type 4, GPOS Type 5, and GPOS Type 6 at the tested scope. GSUB contextual Formats 1/2, GSUB chained contextual Formats 1/2, automatic script/language detection, complex script reordering, bidirectional text, and vertical layout remain pending.
