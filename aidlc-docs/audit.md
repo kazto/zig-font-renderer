@@ -639,3 +639,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build test`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Additional GSUB/GPOS lookup review. Current code covers GSUB Type 3, GSUB Type 5 Format 3, GSUB Type 6 Format 3, GPOS Type 4, GPOS Type 5, and GPOS Type 6 at the tested scope. GSUB contextual Formats 1/2, GSUB chained contextual Formats 1/2, automatic script/language detection, complex script reordering, bidirectional text, and vertical layout remain pending.
+
+---
+
+## Refactoring - Shaper Module Split
+**Timestamp**: 2026-05-13T00:00:00Z
+**User Input**: "src/shaper.zig をリファクタリング、ファイル分割を検討して。"
+**AI Response**: "Split the oversized shaper implementation into focused modules for shared shaping types, OpenType Layout helpers, GSUB, GPOS, legacy kern, and test helpers while preserving the existing `shaper.zig` public facade."
+**Verification**:
+- `zig fmt src/shaper.zig src/shaper_types.zig src/ot_layout.zig src/gsub.zig src/gpos.zig src/kern.zig src/shaper_test_utils.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-shaper-split-av.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-shaper-split-av.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Source organization refactoring. `src/shaper.zig` remains the public facade used by existing callers.
