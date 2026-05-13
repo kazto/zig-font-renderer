@@ -24,8 +24,8 @@ This plan covers the implementation of GPOS Type 4 (Mark-to-Base) and GSUB Type 
   - [ ] Defer Format 1 (Simple) and Format 2 (Class-based).
   - [x] Implement contextual matching logic for backtrack, input, and lookahead sequences.
   - [x] Add recursive lookup application with a hard depth limit (16).
-  - [x] Handle same-length glyph ID replacement after contextual sub-lookups.
-  - [ ] Handle contextual sub-lookups that change glyph stream length.
+  - [x] Handle glyph ID replacement after contextual sub-lookups.
+  - [x] Handle contextual sub-lookups that change glyph stream length.
 
 - [x] Step 3: Hardening and Validation
   - [x] Add explicit offset checks for all newly introduced subtables.

@@ -40,7 +40,7 @@ This document defines the functional design for GPOS Type 5/6 and GSUB Type 3/5 
 - Matches an input sequence using glyph IDs (Format 1), classes (Format 2), or coverages (Format 3).
 - Applies sub-lookups to specific positions in the matched sequence.
 - Shares the same matching engine logic as Type 6 (Chained), just with empty backtrack/lookahead.
-- Contextual sub-lookups that change glyph stream length remain deferred.
+- Contextual sub-lookups replace the affected glyph stream suffix, so substitutions that change glyph count are reflected.
 
 ## Logic Model
 

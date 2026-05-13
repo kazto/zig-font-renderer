@@ -666,4 +666,15 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build test`
 - `zig build`
 - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
-**Context**: Construction Phase - Unit 2 - Additional GSUB lookup support. Contextual sub-lookups that change glyph stream length, GSUB chained contextual Formats 1/2, automatic script/language detection, complex script reordering, bidirectional text, and vertical layout remain pending.
+**Context**: Construction Phase - Unit 2 - Additional GSUB lookup support. At this point, contextual sub-lookups that change glyph stream length still remained pending; GSUB chained contextual Formats 1/2, automatic script/language detection, complex script reordering, bidirectional text, and vertical layout also remained pending.
+
+---
+
+## Code Generation - Contextual Length-Changing Sublookups
+**Timestamp**: 2026-05-13T00:00:00Z
+**User Input**: "ロードマップにしたがって次の作業を行って"
+**AI Response**: "Updated contextual sub-lookup application to replace the affected glyph stream suffix, allowing sub-lookups such as ligature substitution to change glyph count. Added a regression test covering GSUB Type 5 Format 1 invoking a length-changing ligature sub-lookup."
+**Verification**:
+- `zig fmt src/gsub.zig`
+- `zig build test`
+**Context**: Construction Phase - Unit 2 - GSUB contextual substitution hardening. GSUB chained contextual Formats 1/2, automatic script/language detection, complex script reordering, bidirectional text, vertical layout, and targeted visual verification for advanced GPOS placement remain pending.

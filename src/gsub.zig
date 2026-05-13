@@ -372,12 +372,9 @@ pub const Gsub = struct {
 
                 try applyLookup(allocator, face, lookup_list, lookup_index, &sub_glyphs, depth + 1);
 
-                const old_len = glyphs.items.len - (start + subst_rel_idx);
-                const new_len = sub_glyphs.items.len;
-
-                if (new_len == old_len) {
-                    @memcpy(glyphs.items[start + subst_rel_idx ..], sub_glyphs.items);
-                }
+                const replace_start = start + subst_rel_idx;
+                const old_len = glyphs.items.len - replace_start;
+                try glyphs.replaceRange(allocator, replace_start, old_len, sub_glyphs.items);
             }
         }
     }
@@ -587,6 +584,65 @@ test "gsub contextual substitution format 1" {
 
     try std.testing.expectEqual(@as(u16, 10), glyphs.items[0].glyph_id);
     try std.testing.expectEqual(@as(u16, 20), glyphs.items[1].glyph_id);
+}
+
+test "gsub contextual substitution handles length-changing sublookups" {
+    var subtable = [_]u8{0} ** 32;
+    test_utils.writeU16(&subtable, 0, 1); // format
+    test_utils.writeU16(&subtable, 2, 8); // coverage_off
+    test_utils.writeU16(&subtable, 4, 1); // rule_set_count
+    test_utils.writeU16(&subtable, 6, 14); // rule_set_offsets[0]
+
+    // Coverage (first glyph GID 10)
+    test_utils.writeU16(&subtable, 8, 1);
+    test_utils.writeU16(&subtable, 10, 1);
+    test_utils.writeU16(&subtable, 12, 10);
+
+    // RuleSet
+    test_utils.writeU16(&subtable, 14, 1); // rule_count
+    test_utils.writeU16(&subtable, 16, 4); // rule offset relative to RuleSet
+
+    // ContextRule: 10 11 -> apply lookup 0 at sequence start
+    test_utils.writeU16(&subtable, 18, 2); // glyph_count
+    test_utils.writeU16(&subtable, 20, 1); // subst_count
+    test_utils.writeU16(&subtable, 22, 11); // input_sequence[0]
+    test_utils.writeU16(&subtable, 24, 0); // sequence_index
+    test_utils.writeU16(&subtable, 26, 0); // lookup_index
+
+    var ligature = [_]u8{0} ** 24;
+    test_utils.writeU16(&ligature, 2, 8); // coverage_off
+    test_utils.writeU16(&ligature, 4, 1); // ligature_set_count
+    test_utils.writeU16(&ligature, 6, 14); // ligature_set_offsets[0]
+    test_utils.writeU16(&ligature, 8, 1); // coverage format
+    test_utils.writeU16(&ligature, 10, 1); // coverage count
+    test_utils.writeU16(&ligature, 12, 10); // first glyph
+    test_utils.writeU16(&ligature, 14, 1); // ligature_count
+    test_utils.writeU16(&ligature, 16, 4); // ligature offset relative to set
+    test_utils.writeU16(&ligature, 18, 50); // ligature glyph
+    test_utils.writeU16(&ligature, 20, 2); // component count
+    test_utils.writeU16(&ligature, 22, 11); // second component
+
+    var lookup_list = [_]u8{0} ** 42;
+    test_utils.writeU16(&lookup_list, 0, 1);
+    test_utils.writeU16(&lookup_list, 2, 4);
+    test_utils.writeU16(&lookup_list, 4, 4); // Ligature Substitution
+    test_utils.writeU16(&lookup_list, 6, 0);
+    test_utils.writeU16(&lookup_list, 8, 1);
+    test_utils.writeU16(&lookup_list, 10, 8);
+    @memcpy(lookup_list[12 .. 12 + ligature.len], &ligature);
+
+    var glyphs = std.ArrayList(ShapedGlyph).empty;
+    defer glyphs.deinit(std.testing.allocator);
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 'A', .glyph_id = 10, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 'B', .glyph_id = 11, .cluster = 1, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 'C', .glyph_id = 12, .cluster = 2, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+
+    const face: font_parser.Face = undefined;
+    try Gsub.applyContextualSubstitution(std.testing.allocator, face, &lookup_list, &subtable, &glyphs, 0);
+
+    try std.testing.expectEqual(@as(usize, 2), glyphs.items.len);
+    try std.testing.expectEqual(@as(u16, 50), glyphs.items[0].glyph_id);
+    try std.testing.expectEqual(@as(u16, 12), glyphs.items[1].glyph_id);
 }
 
 test "gsub contextual substitution format 2" {

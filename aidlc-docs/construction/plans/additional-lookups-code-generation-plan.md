@@ -22,7 +22,7 @@ This plan covers the implementation of GPOS Type 5 (Mark-to-Ligature), GPOS Type
   - [x] Implement Type 5 Format 3 (coverage-based).
   - [x] Implement Type 5 Format 1 (glyph sequence) and Format 2 (class-based).
   - [x] Add dedicated unit tests for Type 5 contextual substitution.
-  - [ ] Handle contextual sub-lookups that change glyph stream length.
+  - [x] Handle contextual sub-lookups that change glyph stream length.
 
 - [x] Step 3: Implement GPOS Type 6: Mark-to-Mark Attachment
   - [x] Implement `Mark2Array` and `Mark1Array` parsing.
@@ -44,9 +44,9 @@ This plan covers the implementation of GPOS Type 5 (Mark-to-Ligature), GPOS Type
 ## Completion Criteria
 
 - [x] GSUB Type 3 lookups correctly substitute glyphs with their first alternate.
-- [x] GSUB Type 5 Format 3 lookups apply sub-lookups based on coverage context for same-length substitutions.
-- [x] GSUB Type 5 Format 1/2 lookups apply sub-lookups based on glyph and class context for same-length substitutions.
-- [ ] Contextual sub-lookups that change glyph stream length remain pending.
+- [x] GSUB Type 5 Format 3 lookups apply sub-lookups based on coverage context.
+- [x] GSUB Type 5 Format 1/2 lookups apply sub-lookups based on glyph and class context.
+- [x] Contextual sub-lookups can update the glyph stream when substitutions change length.
 - [x] GPOS Type 6 lookups correctly position marks relative to other marks.
 - [x] GPOS Type 5 lookups position marks relative to tested ligature anchors.
 - [x] All subtable accesses are bounds-checked.

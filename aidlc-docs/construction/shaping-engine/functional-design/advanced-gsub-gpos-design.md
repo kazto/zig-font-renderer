@@ -30,8 +30,7 @@ This document defines the functional design for advanced OpenType Layout lookups
 - Backtrack sequences are checked in reverse order (closest to input first).
 - Lookahead sequences are checked in forward order.
 - If a match is found, one or more lookups are applied to the input sequence.
-- Same-length substitutions can change glyph IDs and may trigger further lookups through recursive application.
-- Contextual sub-lookups that change glyph stream length remain deferred.
+- Substitutions can change glyph IDs, update glyph stream length, and may trigger further lookups through recursive application.
 
 ## Logic Model
 
