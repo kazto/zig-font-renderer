@@ -65,13 +65,14 @@
 - [x] Unit 2: NFR Design - ADDITIONAL LOOKUPS (2026-05-12)
 - [x] Unit 2: Code Generation - ADDITIONAL LOOKUPS (2026-05-12)
 - [x] Unit 2: Refactoring - SHAPER MODULE SPLIT (2026-05-13)
+- [x] Unit 2: Code Generation - GSUB TYPE 5 FORMAT 1/2 (2026-05-13)
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 2: Shaping Engine - Module Split Review
-- **Last Completed**: Unit 2: Shaper Module Split Refactoring
+- **Current Stage**: Unit 2: Shaping Engine - Contextual Substitution Review
+- **Last Completed**: Unit 2: GSUB Type 5 Format 1/2 Contextual Substitution
 - **Next Stage**: Unit 2: Script-specific shaping polish or Unit 3: Remaining Type 2 Operators/CFF2
-- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, GSUB/GPOS lookup handling (Single, Alternate, Ligature, Contextual Format 3, Chained Contextual Format 3, Single/Pair Adjustment, Mark-to-Base, Mark-to-Ligature, and Mark-to-Mark) at the tested scope, checked OpenType Layout offsets, and caller-provided selection options; SVG output supports TrueType and CFF outlines with styling and transforms; CFF support includes subroutines, flex, calculation operators, and CID-keyed local subroutine resolution. GSUB contextual/chained Formats 1/2, advanced glyph stream length changes during contextual sub-lookups, automatic script/language detection, complex script reordering, bidirectional text, vertical layout, CFF2, and targeted visual verification for advanced GPOS placement remain pending.
+- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, GSUB/GPOS lookup handling (Single, Alternate, Ligature, Contextual Formats 1/2/3, Chained Contextual Format 3, Single/Pair Adjustment, Mark-to-Base, Mark-to-Ligature, and Mark-to-Mark) at the tested scope, checked OpenType Layout offsets, and caller-provided selection options; SVG output supports TrueType and CFF outlines with styling and transforms; CFF support includes subroutines, flex, calculation operators, and CID-keyed local subroutine resolution. GSUB chained contextual Formats 1/2, advanced glyph stream length changes during contextual sub-lookups, automatic script/language detection, complex script reordering, bidirectional text, vertical layout, CFF2, and targeted visual verification for advanced GPOS placement remain pending.

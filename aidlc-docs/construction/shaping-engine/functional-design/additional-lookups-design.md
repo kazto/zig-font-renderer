@@ -37,10 +37,9 @@ This document defines the functional design for GPOS Type 5/6 and GSUB Type 3/5 
 - Since our engine is currently deterministic and doesn't take "alternate index" as input, it will default to the first alternate provided in the set unless otherwise specified in future extensions.
 
 ### Contextual Substitution (GSUB Type 5)
-- Matches an input sequence of coverages in the current implementation.
+- Matches an input sequence using glyph IDs (Format 1), classes (Format 2), or coverages (Format 3).
 - Applies sub-lookups to specific positions in the matched sequence.
 - Shares the same matching engine logic as Type 6 (Chained), just with empty backtrack/lookahead.
-- Glyph-based Format 1 and class-based Format 2 remain deferred.
 - Contextual sub-lookups that change glyph stream length remain deferred.
 
 ## Logic Model

@@ -654,3 +654,16 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-shaper-split-av.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Source organization refactoring. `src/shaper.zig` remains the public facade used by existing callers.
+
+---
+
+## Code Generation - GSUB Type 5 Format 1/2
+**Timestamp**: 2026-05-13T00:00:00Z
+**User Input**: "ロードマップにしたがって次の作業を行って"
+**AI Response**: "Implemented GSUB Type 5 Contextual Substitution Format 1 (glyph sequence) and Format 2 (class-based) using the existing contextual sub-lookup application path. Added dedicated unit tests for both formats and updated roadmap documentation."
+**Verification**:
+- `zig fmt src/gsub.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
+**Context**: Construction Phase - Unit 2 - Additional GSUB lookup support. Contextual sub-lookups that change glyph stream length, GSUB chained contextual Formats 1/2, automatic script/language detection, complex script reordering, bidirectional text, and vertical layout remain pending.
