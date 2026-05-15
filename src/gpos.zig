@@ -101,6 +101,10 @@ pub const Gpos = struct {
     const mark_lig_class_count_offset = 6;
     const mark_lig_mark_array_offset = 8;
     const mark_lig_lig_array_offset = 10;
+    const mark_lig_lig_array_count_offset = 0;
+    const mark_lig_lig_attach_offsets_offset = 2;
+    const mark_lig_lig_attach_component_count_offset = 0;
+    const mark_lig_lig_attach_component_records_offset = 2;
 
     const mark_array_count_offset = 0;
     const mark_record_size = 4;
@@ -382,7 +386,6 @@ pub const Gpos = struct {
             const mark_index = try ot_layout.Coverage.getIndex(mark_coverage, glyphs[i].glyph_id) orelse continue;
 
             var lig_idx: ?usize = null;
-            var component_idx: u16 = 0;
             if (i > 0) {
                 var j = i - 1;
                 while (true) {
@@ -390,10 +393,6 @@ pub const Gpos = struct {
                         lig_idx = j;
                         break;
                     }
-                    // If we see another mark that is NOT part of this lookup's coverage,
-                    // we might need to skip it or count it for component matching.
-                    // Simplified: every mark between ligature and current mark counts as a component increment.
-                    component_idx += 1;
                     if (j == 0) break;
                     j -= 1;
                 }
@@ -412,18 +411,17 @@ pub const Gpos = struct {
             const mark_anchor_data = try ot_layout.sliceFrom(mark_array, mark_anchor_off);
             const mark_anchor = try readAnchor(mark_anchor_data);
 
-            const lig_count = try readU16(lig_array, 0);
+            const lig_count = try readU16(lig_array, mark_lig_lig_array_count_offset);
             if (lig_index >= lig_count) return font_parser.ParserError.InvalidTable;
-            const lig_attach_off = try readU16(lig_array, 2 + @as(usize, lig_index) * 2);
+            const lig_attach_off = try readU16(lig_array, mark_lig_lig_attach_offsets_offset + @as(usize, lig_index) * 2);
             const lig_attach_data = try ot_layout.sliceFrom(lig_array, lig_attach_off);
-            const comp_count = try readU16(lig_attach_data, 0);
+            const comp_count = try readU16(lig_attach_data, mark_lig_lig_attach_component_count_offset);
             if (comp_count == 0) return font_parser.ParserError.InvalidTable;
 
-            // Limit component_idx to available components
-            const actual_comp_idx = if (component_idx < comp_count) component_idx else comp_count - 1;
+            const actual_comp_idx = inferLigatureComponentIndex(glyphs, l_idx, i, comp_count);
 
             const comp_record_size = @as(usize, class_count) * 2;
-            const comp_record_off = 2 + @as(usize, actual_comp_idx) * comp_record_size;
+            const comp_record_off = mark_lig_lig_attach_component_records_offset + @as(usize, actual_comp_idx) * comp_record_size;
             const anchor_off = try readU16(lig_attach_data, comp_record_off + @as(usize, mark_class) * 2);
             if (anchor_off == 0) continue;
 
@@ -439,6 +437,18 @@ pub const Gpos = struct {
             glyphs[i].y_offset = glyphs[l_idx].y_offset + base_anchor.y - mark_anchor.y;
             glyphs[i].x_advance = 0;
         }
+    }
+
+    fn inferLigatureComponentIndex(glyphs: []const ShapedGlyph, lig_idx: usize, mark_idx: usize, comp_count: u16) u16 {
+        const lig_cluster = glyphs[lig_idx].cluster;
+        const mark_cluster = glyphs[mark_idx].cluster;
+        if (mark_cluster >= lig_cluster) {
+            const cluster_delta = mark_cluster - lig_cluster;
+            if (cluster_delta < @as(usize, comp_count)) return @intCast(cluster_delta);
+            return comp_count - 1;
+        }
+
+        return 0;
     }
 
     pub fn readAnchor(data: []const u8) font_parser.ParserError!struct { x: i16, y: i16 } {
@@ -605,5 +615,53 @@ test "gpos mark to ligature attachment" {
 
     try std.testing.expectEqual(@as(i32, -440), glyphs[1].x_offset);
     try std.testing.expectEqual(@as(i32, 70), glyphs[1].y_offset);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[1].x_advance);
+}
+
+test "gpos mark to ligature uses cluster to select component" {
+    var subtable = [_]u8{0} ** 64;
+    test_utils.writeU16(&subtable, 0, 1);
+    test_utils.writeU16(&subtable, 2, 12);
+    test_utils.writeU16(&subtable, 4, 18);
+    test_utils.writeU16(&subtable, 6, 1);
+    test_utils.writeU16(&subtable, 8, 24);
+    test_utils.writeU16(&subtable, 10, 36);
+
+    test_utils.writeU16(&subtable, 12, 1);
+    test_utils.writeU16(&subtable, 14, 1);
+    test_utils.writeU16(&subtable, 16, 3);
+
+    test_utils.writeU16(&subtable, 18, 1);
+    test_utils.writeU16(&subtable, 20, 1);
+    test_utils.writeU16(&subtable, 22, 1);
+
+    test_utils.writeU16(&subtable, 24, 1);
+    test_utils.writeU16(&subtable, 26, 0);
+    test_utils.writeU16(&subtable, 28, 6);
+    test_utils.writeU16(&subtable, 30, 1);
+    test_utils.writeI16(&subtable, 32, 10);
+    test_utils.writeI16(&subtable, 34, 50);
+
+    test_utils.writeU16(&subtable, 36, 1);
+    test_utils.writeU16(&subtable, 38, 4);
+    test_utils.writeU16(&subtable, 40, 2);
+    test_utils.writeU16(&subtable, 42, 6);
+    test_utils.writeU16(&subtable, 44, 12);
+    test_utils.writeU16(&subtable, 46, 1);
+    test_utils.writeI16(&subtable, 48, 70);
+    test_utils.writeI16(&subtable, 50, 120);
+    test_utils.writeU16(&subtable, 52, 1);
+    test_utils.writeI16(&subtable, 54, 170);
+    test_utils.writeI16(&subtable, 56, 140);
+
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 500, .y_advance = 0, .advance_width = 500, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 0x301, .glyph_id = 3, .cluster = 1, .x_offset = 0, .y_offset = 0, .x_advance = 50, .y_advance = 0, .advance_width = 50, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    try Gpos.applyMarkToLigature(&subtable, &glyphs);
+
+    try std.testing.expectEqual(@as(i32, -340), glyphs[1].x_offset);
+    try std.testing.expectEqual(@as(i32, 90), glyphs[1].y_offset);
     try std.testing.expectEqual(@as(i32, 0), glyphs[1].x_advance);
 }

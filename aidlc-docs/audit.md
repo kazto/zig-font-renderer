@@ -702,3 +702,14 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig fmt src/gsub.zig src/gsub_chained_contextual.zig`
 - `zig build test`
 **Context**: Construction Phase - Unit 2 - Source organization refactoring. `src/gsub.zig` remains the GSUB facade and lookup dispatcher; the chained contextual module owns GSUB Type 6 Format 1/2/3 matching and application logic.
+
+---
+
+## Code Generation - Mark-to-Ligature Component Selection
+**Timestamp**: 2026-05-15T00:00:00Z
+**User Input**: "ロードマップにしたがい、次の作業をおねがい"
+**AI Response**: "Improved GPOS Type 5 Mark-to-Ligature component selection by deriving the component index from the mark cluster relative to the ligature cluster and clamping it to the LigatureAttach component count. Added a regression test proving that a mark belonging to the second component selects the second component anchor."
+**Verification**:
+- `zig fmt src/gpos.zig`
+- `zig build test`
+**Context**: Construction Phase - Unit 2 - Additional GSUB/GPOS lookup hardening. The previously deferred Mark-to-Ligature component index selection item is now complete at the tested scope.

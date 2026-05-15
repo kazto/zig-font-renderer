@@ -32,7 +32,7 @@ This plan covers the implementation of GPOS Type 5 (Mark-to-Ligature), GPOS Type
 - [x] Step 4: Implement GPOS Type 5: Mark-to-Ligature Attachment
   - [x] Implement `LigatureArray` and `ComponentRecord` parsing.
   - [x] Implement Mark-to-Ligature positioning logic for mark class anchors.
-  - [ ] Improve component index resolution for real ligature component selection.
+  - [x] Improve component index resolution for real ligature component selection.
   - [x] Add unit test for ligature marks.
 
 - [x] Step 5: Hardening and Validation

@@ -10,7 +10,7 @@ This document defines the NFR design for additional OpenType Layout features, en
 
 ## Safety & Security Design
 
-- **Ligature Component Bounds**: In Mark-to-Ligature attachment, clamp the selected component index to the available component count; more precise component selection remains pending.
+- **Ligature Component Bounds**: In Mark-to-Ligature attachment, derive the selected component from glyph cluster distance and clamp it to the available component count.
 - **Mark1 Validation**: Ensure that the "base mark" in Mark-to-Mark attachment actually exists and has an anchor for the required class.
 - **Anchor Offset Validation**: Continue strict validation of all anchor offsets (Mark2Array, Mark1Array, LigatureArray, etc.) before slicing.
 

@@ -25,7 +25,7 @@ This document defines the functional design for GPOS Type 5/6 and GSUB Type 3/5 
 - Similar to Mark-to-Base, but the ligature has an array of anchor points corresponding to its components.
 - The mark attaches to a specific component of the ligature.
 - Usually, multiple marks can attach to different components of the same ligature.
-- Current implementation supports tested anchor positioning and defers more robust component index selection for real-world ligature streams.
+- Component index selection uses the mark cluster relative to the ligature cluster, clamped to the ligature component count.
 
 ### Mark-to-Mark Positioning (GPOS Type 6)
 - Positions a mark relative to another mark.
