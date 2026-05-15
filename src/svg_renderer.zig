@@ -229,7 +229,7 @@ pub const SvgRenderer = struct {
         });
 
         for (shaped.glyphs) |glyph| {
-            try appendGlyphPath(allocator, writer, face, glyph.glyph_id, Transform.translate(glyph.x_offset, 0), 0);
+            try appendGlyphPath(allocator, writer, face, glyph.glyph_id, glyphTransform(glyph), 0);
         }
 
         try writer.print(
@@ -241,6 +241,10 @@ pub const SvgRenderer = struct {
         return try output.toOwnedSlice(allocator);
     }
 };
+
+fn glyphTransform(glyph: shaper.ShapedGlyph) Transform {
+    return Transform.translate(glyph.x_offset, glyph.y_offset);
+}
 
 fn validateSvgColor(value: []const u8) SvgError!void {
     if (value.len == 0) return SvgError.InvalidSvgColor;
@@ -575,6 +579,24 @@ test "transform compose applies nested composite placement" {
     const point = parent.compose(child).apply(100, 200);
     try std.testing.expectEqual(@as(f64, 64.0), point.x);
     try std.testing.expectEqual(@as(f64, 126.0), point.y);
+}
+
+test "glyph transform includes vertical shaping offset" {
+    const transform = glyphTransform(.{
+        .codepoint = 'A',
+        .glyph_id = 1,
+        .cluster = 0,
+        .x_offset = 12,
+        .y_offset = 34,
+        .x_advance = 100,
+        .y_advance = 0,
+        .advance_width = 100,
+        .lsb = 0,
+        .kern_adjustment = 0,
+    });
+    const point = transform.apply(10, 20);
+    try std.testing.expectEqual(@as(f64, 22.0), point.x);
+    try std.testing.expectEqual(@as(f64, 54.0), point.y);
 }
 
 test "read F2Dot14 scale values" {

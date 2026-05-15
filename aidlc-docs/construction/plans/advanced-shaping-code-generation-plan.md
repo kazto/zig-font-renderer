@@ -42,4 +42,4 @@ This plan covers the implementation of GPOS Type 4 (Mark-to-Base) and GSUB Type 
 - [x] Recursion depth limit rejects excessive recursive GSUB lookup application.
 - [x] All subtable accesses are bounds-checked.
 - [x] `zig build test` passes.
-- [ ] SVG output for real fonts using these features still needs targeted visual verification.
+- [x] SVG output for real fonts using these features has targeted visual verification.

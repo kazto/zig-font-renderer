@@ -70,13 +70,14 @@
 - [x] Unit 2: Code Generation - GSUB TYPE 6 FORMAT 1/2 (2026-05-13)
 - [x] Unit 2: Refactoring - GSUB CHAINED CONTEXTUAL MODULE SPLIT (2026-05-15)
 - [x] Unit 2: Code Generation - MARK-TO-LIGATURE COMPONENT SELECTION (2026-05-15)
+- [x] Unit 2: Build and Test - ADVANCED SHAPING SVG VERIFICATION (2026-05-15)
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 2: Shaping Engine - Mark-to-Ligature Component Selection Review
-- **Last Completed**: Unit 2: GPOS Type 5 Mark-to-Ligature Component Selection
+- **Current Stage**: Unit 2: Shaping Engine - Advanced Shaping SVG Verification Review
+- **Last Completed**: Unit 2: Advanced Shaping SVG Targeted Verification
 - **Next Stage**: Unit 2: Script-specific shaping polish or Unit 3: Remaining Type 2 Operators/CFF2
-- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, GSUB/GPOS lookup handling (Single, Alternate, Ligature, Contextual Formats 1/2/3, Chained Contextual Formats 1/2/3, Single/Pair Adjustment, Mark-to-Base, Mark-to-Ligature with cluster-based component selection, and Mark-to-Mark) at the tested scope, contextual sub-lookups that change glyph stream length, checked OpenType Layout offsets, and caller-provided selection options; SVG output supports TrueType and CFF outlines with styling and transforms; CFF support includes subroutines, flex, calculation operators, and CID-keyed local subroutine resolution. Automatic script/language detection, complex script reordering, bidirectional text, vertical layout, CFF2, and targeted visual verification for advanced GPOS placement remain pending.
+- **Status**: Shaping supports basic cmap shaping, legacy kern fallback, GSUB/GPOS lookup handling (Single, Alternate, Ligature, Contextual Formats 1/2/3, Chained Contextual Formats 1/2/3, Single/Pair Adjustment, Mark-to-Base, Mark-to-Ligature with cluster-based component selection, and Mark-to-Mark) at the tested scope, contextual sub-lookups that change glyph stream length, checked OpenType Layout offsets, and caller-provided selection options; SVG output supports TrueType and CFF outlines with styling, transforms, and positioned glyph offsets from shaping; CFF support includes subroutines, flex, calculation operators, and CID-keyed local subroutine resolution. Automatic script/language detection, complex script reordering, bidirectional text, vertical layout, and CFF2 remain pending.

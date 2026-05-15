@@ -713,3 +713,21 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig fmt src/gpos.zig`
 - `zig build test`
 **Context**: Construction Phase - Unit 2 - Additional GSUB/GPOS lookup hardening. The previously deferred Mark-to-Ligature component index selection item is now complete at the tested scope.
+
+---
+
+## Build and Test - Advanced Shaping SVG Verification
+**Timestamp**: 2026-05-15T00:00:00Z
+**User Input**: "ロードマップにしたがい、次の作業をおねがい"
+**AI Response**: "Completed the remaining advanced shaping SVG verification roadmap item. Fixed SVG rendering to apply both `x_offset` and `y_offset` from shaped glyphs, added a regression test for vertical shaping offsets in glyph transforms, and generated non-empty SVG smoke outputs for real fonts covering ligature text, combining marks, pair positioning text, and mark-bearing text."
+**Verification**:
+- `zig fmt src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text "fi" --output /tmp/zig-font-renderer-verify-fi.svg --font-size 96 --background white`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text "Á" --output /tmp/zig-font-renderer-verify-mark.svg --font-size 96 --background white`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text "AV" --output /tmp/zig-font-renderer-verify-av.svg --font-size 96 --background white`
+- `zig build run -- --font /usr/share/fonts/truetype/freefont/FreeSerif.ttf --text "fí" --output /tmp/zig-font-renderer-verify-fi-mark.svg --font-size 96 --background white`
+- `wc -c /tmp/zig-font-renderer-verify-fi.svg /tmp/zig-font-renderer-verify-mark.svg /tmp/zig-font-renderer-verify-av.svg /tmp/zig-font-renderer-verify-fi-mark.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Build and Test. Advanced GSUB/GPOS roadmap verification is complete at the current tested scope; script detection, complex shaping, bidi, vertical layout, and CFF2 remain pending.
