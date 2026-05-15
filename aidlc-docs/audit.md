@@ -691,3 +691,14 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build`
 - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
 **Context**: Construction Phase - Unit 2 - Advanced GSUB lookup support. Automatic script/language detection, complex script reordering, bidirectional text, vertical layout, and targeted visual verification for advanced GPOS placement remain pending.
+
+---
+
+## Refactoring - GSUB Chained Contextual Module Split
+**Timestamp**: 2026-05-15T00:00:00Z
+**User Input**: "リファクタリング。 src/gsub.zig の分割を検討して"
+**AI Response**: "Split GSUB Type 6 chained contextual substitution handling into `src/gsub_chained_contextual.zig` while preserving `Gsub.applyChainedContextualSubstitution` as the public facade entry point. Reused the existing recursive substitution-record application through a callback to avoid circular imports."
+**Verification**:
+- `zig fmt src/gsub.zig src/gsub_chained_contextual.zig`
+- `zig build test`
+**Context**: Construction Phase - Unit 2 - Source organization refactoring. `src/gsub.zig` remains the GSUB facade and lookup dispatcher; the chained contextual module owns GSUB Type 6 Format 1/2/3 matching and application logic.

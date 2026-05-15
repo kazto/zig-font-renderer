@@ -68,13 +68,14 @@
 - [x] Unit 2: Code Generation - GSUB TYPE 5 FORMAT 1/2 (2026-05-13)
 - [x] Unit 2: Code Generation - CONTEXTUAL LENGTH-CHANGING SUBLOOKUPS (2026-05-13)
 - [x] Unit 2: Code Generation - GSUB TYPE 6 FORMAT 1/2 (2026-05-13)
+- [x] Unit 2: Refactoring - GSUB CHAINED CONTEXTUAL MODULE SPLIT (2026-05-15)
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 2: Shaping Engine - Chained Contextual Substitution Review
-- **Last Completed**: Unit 2: GSUB Type 6 Format 1/2 Chained Contextual Substitution
+- **Current Stage**: Unit 2: Shaping Engine - GSUB Module Split Review
+- **Last Completed**: Unit 2: GSUB Chained Contextual Module Split
 - **Next Stage**: Unit 2: Script-specific shaping polish or Unit 3: Remaining Type 2 Operators/CFF2
 - **Status**: Shaping supports basic cmap shaping, legacy kern fallback, GSUB/GPOS lookup handling (Single, Alternate, Ligature, Contextual Formats 1/2/3, Chained Contextual Formats 1/2/3, Single/Pair Adjustment, Mark-to-Base, Mark-to-Ligature, and Mark-to-Mark) at the tested scope, contextual sub-lookups that change glyph stream length, checked OpenType Layout offsets, and caller-provided selection options; SVG output supports TrueType and CFF outlines with styling and transforms; CFF support includes subroutines, flex, calculation operators, and CID-keyed local subroutine resolution. Automatic script/language detection, complex script reordering, bidirectional text, vertical layout, CFF2, and targeted visual verification for advanced GPOS placement remain pending.
