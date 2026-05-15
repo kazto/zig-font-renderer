@@ -106,12 +106,22 @@ fn resolveLayoutOptions(options: ShapeOptions, glyphs: []const ShapedGlyph) Shap
     if (resolved.script_tag == null) {
         resolved.script_tag = inferScriptTag(glyphs);
     }
+    if (resolved.language_tag == null) {
+        resolved.language_tag = inferLanguageTag(glyphs);
+    }
     return resolved;
 }
 
 fn inferScriptTag(glyphs: []const ShapedGlyph) ?[4]u8 {
     for (glyphs) |glyph| {
         if (scriptTagForCodepoint(glyph.codepoint)) |tag| return tag;
+    }
+    return null;
+}
+
+fn inferLanguageTag(glyphs: []const ShapedGlyph) ?[4]u8 {
+    for (glyphs) |glyph| {
+        if (languageTagForCodepoint(glyph.codepoint)) |tag| return tag;
     }
     return null;
 }
@@ -128,6 +138,22 @@ fn scriptTagForCodepoint(codepoint: u21) ?[4]u8 {
     if (isInRange(codepoint, 0x3400, 0x9FFF) or isInRange(codepoint, 0xF900, 0xFAFF)) return ot_layout.OtLayout.han_script_tag;
     if (isInRange(codepoint, 0xAC00, 0xD7AF) or isInRange(codepoint, 0x1100, 0x11FF) or isInRange(codepoint, 0x3130, 0x318F)) return ot_layout.OtLayout.hangul_script_tag;
     return null;
+}
+
+fn languageTagForCodepoint(codepoint: u21) ?[4]u8 {
+    if (isTurkishSpecificLatin(codepoint)) return ot_layout.OtLayout.turkish_language_tag;
+    if (isInRange(codepoint, 0x0590, 0x05FF)) return ot_layout.OtLayout.hebrew_language_tag;
+    if (isInRange(codepoint, 0x0600, 0x06FF) or isInRange(codepoint, 0x0750, 0x077F) or isInRange(codepoint, 0x08A0, 0x08FF)) return ot_layout.OtLayout.arabic_language_tag;
+    if (isInRange(codepoint, 0x0E00, 0x0E7F)) return ot_layout.OtLayout.thai_language_tag;
+    if (isInRange(codepoint, 0x3040, 0x30FF) or isInRange(codepoint, 0x31F0, 0x31FF)) return ot_layout.OtLayout.japanese_language_tag;
+    if (isInRange(codepoint, 0xAC00, 0xD7AF) or isInRange(codepoint, 0x1100, 0x11FF) or isInRange(codepoint, 0x3130, 0x318F)) return ot_layout.OtLayout.korean_language_tag;
+    return null;
+}
+
+fn isTurkishSpecificLatin(codepoint: u21) bool {
+    return codepoint == 0x011E or codepoint == 0x011F or
+        codepoint == 0x0130 or codepoint == 0x0131 or
+        codepoint == 0x015E or codepoint == 0x015F;
 }
 
 fn isInRange(codepoint: u21, start: u21, end: u21) bool {
@@ -252,6 +278,7 @@ test "shape options infer script from text when unspecified" {
     };
     const resolved = resolveLayoutOptions(.{}, &glyphs);
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.kana_script_tag, &resolved.script_tag.?);
+    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.japanese_language_tag, &resolved.language_tag.?);
 }
 
 test "shape options keep caller-provided script tag" {
@@ -262,11 +289,70 @@ test "shape options keep caller-provided script tag" {
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.latin_script_tag, &resolved.script_tag.?);
 }
 
+test "shape options keep caller-provided language tag" {
+    const glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0x304B, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+    const resolved = resolveLayoutOptions(.{ .language_tag = ot_layout.OtLayout.turkish_language_tag }, &glyphs);
+    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.turkish_language_tag, &resolved.language_tag.?);
+}
+
 test "script inference maps common Unicode ranges" {
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.latin_script_tag, &(scriptTagForCodepoint('A').?));
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.arabic_script_tag, &(scriptTagForCodepoint(0x0627).?));
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.han_script_tag, &(scriptTagForCodepoint(0x6F22).?));
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.hangul_script_tag, &(scriptTagForCodepoint(0xD55C).?));
+}
+
+test "language inference maps common Unicode ranges" {
+    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.turkish_language_tag, &(languageTagForCodepoint(0x0130).?));
+    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.arabic_language_tag, &(languageTagForCodepoint(0x0627).?));
+    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.japanese_language_tag, &(languageTagForCodepoint(0x304B).?));
+    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.korean_language_tag, &(languageTagForCodepoint(0xD55C).?));
+}
+
+test "OpenType layout lookup collection uses inferred language when present" {
+    var data = [_]u8{0} ** 96;
+    test_utils.writeU16(&data, ot_layout.OtLayout.script_list_offset, 10);
+    test_utils.writeU16(&data, ot_layout.OtLayout.feature_list_offset, 48);
+    test_utils.writeU16(&data, ot_layout.OtLayout.lookup_list_offset, 90);
+
+    test_utils.writeU16(&data, 10, 1);
+    data[12..16].* = ot_layout.OtLayout.latin_script_tag;
+    test_utils.writeU16(&data, 16, 8);
+
+    test_utils.writeU16(&data, 18, 0);
+    test_utils.writeU16(&data, 20, 1);
+    data[22..26].* = ot_layout.OtLayout.turkish_language_tag;
+    test_utils.writeU16(&data, 26, 18);
+
+    test_utils.writeU16(&data, 36, 0);
+    test_utils.writeU16(&data, 38, ot_layout.OtLayout.required_feature_none);
+    test_utils.writeU16(&data, 40, 1);
+    test_utils.writeU16(&data, 42, 1);
+
+    test_utils.writeU16(&data, 48, 2);
+    data[50..54].* = "liga".*;
+    test_utils.writeU16(&data, 54, 14);
+    data[56..60].* = "locl".*;
+    test_utils.writeU16(&data, 60, 20);
+
+    test_utils.writeU16(&data, 62, 0);
+    test_utils.writeU16(&data, 64, 1);
+    test_utils.writeU16(&data, 66, 3);
+    test_utils.writeU16(&data, 68, 0);
+    test_utils.writeU16(&data, 70, 1);
+    test_utils.writeU16(&data, 72, 5);
+
+    const glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0x0130, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+    const resolved = resolveLayoutOptions(.{ .script_tag = ot_layout.OtLayout.latin_script_tag }, &glyphs);
+    var lookup_indices = try ot_layout.OtLayout.collectLookupIndices(std.testing.allocator, &data, resolved);
+    defer lookup_indices.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), lookup_indices.items.len);
+    try std.testing.expectEqual(@as(u16, 5), lookup_indices.items[0]);
 }
 
 test "OpenType layout lookup collection falls back when requested script is absent" {

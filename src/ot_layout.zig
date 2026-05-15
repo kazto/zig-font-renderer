@@ -26,6 +26,12 @@ pub const OtLayout = struct {
     pub const hebrew_script_tag = "hebr".*;
     pub const kana_script_tag = "kana".*;
     pub const thai_script_tag = "thai".*;
+    pub const arabic_language_tag = "ARA ".*;
+    pub const hebrew_language_tag = "IWR ".*;
+    pub const japanese_language_tag = "JAN ".*;
+    pub const korean_language_tag = "KOR ".*;
+    pub const thai_language_tag = "THA ".*;
+    pub const turkish_language_tag = "TRK ".*;
     pub const required_feature_none = 0xffff;
 
     pub const header_min_size = 10;

@@ -746,3 +746,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --quiet`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Script-specific shaping polish. This completes the first automatic script selection increment; automatic language detection, complex script reordering, bidi, vertical layout, and CFF2 remain pending.
+
+---
+
+## Code Generation - Automatic Language Tag Inference
+**Timestamp**: 2026-05-15T00:00:00Z
+**User Input**: "ロードマップにしたがい、次の作業をおねがい"
+**AI Response**: "Added coarse automatic OpenType language tag inference for selected scripts/languages when callers do not provide `ShapeOptions.language_tag`. Explicit caller-provided language tags remain authoritative, and OpenType Layout lookup collection already falls back to the default LangSys when the inferred language is absent from a font."
+**Verification**:
+- `zig fmt src/shaper.zig src/ot_layout.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/ipafont-gothic/ipag.ttf --text かな --quiet`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text İstanbul --quiet`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Script-specific shaping polish. Automatic script and language tag inference are complete at the current coarse heuristic scope; feature default policy, complex script reordering, bidi, vertical layout, and CFF2 remain pending.
