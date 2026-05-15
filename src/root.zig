@@ -13,6 +13,7 @@ pub const TableMetadata = font_parser.TableMetadata;
 
 pub const ShapeEngine = shaper.ShapeEngine;
 pub const ShapeError = shaper.ShapeError;
+pub const ShapeDirection = shaper.ShapeDirection;
 pub const ShapeOptions = shaper.ShapeOptions;
 pub const ShapedGlyph = shaper.ShapedGlyph;
 pub const ShapedText = shaper.ShapedText;

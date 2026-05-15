@@ -791,3 +791,17 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-point-composite.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 3 - SVG renderer composite glyph support. Point-matched composite placement is complete at the current tested scope; uncommon Type 2 operators, CFF2, complex script reordering, bidi, and vertical layout remain pending.
+
+---
+
+## Code Generation - RTL-only Visual Ordering
+**Timestamp**: 2026-05-15T00:00:00Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Added `ShapeDirection` with automatic RTL-only visual ordering. The shaper now mirrors horizontal glyph offsets and reverses the shaped glyph sequence when input contains only strong RTL codepoints plus neutral characters; mixed strong LTR/RTL text remains in input order until full Unicode Bidi support is implemented."
+**Verification**:
+- `zig fmt src/shaper.zig src/shaper_types.zig src/root.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text שלום --quiet`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Direction handling increment. RTL-only visual ordering is complete at the current tested scope; full mixed-direction Unicode Bidi, complex script reordering, vertical layout, uncommon Type 2 operators, and CFF2 remain pending.

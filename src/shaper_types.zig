@@ -11,6 +11,13 @@ pub const ShapeOptions = struct {
     script_tag: ?[4]u8 = null,
     language_tag: ?[4]u8 = null,
     feature_tags: ?[]const [4]u8 = null,
+    direction: ShapeDirection = .auto,
+};
+
+pub const ShapeDirection = enum {
+    auto,
+    ltr,
+    rtl,
 };
 
 pub const ShapedGlyph = struct {

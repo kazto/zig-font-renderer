@@ -6,7 +6,7 @@
 
 ## Scope
 
-Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, caller-provided OpenType Layout script/language/feature selection, coarse automatic script/language tag inference, and conservative default feature policy.
+Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, caller-provided OpenType Layout script/language/feature selection, coarse automatic script/language tag inference, conservative default feature policy, and RTL-only visual ordering.
 
 ## Application Code
 
@@ -20,6 +20,7 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
   - Infers a coarse OpenType script tag from input Unicode ranges when callers do not provide one, while preserving explicit caller tags.
   - Infers a coarse OpenType language tag for selected Unicode ranges when callers do not provide one, while preserving explicit caller tags.
   - Applies conservative default OpenType features when callers do not provide feature tags, while preserving explicit caller tags.
+  - Adds `ShapeDirection` and automatic RTL-only visual ordering while leaving mixed-direction text in input order.
   - Shares ScriptList/LangSys/FeatureList lookup index collection between GSUB and GPOS.
   - Validates OpenType Layout offset slices before dereferencing them.
   - Preserves legacy `kern` fallback when GPOS is absent or does not apply an adjustment.
@@ -64,7 +65,9 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
 - Result: Passed after adding automatic language tag inference and fallback.
 - Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
 - Result: Passed after adding default feature policy.
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text שלום --quiet`
+- Result: Passed after adding RTL-only visual ordering.
 
 ## Known Limitations
 
-- Complex script shaping, bidirectional text, and vertical layout are not implemented.
+- Complex script shaping, full mixed-direction Unicode Bidi, and vertical layout are not implemented.

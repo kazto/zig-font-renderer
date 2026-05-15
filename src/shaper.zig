@@ -8,6 +8,7 @@ const kern = @import("kern.zig");
 const test_utils = @import("shaper_test_utils.zig");
 
 pub const ShapeError = types.ShapeError;
+pub const ShapeDirection = types.ShapeDirection;
 pub const ShapeOptions = types.ShapeOptions;
 pub const ShapedGlyph = types.ShapedGlyph;
 pub const ShapedText = types.ShapedText;
@@ -140,6 +141,10 @@ pub const ShapeEngine = struct {
             }
         }
 
+        if (resolveDirection(options.direction, glyphs.items) == .rtl) {
+            applyRtlVisualOrder(glyphs.items, total_advance);
+        }
+
         return .{
             .glyphs = try glyphs.toOwnedSlice(allocator),
             .total_advance = total_advance,
@@ -217,6 +222,43 @@ fn isInRange(codepoint: u21, start: u21, end: u21) bool {
     return codepoint >= start and codepoint <= end;
 }
 
+fn resolveDirection(direction: ShapeDirection, glyphs: []const ShapedGlyph) ShapeDirection {
+    if (direction != .auto) return direction;
+
+    var saw_rtl = false;
+    for (glyphs) |glyph| {
+        if (isStrongRtlCodepoint(glyph.codepoint)) {
+            saw_rtl = true;
+        } else if (isStrongLtrCodepoint(glyph.codepoint)) {
+            return .ltr;
+        }
+    }
+
+    return if (saw_rtl) .rtl else .ltr;
+}
+
+fn applyRtlVisualOrder(glyphs: []ShapedGlyph, total_advance: i32) void {
+    for (glyphs) |*glyph| {
+        glyph.x_offset = total_advance - (glyph.x_offset + glyph.x_advance);
+    }
+    std.mem.reverse(ShapedGlyph, glyphs);
+}
+
+fn isStrongRtlCodepoint(codepoint: u21) bool {
+    return isInRange(codepoint, 0x0590, 0x08FF) or
+        isInRange(codepoint, 0xFB1D, 0xFDFF) or
+        isInRange(codepoint, 0xFE70, 0xFEFF) or
+        isInRange(codepoint, 0x10800, 0x10FFF);
+}
+
+fn isStrongLtrCodepoint(codepoint: u21) bool {
+    return isInRange(codepoint, 0x0041, 0x02AF) or
+        isInRange(codepoint, 0x0370, 0x052F) or
+        isInRange(codepoint, 0x0900, 0x1FFF) or
+        isInRange(codepoint, 0x3040, 0xA7FF) or
+        isInRange(codepoint, 0xAC00, 0xD7AF);
+}
+
 test "detects whether GPOS changed positioning" {
     const unchanged = [_]ShapedGlyph{.{
         .codepoint = 'A',
@@ -245,6 +287,34 @@ test "detects whether GPOS changed positioning" {
         .kern_adjustment = 0,
     }};
     try std.testing.expect(kern.hasGposAdjustment(&adjusted));
+}
+
+test "automatic direction uses RTL for RTL-only text" {
+    const rtl = [_]ShapedGlyph{
+        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 0x05D1, .glyph_id = 2, .cluster = 1, .x_offset = 100, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
+    };
+    const mixed = [_]ShapedGlyph{
+        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'A', .glyph_id = 2, .cluster = 1, .x_offset = 100, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    try std.testing.expectEqual(ShapeDirection.rtl, resolveDirection(.auto, &rtl));
+    try std.testing.expectEqual(ShapeDirection.ltr, resolveDirection(.auto, &mixed));
+}
+
+test "RTL visual order mirrors horizontal positions" {
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 0x05D1, .glyph_id = 2, .cluster = 1, .x_offset = 100, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    applyRtlVisualOrder(&glyphs, 180);
+
+    try std.testing.expectEqual(@as(u16, 2), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u16, 1), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(i32, 80), glyphs[1].x_offset);
 }
 
 test "OpenType layout lookup collection filters by feature tag" {

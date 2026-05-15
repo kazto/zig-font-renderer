@@ -2,7 +2,7 @@
 
 ## Scope
 
-The current increment implements basic left-to-right text shaping using data exposed by Unit 1.
+The current increment implements horizontal text shaping using data exposed by Unit 1, including RTL-only visual ordering at the tested scope.
 
 ## Flow
 
@@ -10,14 +10,14 @@ The current increment implements basic left-to-right text shaping using data exp
 2. Validate UTF-8.
 3. Iterate Unicode codepoints in input order.
 4. Resolve each codepoint to a glyph ID and horizontal metrics through `Face.getGlyphInfo`.
-5. Emit `ShapedGlyph` records with cluster indexes and horizontal pen positions.
-6. Apply supported legacy pair kerning from the `kern` table.
-7. Recompute horizontal offsets and total advance in raw FUnits.
+5. Emit `ShapedGlyph` records with cluster indexes and horizontal metrics.
+6. Apply supported GSUB substitutions and GPOS positioning.
+7. Apply supported legacy pair kerning from the `kern` table when GPOS did not position the glyphs.
+8. Recompute horizontal offsets and total advance in raw FUnits.
+9. For RTL-only input or explicit RTL direction, mirror glyph offsets and reverse the shaped glyph sequence for visual output.
 
 ## Deferred Logic
 
-- GSUB substitutions, including ligatures.
-- GPOS positioning.
-- Bidirectional text handling.
-- Script-specific shaping.
+- Full mixed-direction Unicode Bidi handling.
+- Complex script reordering.
 - Vertical writing mode.
