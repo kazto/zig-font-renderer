@@ -678,3 +678,16 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig fmt src/gsub.zig`
 - `zig build test`
 **Context**: Construction Phase - Unit 2 - GSUB contextual substitution hardening. GSUB chained contextual Formats 1/2, automatic script/language detection, complex script reordering, bidirectional text, vertical layout, and targeted visual verification for advanced GPOS placement remain pending.
+
+---
+
+## Code Generation - GSUB Type 6 Format 1/2
+**Timestamp**: 2026-05-13T00:00:00Z
+**User Input**: "ロードマップにしたがって次の作業を行って"
+**AI Response**: "Implemented GSUB Type 6 Chained Contextual Substitution Format 1 (glyph sequence) and Format 2 (class-based) using the existing contextual sub-lookup application path. Added dedicated unit tests for both formats."
+**Verification**:
+- `zig fmt src/gsub.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
+**Context**: Construction Phase - Unit 2 - Advanced GSUB lookup support. Automatic script/language detection, complex script reordering, bidirectional text, vertical layout, and targeted visual verification for advanced GPOS placement remain pending.

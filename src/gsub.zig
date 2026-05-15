@@ -66,6 +66,22 @@ pub const Gsub = struct {
     const subst_record_sequence_index_offset = 0;
     const subst_record_lookup_index_offset = 2;
 
+    const chained_f1_coverage_offset = 2;
+    const chained_f1_rule_set_count_offset = 4;
+    const chained_f1_rule_set_offsets_offset = 6;
+    const chain_rule_set_count_offset = 0;
+    const chain_rule_set_offsets_offset = 2;
+    const chain_rule_backtrack_count_offset = 0;
+    const chained_f2_coverage_offset = 2;
+    const chained_f2_backtrack_class_def_offset = 4;
+    const chained_f2_input_class_def_offset = 6;
+    const chained_f2_lookahead_class_def_offset = 8;
+    const chained_f2_class_set_count_offset = 10;
+    const chained_f2_class_set_offsets_offset = 12;
+    const chain_class_set_count_offset = 0;
+    const chain_class_set_offsets_offset = 2;
+    const chain_class_rule_backtrack_count_offset = 0;
+
     pub fn applyAlternateSubstitution(subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph)) font_parser.ParserError!void {
         const format = try readU16(subtable, alt_format_offset);
         if (format != 1) return;
@@ -381,8 +397,189 @@ pub const Gsub = struct {
 
     pub fn applyChainedContextualSubstitution(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph), depth: usize) LayoutError!void {
         const format = try readU16(subtable, 0);
-        if (format == 3) {
+        if (format == 1) {
+            try applyChainedContextualFormat1(allocator, face, lookup_list, subtable, glyphs, depth);
+        } else if (format == 2) {
+            try applyChainedContextualFormat2(allocator, face, lookup_list, subtable, glyphs, depth);
+        } else if (format == 3) {
             try applyChainedContextualFormat3(allocator, face, lookup_list, subtable, glyphs, depth);
+        }
+    }
+
+    pub fn applyChainedContextualFormat1(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph), depth: usize) LayoutError!void {
+        const coverage_off = try readU16(subtable, chained_f1_coverage_offset);
+        const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
+        const rule_set_count = try readU16(subtable, chained_f1_rule_set_count_offset);
+
+        var i: usize = 0;
+        while (i < glyphs.items.len) {
+            const coverage_index = try ot_layout.Coverage.getIndex(coverage_data, glyphs.items[i].glyph_id) orelse {
+                i += 1;
+                continue;
+            };
+            if (coverage_index >= rule_set_count) return font_parser.ParserError.InvalidTable;
+
+            const rule_set_off = try readU16(subtable, chained_f1_rule_set_offsets_offset + @as(usize, coverage_index) * 2);
+            if (rule_set_off == 0) {
+                i += 1;
+                continue;
+            }
+
+            const rule_set = try ot_layout.sliceFrom(subtable, rule_set_off);
+            const rule_count = try readU16(rule_set, chain_rule_set_count_offset);
+            var matched_len: ?u16 = null;
+
+            for (0..rule_count) |rule_idx| {
+                const rule_off = try readU16(rule_set, chain_rule_set_offsets_offset + rule_idx * 2);
+                const rule = try ot_layout.sliceFrom(rule_set, rule_off);
+                const backtrack_count = try readU16(rule, chain_rule_backtrack_count_offset);
+                var offset: usize = chain_rule_backtrack_count_offset + 2;
+
+                if (i < backtrack_count) continue;
+                var matches = true;
+                for (0..backtrack_count) |j| {
+                    const expected_gid = try readU16(rule, offset + j * 2);
+                    if (glyphs.items[i - 1 - j].glyph_id != expected_gid) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, backtrack_count) * 2;
+
+                const input_count = try readU16(rule, offset);
+                offset += 2;
+                if (input_count == 0 or i + input_count > glyphs.items.len) continue;
+                for (1..input_count) |input_idx| {
+                    const expected_gid = try readU16(rule, offset + (input_idx - 1) * 2);
+                    if (glyphs.items[i + input_idx].glyph_id != expected_gid) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, input_count - 1) * 2;
+
+                const lookahead_count = try readU16(rule, offset);
+                offset += 2;
+                if (i + input_count + lookahead_count > glyphs.items.len) continue;
+                for (0..lookahead_count) |lookahead_idx| {
+                    const expected_gid = try readU16(rule, offset + lookahead_idx * 2);
+                    if (glyphs.items[i + input_count + lookahead_idx].glyph_id != expected_gid) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, lookahead_count) * 2;
+
+                const subst_count = try readU16(rule, offset);
+                offset += 2;
+                const subst_records = try ot_layout.sliceRange(rule, offset, @as(usize, subst_count) * subst_record_size);
+                try applySubstitutionRecords(allocator, face, lookup_list, subst_records, subst_count, glyphs, i, depth);
+                matched_len = input_count;
+                break;
+            }
+
+            if (matched_len) |len| {
+                i += len;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    pub fn applyChainedContextualFormat2(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph), depth: usize) LayoutError!void {
+        const coverage_off = try readU16(subtable, chained_f2_coverage_offset);
+        const backtrack_class_def_off = try readU16(subtable, chained_f2_backtrack_class_def_offset);
+        const input_class_def_off = try readU16(subtable, chained_f2_input_class_def_offset);
+        const lookahead_class_def_off = try readU16(subtable, chained_f2_lookahead_class_def_offset);
+        const class_set_count = try readU16(subtable, chained_f2_class_set_count_offset);
+        const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
+        const backtrack_class_def = try ot_layout.sliceFrom(subtable, backtrack_class_def_off);
+        const input_class_def = try ot_layout.sliceFrom(subtable, input_class_def_off);
+        const lookahead_class_def = try ot_layout.sliceFrom(subtable, lookahead_class_def_off);
+
+        var i: usize = 0;
+        while (i < glyphs.items.len) {
+            if (try ot_layout.Coverage.getIndex(coverage_data, glyphs.items[i].glyph_id) == null) {
+                i += 1;
+                continue;
+            }
+
+            const first_class = try ot_layout.ClassDef.getClass(input_class_def, glyphs.items[i].glyph_id);
+            if (first_class >= class_set_count) return font_parser.ParserError.InvalidTable;
+
+            const class_set_off = try readU16(subtable, chained_f2_class_set_offsets_offset + @as(usize, first_class) * 2);
+            if (class_set_off == 0) {
+                i += 1;
+                continue;
+            }
+
+            const class_set = try ot_layout.sliceFrom(subtable, class_set_off);
+            const class_rule_count = try readU16(class_set, chain_class_set_count_offset);
+            var matched_len: ?u16 = null;
+
+            for (0..class_rule_count) |rule_idx| {
+                const class_rule_off = try readU16(class_set, chain_class_set_offsets_offset + rule_idx * 2);
+                const class_rule = try ot_layout.sliceFrom(class_set, class_rule_off);
+                const backtrack_count = try readU16(class_rule, chain_class_rule_backtrack_count_offset);
+                var offset: usize = chain_class_rule_backtrack_count_offset + 2;
+
+                if (i < backtrack_count) continue;
+                var matches = true;
+                for (0..backtrack_count) |j| {
+                    const expected_class = try readU16(class_rule, offset + j * 2);
+                    const actual_class = try ot_layout.ClassDef.getClass(backtrack_class_def, glyphs.items[i - 1 - j].glyph_id);
+                    if (actual_class != expected_class) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, backtrack_count) * 2;
+
+                const input_count = try readU16(class_rule, offset);
+                offset += 2;
+                if (input_count == 0 or i + input_count > glyphs.items.len) continue;
+                for (1..input_count) |input_idx| {
+                    const expected_class = try readU16(class_rule, offset + (input_idx - 1) * 2);
+                    const actual_class = try ot_layout.ClassDef.getClass(input_class_def, glyphs.items[i + input_idx].glyph_id);
+                    if (actual_class != expected_class) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, input_count - 1) * 2;
+
+                const lookahead_count = try readU16(class_rule, offset);
+                offset += 2;
+                if (i + input_count + lookahead_count > glyphs.items.len) continue;
+                for (0..lookahead_count) |lookahead_idx| {
+                    const expected_class = try readU16(class_rule, offset + lookahead_idx * 2);
+                    const actual_class = try ot_layout.ClassDef.getClass(lookahead_class_def, glyphs.items[i + input_count + lookahead_idx].glyph_id);
+                    if (actual_class != expected_class) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, lookahead_count) * 2;
+
+                const subst_count = try readU16(class_rule, offset);
+                offset += 2;
+                const subst_records = try ot_layout.sliceRange(class_rule, offset, @as(usize, subst_count) * subst_record_size);
+                try applySubstitutionRecords(allocator, face, lookup_list, subst_records, subst_count, glyphs, i, depth);
+                matched_len = input_count;
+                break;
+            }
+
+            if (matched_len) |len| {
+                i += len;
+            } else {
+                i += 1;
+            }
         }
     }
 
@@ -520,6 +717,141 @@ test "gsub chained contextual substitution format 3" {
     test_utils.writeU16(&lookup_list, 6, 0); // flag
     test_utils.writeU16(&lookup_list, 8, 1); // subtable count
     test_utils.writeU16(&lookup_list, 10, 8); // subtable offset (relative to 4, so at 12)
+    @memcpy(lookup_list[12 .. 12 + sub_lookup.len], &sub_lookup);
+
+    var glyphs = std.ArrayList(ShapedGlyph).empty;
+    defer glyphs.deinit(std.testing.allocator);
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 'B', .glyph_id = 2, .cluster = 1, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 'C', .glyph_id = 3, .cluster = 2, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+
+    const face: font_parser.Face = undefined;
+    try Gsub.applyChainedContextualSubstitution(std.testing.allocator, face, &lookup_list, &subtable, &glyphs, 0);
+
+    try std.testing.expectEqual(@as(u16, 4), glyphs.items[1].glyph_id);
+}
+
+test "gsub chained contextual substitution format 1" {
+    var subtable = [_]u8{0} ** 40;
+    test_utils.writeU16(&subtable, 0, 1); // format
+    test_utils.writeU16(&subtable, 2, 8); // coverage_off
+    test_utils.writeU16(&subtable, 4, 1); // rule_set_count
+    test_utils.writeU16(&subtable, 6, 14); // rule_set_offsets[0]
+
+    // Coverage (input GID 2)
+    test_utils.writeU16(&subtable, 8, 1);
+    test_utils.writeU16(&subtable, 10, 1);
+    test_utils.writeU16(&subtable, 12, 2);
+
+    // ChainRuleSet
+    test_utils.writeU16(&subtable, 14, 1); // rule_count
+    test_utils.writeU16(&subtable, 16, 4); // rule offset relative to set
+
+    // ChainSubRule: backtrack 1, input 2, lookahead 3 -> lookup 0 on input
+    test_utils.writeU16(&subtable, 18, 1); // backtrack_count
+    test_utils.writeU16(&subtable, 20, 1); // backtrack glyph
+    test_utils.writeU16(&subtable, 22, 1); // input_count
+    test_utils.writeU16(&subtable, 24, 1); // lookahead_count
+    test_utils.writeU16(&subtable, 26, 3); // lookahead glyph
+    test_utils.writeU16(&subtable, 28, 1); // subst_count
+    test_utils.writeU16(&subtable, 30, 0); // sequence_index
+    test_utils.writeU16(&subtable, 32, 0); // lookup_index
+
+    var sub_lookup = [_]u8{0} ** 12;
+    test_utils.writeU16(&sub_lookup, 0, 1);
+    test_utils.writeU16(&sub_lookup, 2, 6);
+    test_utils.writeI16(&sub_lookup, 4, 2);
+    test_utils.writeU16(&sub_lookup, 6, 1);
+    test_utils.writeU16(&sub_lookup, 8, 1);
+    test_utils.writeU16(&sub_lookup, 10, 2);
+
+    var lookup_list = [_]u8{0} ** 30;
+    test_utils.writeU16(&lookup_list, 0, 1);
+    test_utils.writeU16(&lookup_list, 2, 4);
+    test_utils.writeU16(&lookup_list, 4, 1);
+    test_utils.writeU16(&lookup_list, 6, 0);
+    test_utils.writeU16(&lookup_list, 8, 1);
+    test_utils.writeU16(&lookup_list, 10, 8);
+    @memcpy(lookup_list[12 .. 12 + sub_lookup.len], &sub_lookup);
+
+    var glyphs = std.ArrayList(ShapedGlyph).empty;
+    defer glyphs.deinit(std.testing.allocator);
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 'B', .glyph_id = 2, .cluster = 1, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 'C', .glyph_id = 3, .cluster = 2, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+
+    const face: font_parser.Face = undefined;
+    try Gsub.applyChainedContextualSubstitution(std.testing.allocator, face, &lookup_list, &subtable, &glyphs, 0);
+
+    try std.testing.expectEqual(@as(u16, 4), glyphs.items[1].glyph_id);
+}
+
+test "gsub chained contextual substitution format 2" {
+    var subtable = [_]u8{0} ** 74;
+    test_utils.writeU16(&subtable, 0, 2); // format
+    test_utils.writeU16(&subtable, 2, 16); // coverage_off
+    test_utils.writeU16(&subtable, 4, 22); // backtrack_class_def_off
+    test_utils.writeU16(&subtable, 6, 32); // input_class_def_off
+    test_utils.writeU16(&subtable, 8, 42); // lookahead_class_def_off
+    test_utils.writeU16(&subtable, 10, 2); // class_set_count
+    test_utils.writeU16(&subtable, 12, 0); // class 0 set
+    test_utils.writeU16(&subtable, 14, 52); // class 1 set
+
+    // Coverage (input GID 2)
+    test_utils.writeU16(&subtable, 16, 1);
+    test_utils.writeU16(&subtable, 18, 1);
+    test_utils.writeU16(&subtable, 20, 2);
+
+    // ClassDef Format 2 for backtrack GID 1 -> class 1
+    test_utils.writeU16(&subtable, 22, 2);
+    test_utils.writeU16(&subtable, 24, 1);
+    test_utils.writeU16(&subtable, 26, 1);
+    test_utils.writeU16(&subtable, 28, 1);
+    test_utils.writeU16(&subtable, 30, 1);
+
+    // ClassDef Format 2 for input GID 2 -> class 1
+    test_utils.writeU16(&subtable, 32, 2);
+    test_utils.writeU16(&subtable, 34, 1);
+    test_utils.writeU16(&subtable, 36, 2);
+    test_utils.writeU16(&subtable, 38, 2);
+    test_utils.writeU16(&subtable, 40, 1);
+
+    // ClassDef Format 2 for lookahead GID 3 -> class 1
+    test_utils.writeU16(&subtable, 42, 2);
+    test_utils.writeU16(&subtable, 44, 1);
+    test_utils.writeU16(&subtable, 46, 3);
+    test_utils.writeU16(&subtable, 48, 3);
+    test_utils.writeU16(&subtable, 50, 1);
+
+    // ChainSubClassSet for input class 1
+    test_utils.writeU16(&subtable, 52, 1); // class_rule_count
+    test_utils.writeU16(&subtable, 54, 4); // class_rule offset relative to set
+
+    // ChainSubClassRule: backtrack class 1, input class 1, lookahead class 1
+    test_utils.writeU16(&subtable, 56, 1); // backtrack_count
+    test_utils.writeU16(&subtable, 58, 1); // backtrack class
+    test_utils.writeU16(&subtable, 60, 1); // input_count
+    test_utils.writeU16(&subtable, 62, 1); // lookahead_count
+    test_utils.writeU16(&subtable, 64, 1); // lookahead class
+    test_utils.writeU16(&subtable, 66, 1); // subst_count
+    test_utils.writeU16(&subtable, 68, 0); // sequence_index
+    test_utils.writeU16(&subtable, 70, 0); // lookup_index
+
+    var sub_lookup = [_]u8{0} ** 12;
+    test_utils.writeU16(&sub_lookup, 0, 1);
+    test_utils.writeU16(&sub_lookup, 2, 6);
+    test_utils.writeI16(&sub_lookup, 4, 2);
+    test_utils.writeU16(&sub_lookup, 6, 1);
+    test_utils.writeU16(&sub_lookup, 8, 1);
+    test_utils.writeU16(&sub_lookup, 10, 2);
+
+    var lookup_list = [_]u8{0} ** 30;
+    test_utils.writeU16(&lookup_list, 0, 1);
+    test_utils.writeU16(&lookup_list, 2, 4);
+    test_utils.writeU16(&lookup_list, 4, 1);
+    test_utils.writeU16(&lookup_list, 6, 0);
+    test_utils.writeU16(&lookup_list, 8, 1);
+    test_utils.writeU16(&lookup_list, 10, 8);
     @memcpy(lookup_list[12 .. 12 + sub_lookup.len], &sub_lookup);
 
     var glyphs = std.ArrayList(ShapedGlyph).empty;

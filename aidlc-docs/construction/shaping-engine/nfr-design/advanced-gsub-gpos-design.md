@@ -4,7 +4,7 @@ This document defines the NFR design for advanced OpenType Layout features, prio
 
 ## Performance Design
 
-- **Context Matching Efficiency**: Use direct coverage comparisons for the implemented Format 3 path. Glyph ID and class-based contextual formats remain deferred.
+- **Context Matching Efficiency**: Use direct glyph, class, or coverage comparisons for the implemented chained contextual paths.
 - **Anchor Resolution**: Resolve Mark and Base anchors in a single pass where possible.
 - **Lookbehind Limits**: Bound contextual backtrack checks by the coverage sequence length to avoid out-of-bounds reads.
 

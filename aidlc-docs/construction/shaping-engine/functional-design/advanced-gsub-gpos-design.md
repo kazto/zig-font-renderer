@@ -26,7 +26,7 @@ This document defines the functional design for advanced OpenType Layout lookups
 - Attachment only occurs if both the base and the mark have anchors defined for the same MarkClass.
 
 ### Chained Contextual Substitution (GSUB Type 6)
-- Current implementation supports coverage-based Format 3. Glyph-based Format 1 and class-based Format 2 remain deferred.
+- Current implementation supports glyph-based Format 1, class-based Format 2, and coverage-based Format 3.
 - Backtrack sequences are checked in reverse order (closest to input first).
 - Lookahead sequences are checked in forward order.
 - If a match is found, one or more lookups are applied to the input sequence.

@@ -21,7 +21,7 @@ This plan covers the implementation of GPOS Type 4 (Mark-to-Base) and GSUB Type 
 
 - [x] Step 2: Implement GSUB Type 6: Chained Contextual Substitution
   - [x] Implement Format 3 (Coverage-based).
-  - [ ] Defer Format 1 (Simple) and Format 2 (Class-based).
+  - [x] Implement Format 1 (glyph sequence) and Format 2 (class-based).
   - [x] Implement contextual matching logic for backtrack, input, and lookahead sequences.
   - [x] Add recursive lookup application with a hard depth limit (16).
   - [x] Handle glyph ID replacement after contextual sub-lookups.
@@ -38,6 +38,7 @@ This plan covers the implementation of GPOS Type 4 (Mark-to-Base) and GSUB Type 
 
 - [x] GPOS Type 4 lookups correctly position marks relative to bases.
 - [x] GSUB Type 6 Format 3 lookups correctly substitute glyphs based on coverage-based context.
+- [x] GSUB Type 6 Format 1/2 lookups substitute glyphs based on glyph and class-based chained context.
 - [x] Recursion depth limit rejects excessive recursive GSUB lookup application.
 - [x] All subtable accesses are bounds-checked.
 - [x] `zig build test` passes.
