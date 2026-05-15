@@ -12,6 +12,52 @@ pub const ShapeOptions = types.ShapeOptions;
 pub const ShapedGlyph = types.ShapedGlyph;
 pub const ShapedText = types.ShapedText;
 
+const default_feature_tags = [_][4]u8{
+    "ccmp".*,
+    "locl".*,
+    "liga".*,
+    "clig".*,
+    "calt".*,
+    "kern".*,
+    "mark".*,
+    "mkmk".*,
+};
+
+const arabic_default_feature_tags = [_][4]u8{
+    "ccmp".*,
+    "locl".*,
+    "isol".*,
+    "init".*,
+    "medi".*,
+    "fina".*,
+    "rlig".*,
+    "calt".*,
+    "kern".*,
+    "mark".*,
+    "mkmk".*,
+};
+
+const indic_default_feature_tags = [_][4]u8{
+    "ccmp".*,
+    "locl".*,
+    "nukt".*,
+    "akhn".*,
+    "rphf".*,
+    "blwf".*,
+    "half".*,
+    "pstf".*,
+    "vatu".*,
+    "pres".*,
+    "abvs".*,
+    "blws".*,
+    "psts".*,
+    "haln".*,
+    "calt".*,
+    "kern".*,
+    "mark".*,
+    "mkmk".*,
+};
+
 pub const ShapeEngine = struct {
     pub fn init() ShapeEngine {
         return .{};
@@ -109,7 +155,18 @@ fn resolveLayoutOptions(options: ShapeOptions, glyphs: []const ShapedGlyph) Shap
     if (resolved.language_tag == null) {
         resolved.language_tag = inferLanguageTag(glyphs);
     }
+    if (resolved.feature_tags == null) {
+        resolved.feature_tags = defaultFeatureTagsForScript(resolved.script_tag);
+    }
     return resolved;
+}
+
+fn defaultFeatureTagsForScript(script_tag: ?[4]u8) []const [4]u8 {
+    if (script_tag) |tag| {
+        if (std.mem.eql(u8, &tag, &ot_layout.OtLayout.arabic_script_tag)) return &arabic_default_feature_tags;
+        if (std.mem.eql(u8, &tag, &ot_layout.OtLayout.devanagari_script_tag)) return &indic_default_feature_tags;
+    }
+    return &default_feature_tags;
 }
 
 fn inferScriptTag(glyphs: []const ShapedGlyph) ?[4]u8 {
@@ -297,6 +354,34 @@ test "shape options keep caller-provided language tag" {
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.turkish_language_tag, &resolved.language_tag.?);
 }
 
+test "shape options assign default feature policy" {
+    const glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+    const resolved = resolveLayoutOptions(.{}, &glyphs);
+    try std.testing.expect(resolved.feature_tags != null);
+    try std.testing.expectEqualSlices(u8, &"liga".*, &resolved.feature_tags.?[2]);
+}
+
+test "shape options keep caller-provided feature tags" {
+    const glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+    const selected = [_][4]u8{"salt".*};
+    const resolved = resolveLayoutOptions(.{ .feature_tags = &selected }, &glyphs);
+    try std.testing.expectEqualSlices(u8, &"salt".*, &resolved.feature_tags.?[0]);
+}
+
+test "default feature policy varies by script" {
+    const arabic_tags = defaultFeatureTagsForScript(ot_layout.OtLayout.arabic_script_tag);
+    try std.testing.expect(hasFeatureTag(arabic_tags, "init".*));
+    try std.testing.expect(hasFeatureTag(arabic_tags, "fina".*));
+
+    const indic_tags = defaultFeatureTagsForScript(ot_layout.OtLayout.devanagari_script_tag);
+    try std.testing.expect(hasFeatureTag(indic_tags, "half".*));
+    try std.testing.expect(hasFeatureTag(indic_tags, "haln".*));
+}
+
 test "script inference maps common Unicode ranges" {
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.latin_script_tag, &(scriptTagForCodepoint('A').?));
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.arabic_script_tag, &(scriptTagForCodepoint(0x0627).?));
@@ -304,11 +389,60 @@ test "script inference maps common Unicode ranges" {
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.hangul_script_tag, &(scriptTagForCodepoint(0xD55C).?));
 }
 
+fn hasFeatureTag(tags: []const [4]u8, needle: [4]u8) bool {
+    for (tags) |tag| {
+        if (std.mem.eql(u8, &tag, &needle)) return true;
+    }
+    return false;
+}
+
 test "language inference maps common Unicode ranges" {
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.turkish_language_tag, &(languageTagForCodepoint(0x0130).?));
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.arabic_language_tag, &(languageTagForCodepoint(0x0627).?));
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.japanese_language_tag, &(languageTagForCodepoint(0x304B).?));
     try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.korean_language_tag, &(languageTagForCodepoint(0xD55C).?));
+}
+
+test "OpenType layout lookup collection filters to default feature policy" {
+    var data = [_]u8{0} ** 100;
+    test_utils.writeU16(&data, ot_layout.OtLayout.script_list_offset, 10);
+    test_utils.writeU16(&data, ot_layout.OtLayout.feature_list_offset, 34);
+    test_utils.writeU16(&data, ot_layout.OtLayout.lookup_list_offset, 92);
+
+    test_utils.writeU16(&data, 10, 1);
+    data[12..16].* = ot_layout.OtLayout.default_script_tag;
+    test_utils.writeU16(&data, 16, 8);
+
+    test_utils.writeU16(&data, 18, 4);
+    test_utils.writeU16(&data, 20, 0);
+    test_utils.writeU16(&data, 22, 0);
+    test_utils.writeU16(&data, 24, ot_layout.OtLayout.required_feature_none);
+    test_utils.writeU16(&data, 26, 2);
+    test_utils.writeU16(&data, 28, 0);
+    test_utils.writeU16(&data, 30, 1);
+
+    test_utils.writeU16(&data, 34, 2);
+    data[36..40].* = "liga".*;
+    test_utils.writeU16(&data, 40, 14);
+    data[42..46].* = "salt".*;
+    test_utils.writeU16(&data, 46, 20);
+
+    test_utils.writeU16(&data, 48, 0);
+    test_utils.writeU16(&data, 50, 1);
+    test_utils.writeU16(&data, 52, 7);
+    test_utils.writeU16(&data, 54, 0);
+    test_utils.writeU16(&data, 56, 1);
+    test_utils.writeU16(&data, 58, 11);
+
+    const glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+    const resolved = resolveLayoutOptions(.{}, &glyphs);
+    var lookup_indices = try ot_layout.OtLayout.collectLookupIndices(std.testing.allocator, &data, resolved);
+    defer lookup_indices.deinit(std.testing.allocator);
+
+    try std.testing.expectEqual(@as(usize, 1), lookup_indices.items.len);
+    try std.testing.expectEqual(@as(u16, 7), lookup_indices.items[0]);
 }
 
 test "OpenType layout lookup collection uses inferred language when present" {

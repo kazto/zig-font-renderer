@@ -761,3 +761,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text İstanbul --quiet`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Script-specific shaping polish. Automatic script and language tag inference are complete at the current coarse heuristic scope; feature default policy, complex script reordering, bidi, vertical layout, and CFF2 remain pending.
+
+---
+
+## Code Generation - Default Feature Policy
+**Timestamp**: 2026-05-15T00:00:00Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Added a conservative default OpenType feature policy when callers do not provide `ShapeOptions.feature_tags`. The default keeps common shaping features such as `ccmp`, `locl`, ligatures, contextual alternates, kerning, and mark positioning, with Arabic and Indic-specific additions. Explicit caller-provided feature tags remain authoritative."
+**Verification**:
+- `zig fmt src/shaper.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
+- `zig build run -- --font /usr/share/fonts/opentype/ipafont-gothic/ipag.ttf --text かな --quiet`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Script-specific shaping polish. Default feature policy is complete at the current conservative scope; complex script reordering, bidi, vertical layout, and CFF2 remain pending.
