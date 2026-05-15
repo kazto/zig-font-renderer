@@ -9,6 +9,7 @@
 - Empty glyph ranges produce no path.
 - Composite glyphs are expanded when their components use XY offsets.
 - Composite glyphs with uniform scale, separate XY scale, or 2x2 transforms are emitted by transforming path coordinates.
+- Point-matched composite glyph components align the referenced component point with an already accumulated parent component point.
 - Nested composite glyph transforms are composed before path emission.
 - Composite recursion is bounded to prevent malformed fonts from causing unbounded expansion.
 - `--font-size` must be a positive finite number.
@@ -35,5 +36,4 @@
 
 ## Deferred Rules
 
-- Point-matched composite components return `UnsupportedCompositeGlyph`.
 - CFF2 outlines are not rendered.

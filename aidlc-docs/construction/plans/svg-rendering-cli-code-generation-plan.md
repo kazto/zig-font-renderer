@@ -43,7 +43,7 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Decode component records in composite TrueType glyphs.
   - Support XY offset component placement.
   - Recursively emit component paths with bounded recursion.
-  - Reject point-matched or transformed components that are not yet supported.
+  - Initially rejected point-matched or transformed components that were not yet supported.
 
 - [x] Step 7: Add SVG sizing controls
   - Add renderer `RenderOptions`.
@@ -73,7 +73,7 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Decode composite glyph F2Dot14 scale values.
   - Support uniform scale, separate XY scale, and 2x2 component transforms.
   - Compose nested component transforms before emitting path coordinates.
-  - Preserve explicit rejection for point-matched composite components.
+  - Preserve explicit rejection for point-matched composite components until point attachment is implemented.
 
 - [x] Step 12: Add explicit CFF outline unsupported handling
   - Detect `CFF ` and `CFF2` tables when `glyf` is absent.
@@ -118,11 +118,17 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Resolve glyph-specific Font DICT `Private` and local `Subrs` offsets.
   - Verify CFF and TrueType SVG generation still succeeds.
 
+- [x] Step 19: Add point-matched composite glyph rendering
+  - Reuse simple glyph point decoding for component point collection.
+  - Track accumulated parent component points while expanding composites.
+  - Align component point indexes to referenced parent point indexes before path emission.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
 - [x] Composite glyphs with XY offsets can be expanded into visible component paths.
 - [x] Composite glyphs with scale or matrix transforms can be emitted as transformed paths.
+- [x] Point-matched composite glyph components can align referenced component and parent points.
 - [x] SVG output has practical pixel dimensions.
 - [x] SVG output is sized from actual rendered glyph bounds.
 - [x] High-level API is available for one-call SVG rendering.

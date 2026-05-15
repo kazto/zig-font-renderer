@@ -23,6 +23,7 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Decodes simple TrueType `glyf` contours.
   - Expands composite TrueType glyphs when components use XY offsets.
   - Applies composite uniform scale, separate XY scale, and 2x2 transforms to emitted path coordinates.
+  - Aligns point-matched composite TrueType components by resolving component point indexes against accumulated parent component points.
   - Parses CFF INDEX data and Top DICT `CharStrings` offsets.
   - Retrieves CFF Type 2 charstrings by glyph ID.
   - Resolves CID-keyed CFF `FDArray`/`FDSelect` data for glyph-specific local subroutines.
@@ -128,10 +129,14 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed.
 - Command: `wc -c /tmp/zig-font-renderer-cff-op-A.svg /tmp/zig-font-renderer-cff-op-B.svg /tmp/zig-font-renderer-cff-op-S.svg /tmp/zig-font-renderer-cff-op-g.svg /tmp/zig-font-renderer-cff-op-O.svg /tmp/zig-font-renderer-type2-regression.svg`
 - Result: Passed; all generated SVG files are non-empty.
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text Å --output /tmp/zig-font-renderer-point-composite.svg --font-size 96`
+- Result: Passed; TrueType composite SVG output still renders after point-matched component support.
+- Command: `wc -c /tmp/zig-font-renderer-point-composite.svg`
+- Result: `899 /tmp/zig-font-renderer-point-composite.svg`
 
 ## Known Limitations
 
-- Point-matched composite glyphs are not implemented.
+- Point-matched composite glyphs are implemented for tested TrueType component point alignment cases.
 - Some uncommon Type 2 operators beyond compact curves and flex operators are not implemented.
 - CFF2 outlines are not implemented.
 - Complex shaping remains incomplete.

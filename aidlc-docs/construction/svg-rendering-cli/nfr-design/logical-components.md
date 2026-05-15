@@ -8,7 +8,8 @@
 - `RenderOptions`: Public renderer sizing and basic styling options.
 - `validateSvgColor`: Internal SVG attribute value guard for fill and background.
 - `appendGlyphPath`: Internal glyph-to-path converter.
-- `appendCompositeGlyphPaths`: Internal composite glyph expander for XY-offset components.
+- `appendCompositeGlyphPaths`: Internal composite glyph expander for XY-offset, transformed, and point-matched components.
+- `appendGlyphTransformedPoints`: Internal point collector used to resolve composite point-matched placement.
 - `cff_outline.appendGlyphPath`: CFF Type 2 outline-to-SVG path converter.
 - `cff_types`: Shared CFF error, transform, INDEX, context, and Type 2 state definitions.
 - `cff_index`: CFF INDEX and DICT operand parsing helpers.

@@ -776,3 +776,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build run -- --font /usr/share/fonts/opentype/ipafont-gothic/ipag.ttf --text かな --quiet`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Script-specific shaping polish. Default feature policy is complete at the current conservative scope; complex script reordering, bidi, vertical layout, and CFF2 remain pending.
+
+---
+
+## Code Generation - Point-Matched Composite Glyphs
+**Timestamp**: 2026-05-15T00:00:00Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented point-matched TrueType composite glyph placement by reusing simple glyph point decoding, tracking accumulated parent component points, and translating a component so its referenced point aligns with the referenced parent point. Added regression coverage for a synthetic point-matched composite glyph."
+**Verification**:
+- `zig fmt src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text Å --output /tmp/zig-font-renderer-point-composite.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-point-composite.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 3 - SVG renderer composite glyph support. Point-matched composite placement is complete at the current tested scope; uncommon Type 2 operators, CFF2, complex script reordering, bidi, and vertical layout remain pending.

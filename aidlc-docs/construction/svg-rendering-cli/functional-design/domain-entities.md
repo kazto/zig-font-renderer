@@ -47,7 +47,7 @@ Internal FUnit bounding box:
 
 ## Composite Component
 
-Internal component record in a composite TrueType glyph. The current implementation supports component glyph ID, XY offset placement, uniform scale, separate XY scale, and 2x2 transforms.
+Internal component record in a composite TrueType glyph. The current implementation supports component glyph ID, XY offset placement, point-matched placement, uniform scale, separate XY scale, and 2x2 transforms.
 
 ## Transform
 
