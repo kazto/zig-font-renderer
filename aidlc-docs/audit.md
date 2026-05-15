@@ -731,3 +731,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-verify-fi.svg /tmp/zig-font-renderer-verify-mark.svg /tmp/zig-font-renderer-verify-av.svg /tmp/zig-font-renderer-verify-fi-mark.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Build and Test. Advanced GSUB/GPOS roadmap verification is complete at the current tested scope; script detection, complex shaping, bidi, vertical layout, and CFF2 remain pending.
+
+---
+
+## Code Generation - Automatic Script Tag Inference
+**Timestamp**: 2026-05-15T00:00:00Z
+**User Input**: "ロードマップにしたがい、次の作業をおねがい"
+**AI Response**: "Added coarse automatic OpenType script tag inference for common Unicode ranges when callers do not provide `ShapeOptions.script_tag`. Explicit caller-provided script tags remain authoritative, and OpenType Layout lookup collection falls back to DFLT/latn when the requested script is absent from a font."
+**Verification**:
+- `zig fmt src/shaper.zig src/ot_layout.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/ipafont-gothic/ipag.ttf --text かな --quiet`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --quiet`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Script-specific shaping polish. This completes the first automatic script selection increment; automatic language detection, complex script reordering, bidi, vertical layout, and CFF2 remain pending.

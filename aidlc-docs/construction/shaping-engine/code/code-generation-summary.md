@@ -6,7 +6,7 @@
 
 ## Scope
 
-Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, and caller-provided OpenType Layout script/language/feature selection.
+Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, caller-provided OpenType Layout script/language/feature selection, and coarse automatic script tag inference.
 
 ## Application Code
 
@@ -17,6 +17,7 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
   - Implements initial GSUB Single Substitution and Ligature Substitution.
   - Implements initial GPOS Single Adjustment and Pair Adjustment.
   - Adds `ShapeOptions` and `shapeTextWithOptions` for caller-selected script, language, and feature tags.
+  - Infers a coarse OpenType script tag from input Unicode ranges when callers do not provide one, while preserving explicit caller tags.
   - Shares ScriptList/LangSys/FeatureList lookup index collection between GSUB and GPOS.
   - Validates OpenType Layout offset slices before dereferencing them.
   - Preserves legacy `kern` fallback when GPOS is absent or does not apply an adjustment.
@@ -55,8 +56,10 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
 - Result: Passed after adding OpenType Layout selection.
 - Command: `wc -c /tmp/zig-font-renderer-shape-options-av.svg`
 - Result: `523 /tmp/zig-font-renderer-shape-options-av.svg`
+- Command: `zig build run -- --font /usr/share/fonts/opentype/ipafont-gothic/ipag.ttf --text かな --quiet`
+- Result: Passed after adding automatic script tag inference and fallback.
 
 ## Known Limitations
 
 - Complex script shaping, bidirectional text, and vertical layout are not implemented.
-- Automatic script/language detection and full feature default policy are not implemented.
+- Automatic language detection and full feature default policy are not implemented.

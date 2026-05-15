@@ -18,11 +18,12 @@
 - GSUB Contextual Substitution (Type 5 Format 3) applies lookups to input sequences based on coverage context.
 - GSUB Chained Contextual Substitution (Type 6 Format 3) applies lookups to input sequences based on surrounding coverage-based backtrack and lookahead glyphs.
 - Callers may constrain OpenType Layout lookup application with explicit script, language, and feature tags.
+- When no script tag is provided, the shaping engine infers a coarse OpenType script tag from the first supported Unicode script range in the input and falls back to DFLT/latn if that script is absent from the font.
 - Legacy `kern` remains a fallback when GPOS is absent or does not apply an adjustment.
 - Cluster indexes follow input codepoint order.
 
 ## Deferred Rules
 
 - Complex script reordering is not applied.
-- Automatic script/language detection and feature default policy beyond caller-provided tags are not applied.
+- Automatic language detection and feature default policy beyond caller-provided tags are not applied.
 - Bidirectional text and vertical layout are not applied.

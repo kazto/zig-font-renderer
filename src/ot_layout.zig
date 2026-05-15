@@ -17,6 +17,15 @@ pub const TableTags = struct {
 pub const OtLayout = struct {
     pub const default_script_tag = "DFLT".*;
     pub const latin_script_tag = "latn".*;
+    pub const arabic_script_tag = "arab".*;
+    pub const cyrillic_script_tag = "cyrl".*;
+    pub const devanagari_script_tag = "deva".*;
+    pub const greek_script_tag = "grek".*;
+    pub const han_script_tag = "hani".*;
+    pub const hangul_script_tag = "hang".*;
+    pub const hebrew_script_tag = "hebr".*;
+    pub const kana_script_tag = "kana".*;
+    pub const thai_script_tag = "thai".*;
     pub const required_feature_none = 0xffff;
 
     pub const header_min_size = 10;
@@ -124,9 +133,10 @@ pub const OtLayout = struct {
         const script_list_data = try sliceFrom(data, script_list_off);
         const feature_list_data = try sliceFrom(data, feature_list_off);
 
-        const script_off_val = if (options.script_tag) |script_tag|
-            try findScriptOffset(script_list_data, script_tag)
-        else blk: {
+        const script_off_val = blk: {
+            if (options.script_tag) |script_tag| {
+                if (try findScriptOffset(script_list_data, script_tag)) |script_off| break :blk script_off;
+            }
             var script_off = try findScriptOffset(script_list_data, default_script_tag);
             if (script_off == null) script_off = try findScriptOffset(script_list_data, latin_script_tag);
             break :blk script_off;
