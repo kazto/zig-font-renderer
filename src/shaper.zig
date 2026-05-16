@@ -141,8 +141,11 @@ pub const ShapeEngine = struct {
             }
         }
 
-        if (resolveDirection(options.direction, glyphs.items) == .rtl) {
+        const resolved_direction = resolveDirection(options.direction, glyphs.items);
+        if (resolved_direction == .rtl) {
             applyRtlVisualOrder(glyphs.items, total_advance);
+        } else if (hasMixedStrongDirections(glyphs.items)) {
+            try applyMixedDirectionVisualOrder(allocator, glyphs.items);
         }
 
         return .{
@@ -244,6 +247,91 @@ fn applyRtlVisualOrder(glyphs: []ShapedGlyph, total_advance: i32) void {
     std.mem.reverse(ShapedGlyph, glyphs);
 }
 
+fn applyMixedDirectionVisualOrder(
+    allocator: std.mem.Allocator,
+    glyphs: []ShapedGlyph,
+) !void {
+    var visual_glyphs = std.ArrayList(ShapedGlyph).empty;
+    defer visual_glyphs.deinit(allocator);
+
+    var run_start: usize = 0;
+    var run_direction: ShapeDirection = .ltr;
+    var index: usize = 0;
+    while (index < glyphs.len) : (index += 1) {
+        if (strongDirectionForCodepoint(glyphs[index].codepoint)) |direction| {
+            if (index == run_start) {
+                run_direction = direction;
+                continue;
+            }
+            if (direction != run_direction) {
+                try appendVisualRun(allocator, &visual_glyphs, glyphs[run_start..index], run_direction);
+                run_start = index;
+                run_direction = direction;
+            }
+        }
+    }
+
+    try appendVisualRun(allocator, &visual_glyphs, glyphs[run_start..], run_direction);
+
+    for (visual_glyphs.items, 0..) |glyph, out_index| {
+        glyphs[out_index] = glyph;
+    }
+}
+
+fn appendVisualRun(
+    allocator: std.mem.Allocator,
+    visual_glyphs: *std.ArrayList(ShapedGlyph),
+    run: []const ShapedGlyph,
+    run_direction: ShapeDirection,
+) !void {
+    switch (run_direction) {
+        .ltr, .auto => {
+            for (run) |glyph| {
+                try visual_glyphs.append(allocator, glyph);
+            }
+        },
+        .rtl => {
+            const run_start = run[0].x_offset;
+            var run_end = run[0].x_offset + run[0].x_advance;
+            for (run[1..]) |glyph| {
+                run_end = @max(run_end, glyph.x_offset + glyph.x_advance);
+            }
+
+            var index: usize = run.len;
+            while (index > 0) : (index -= 1) {
+                const glyph = run[index - 1];
+                var visual_glyph = glyph;
+                visual_glyph.x_offset = run_start + (run_end - (glyph.x_offset + glyph.x_advance));
+                try visual_glyphs.append(allocator, visual_glyph);
+            }
+        },
+    }
+}
+
+fn hasMixedStrongDirections(glyphs: []const ShapedGlyph) bool {
+    var saw_ltr = false;
+    var saw_rtl = false;
+
+    for (glyphs) |glyph| {
+        if (strongDirectionForCodepoint(glyph.codepoint)) |direction| {
+            switch (direction) {
+                .ltr => saw_ltr = true,
+                .rtl => saw_rtl = true,
+                .auto => {},
+            }
+            if (saw_ltr and saw_rtl) return true;
+        }
+    }
+
+    return false;
+}
+
+fn strongDirectionForCodepoint(codepoint: u21) ?ShapeDirection {
+    if (isStrongRtlCodepoint(codepoint)) return .rtl;
+    if (isStrongLtrCodepoint(codepoint)) return .ltr;
+    return null;
+}
+
 fn isStrongRtlCodepoint(codepoint: u21) bool {
     return isInRange(codepoint, 0x0590, 0x08FF) or
         isInRange(codepoint, 0xFB1D, 0xFDFF) or
@@ -315,6 +403,26 @@ test "RTL visual order mirrors horizontal positions" {
     try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
     try std.testing.expectEqual(@as(u16, 1), glyphs[1].glyph_id);
     try std.testing.expectEqual(@as(i32, 80), glyphs[1].x_offset);
+}
+
+test "mixed direction visual order reverses RTL runs inside LTR text" {
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 0x05D0, .glyph_id = 2, .cluster = 1, .x_offset = 80, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 0x05D1, .glyph_id = 3, .cluster = 2, .x_offset = 150, .y_offset = 0, .x_advance = 90, .y_advance = 0, .advance_width = 90, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'B', .glyph_id = 4, .cluster = 3, .x_offset = 240, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    try applyMixedDirectionVisualOrder(std.testing.allocator, &glyphs);
+
+    try std.testing.expectEqual(@as(u16, 1), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u16, 3), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(i32, 80), glyphs[1].x_offset);
+    try std.testing.expectEqual(@as(u16, 2), glyphs[2].glyph_id);
+    try std.testing.expectEqual(@as(i32, 170), glyphs[2].x_offset);
+    try std.testing.expectEqual(@as(u16, 4), glyphs[3].glyph_id);
+    try std.testing.expectEqual(@as(i32, 240), glyphs[3].x_offset);
 }
 
 test "OpenType layout lookup collection filters by feature tag" {

@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-04-27T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Unit 2: Shaping Engine - Additional Lookup Review
+- **Current Stage**: CONSTRUCTION - Unit 2: Shaping Engine - Mixed Direction Visual Ordering Review
 
 ## Execution Plan Summary
 - **Total Stages**: 14 (Total workflow stages including those executed/skipped)
@@ -76,6 +76,7 @@
 - [x] Unit 2: Code Generation - DEFAULT FEATURE POLICY (2026-05-15)
 - [x] Unit 3: Code Generation - POINT-MATCHED COMPOSITE GLYPHS (2026-05-15)
 - [x] Unit 2: Code Generation - RTL-ONLY VISUAL ORDERING (2026-05-15)
+- [x] Unit 2: Code Generation - MIXED-DIRECTION VISUAL ORDERING (2026-05-16)
 - [x] Unit 3: Code Generation - TYPE 2 STEM3 HINT COUNTING (2026-05-16)
 - [x] Unit 3: Code Generation - TYPE 2 SETCURRENTPOINT (2026-05-16)
 - [x] Unit 3: Code Generation - TYPE 2 CLOSURE / OTHERSUBR COMPATIBILITY (2026-05-16)
@@ -85,7 +86,7 @@
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 3: SVG Renderer - Type 2 Closure / Othersubr Compatibility Review
-- **Last Completed**: Unit 3: Type 2 Closure / Othersubr Compatibility
-- **Next Stage**: Unit 2: Remaining script-specific shaping polish or Unit 3: Remaining Type 2 Operators/CFF2
-- **Status**: Shaping supports basic cmap shaping, coarse automatic script/language tag inference, conservative default feature policy, RTL-only visual ordering, legacy kern fallback, GSUB/GPOS lookup handling (Single, Alternate, Ligature, Contextual Formats 1/2/3, Chained Contextual Formats 1/2/3, Single/Pair Adjustment, Mark-to-Base, Mark-to-Ligature with cluster-based component selection, and Mark-to-Mark) at the tested scope, contextual sub-lookups that change glyph stream length, checked OpenType Layout offsets, and caller-provided selection options; SVG output supports TrueType and CFF outlines with styling, transforms, positioned glyph offsets from shaping, transformed composite glyphs, and point-matched TrueType composite components at the tested scope; CFF support includes subroutines, flex, calculation operators, CID-keyed local subroutine resolution, stem3 hint counting for mask alignment, Type 2 `setcurrentpoint`, `closepath`, and othersubr/pop compatibility. Full mixed-direction Unicode Bidi, complex script reordering, vertical layout, uncommon Type 2 operators, and CFF2 remain pending.
+- **Current Stage**: Unit 2: Shaping Engine - Mixed Direction Visual Ordering Review
+- **Last Completed**: Unit 2: Mixed-Direction Visual Ordering
+- **Next Stage**: Unit 2: Remaining complex script reordering or Unit 3: Remaining Type 2 Operators/CFF2
+- **Status**: Shaping supports basic cmap shaping, coarse automatic script/language tag inference, conservative default feature policy, RTL-only visual ordering, mixed RTL run reordering inside predominantly LTR text, legacy kern fallback, GSUB/GPOS lookup handling (Single, Alternate, Ligature, Contextual Formats 1/2/3, Chained Contextual Formats 1/2/3, Single/Pair Adjustment, Mark-to-Base, Mark-to-Ligature with cluster-based component selection, and Mark-to-Mark) at the tested scope, contextual sub-lookups that change glyph stream length, checked OpenType Layout offsets, and caller-provided selection options; SVG output supports TrueType and CFF outlines with styling, transforms, positioned glyph offsets from shaping, transformed composite glyphs, and point-matched TrueType composite components at the tested scope; CFF support includes subroutines, flex, calculation operators, CID-keyed local subroutine resolution, stem3 hint counting for mask alignment, Type 2 `setcurrentpoint`, `closepath`, and othersubr/pop compatibility. Full mixed-direction Unicode Bidi, complex script reordering, vertical layout, uncommon Type 2 operators, and CFF2 remain pending.

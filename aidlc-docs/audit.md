@@ -808,6 +808,21 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 
 ---
 
+## Code Generation - Mixed-Direction Visual Ordering
+**Timestamp**: 2026-05-16T00:00:00Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Extended the shaper with a mixed-direction visual ordering heuristic. When a line contains both strong LTR and strong RTL codepoints, contiguous RTL runs are reversed within their local span so mixed text renders more naturally while keeping the full Unicode Bidi implementation deferred."
+**Verification**:
+- `zig fmt src/shaper.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text \"AשלוםB\" --output /tmp/zig-font-renderer-mixed-direction.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-mixed-direction.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Direction handling increment. Mixed RTL run visual ordering is complete at the current tested scope; full mixed-direction Unicode Bidi, complex script reordering, vertical layout, uncommon Type 2 operators, and CFF2 remain pending.
+
+---
+
 ## Code Generation - Type 2 Stem3 Hint Counting
 **Timestamp**: 2026-05-16T00:00:00Z
 **User Input**: "次の作業をおねがい"

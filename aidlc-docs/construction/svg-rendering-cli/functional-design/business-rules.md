@@ -20,6 +20,7 @@
 - Optional SVG background emits a full-size `<rect>` before glyph paths.
 - SVG color values must be non-empty and limited to characters safe for attribute values.
 - Text advance remains included in horizontal bounds when advance exceeds visible outline bounds.
+- Automatic direction handling keeps pure RTL text in RTL visual order and reverses contiguous strong RTL runs within mixed strong LTR/RTL text when the paragraph resolves to LTR.
 - CLI metadata output is suppressed when `--output` is used.
 - `renderToSvg` owns file loading and returns an allocated SVG buffer owned by the caller.
 - CLI SVG output must use the same high-level API exposed to library users.
