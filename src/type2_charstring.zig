@@ -67,13 +67,10 @@ pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []co
         offset += 1;
         switch (byte) {
             Type2.hstem, Type2.vstem, Type2.hstemhm, Type2.vstemhm => {
-                const width_operands: usize = if ((state.stack_len % hint_stem_operand_count) == optional_width_operand_count) optional_width_operand_count else stack_empty;
-                state.hint_count += (state.stack_len - width_operands) / hint_stem_operand_count;
-                state.stack_len = stack_empty;
+                applyStemHintCount(state);
             },
             Type2.hintmask, Type2.cntrmask => {
-                const width_operands: usize = if ((state.stack_len % hint_stem_operand_count) == optional_width_operand_count) optional_width_operand_count else stack_empty;
-                state.hint_count += (state.stack_len - width_operands) / hint_stem_operand_count;
+                applyStemHintCount(state);
                 state.stack_len = stack_empty;
                 const mask_len = (state.hint_count + hint_mask_rounding) / hint_mask_bits_per_byte;
                 if (offset + mask_len > charstring.len) return font_parser.ParserError.InvalidTable;
@@ -206,6 +203,7 @@ pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []co
                 offset += 1;
                 switch (escaped_operator) {
                     Type2.escaped_dotsection => state.stack_len = stack_empty,
+                    Type2.escaped_vstem3, Type2.escaped_hstem3 => applyStemHintCount(state),
                     Type2.escaped_and => try executeType2And(state),
                     Type2.escaped_or => try executeType2Or(state),
                     Type2.escaped_not => try executeType2Not(state),
@@ -226,6 +224,7 @@ pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []co
                     Type2.escaped_exch => try executeType2Exch(state),
                     Type2.escaped_index => try executeType2Index(state),
                     Type2.escaped_roll => try executeType2Roll(state),
+                    Type2.escaped_setcurrentpoint => try executeType2SetCurrentPoint(state),
                     Type2.escaped_flex => try emitType2Flex(writer, transform, state),
                     Type2.escaped_hflex => try emitType2HFlex(writer, transform, state),
                     Type2.escaped_hflex1 => try emitType2HFlex1(writer, transform, state),
@@ -249,6 +248,12 @@ fn emitType2Curve(writer: std.ArrayList(u8).Writer, transform: Transform, state:
     const c2 = transform.apply(c2x, c2y);
     const end = transform.apply(state.x, state.y);
     try writer.print("C {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} {d:.2} ", .{ c1.x, c1.y, c2.x, c2.y, end.x, end.y });
+}
+
+fn applyStemHintCount(state: *Type2State) void {
+    const width_operands: usize = if ((state.stack_len % hint_stem_operand_count) == optional_width_operand_count) optional_width_operand_count else stack_empty;
+    state.hint_count += (state.stack_len - width_operands) / hint_stem_operand_count;
+    state.stack_len = stack_empty;
 }
 
 fn executeType2And(state: *Type2State) CffError!void {
@@ -402,6 +407,14 @@ fn executeType2Roll(state: *Type2State) CffError!void {
         }
         state.stack[base] = last;
     }
+}
+
+fn executeType2SetCurrentPoint(state: *Type2State) CffError!void {
+    if (state.stack_len < stack_pair_operand_count) return font_parser.ParserError.InvalidTable;
+    state.x = state.stack[state.stack_len - stack_pair_operand_count];
+    state.y = state.stack[state.stack_len - stack_single_operand];
+    state.has_current_point = true;
+    state.stack_len = stack_empty;
 }
 
 fn popType2Stack(state: *Type2State) i32 {
@@ -618,6 +631,49 @@ test "Type2 escaped arithmetic operators feed drawing operands" {
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
     try std.testing.expectEqualStrings("M 0.00 0.00 L 30.00 6.00 Z ", output.items);
+}
+
+test "Type2 hstem3 and vstem3 contribute to hintmask length" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
+    const charstring = [_]u8{
+        139,           139,                  139,            139,           139,           139,
+        Type2.escape,  Type2.escaped_hstem3, Type2.hintmask, 0x00,          139,           139,
+        Type2.rmoveto, 189,                  139,            Type2.rlineto, Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 Z ", output.items);
+}
+
+test "Type2 setcurrentpoint updates the current point" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
+    const charstring = [_]u8{
+        139,                           139,           Type2.rmoveto,
+        149,                           159,           Type2.escape,
+        Type2.escaped_setcurrentpoint, 141,           142,
+        Type2.rlineto,                 Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 12.00 23.00 Z ", output.items);
 }
 
 test "Type2 escaped storage and conditional operators feed drawing operands" {

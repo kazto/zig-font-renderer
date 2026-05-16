@@ -34,6 +34,8 @@ pub const Cff = struct {
 
 pub const Type2 = struct {
     pub const escaped_dotsection = 0;
+    pub const escaped_vstem3 = 1;
+    pub const escaped_hstem3 = 2;
     pub const escaped_and = 3;
     pub const escaped_or = 4;
     pub const escaped_not = 5;
@@ -54,13 +56,16 @@ pub const Type2 = struct {
     pub const escaped_exch = 28;
     pub const escaped_index = 29;
     pub const escaped_roll = 30;
+    pub const escaped_setcurrentpoint = 33;
     pub const escaped_flex = 35;
     pub const escaped_hflex = 34;
     pub const escaped_hflex1 = 36;
     pub const escaped_flex1 = 37;
 
     pub const hstem = 1;
+    pub const hstem3 = 2;
     pub const vstem = 3;
+    pub const vstem3 = 1;
     pub const vmoveto = 4;
     pub const rlineto = 5;
     pub const hlineto = 6;

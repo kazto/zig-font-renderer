@@ -29,6 +29,8 @@
 - Basic Type 2 `rmoveto`, `hmoveto`, `vmoveto`, `rlineto`, `hlineto`, `vlineto`, `rrcurveto`, and `endchar` operators emit SVG path commands.
 - Type 2 `callsubr` and `callgsubr` expand local/global CFF subroutines with bounded recursion.
 - Type 2 `hintmask` and `cntrmask` bytes are skipped according to the active stem hint count.
+- Type 2 escaped `hstem3` and `vstem3` operators contribute to the active stem hint count used by `hintmask` and `cntrmask`.
+- Type 2 escaped `setcurrentpoint` updates the current point without emitting a path segment.
 - Common Type 2 compact curve operators `hhcurveto`, `vvcurveto`, `hvcurveto`, `vhcurveto`, `rcurveline`, and `rlinecurve` emit SVG path commands.
 - Type 2 escaped flex operators `hflex`, `flex`, `hflex1`, and `flex1` emit two SVG cubic path commands.
 - Type 2 escaped calculation and stack operators update the operand stack for subsequent path commands.

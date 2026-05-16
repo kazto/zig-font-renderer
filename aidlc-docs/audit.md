@@ -805,3 +805,33 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text שלום --quiet`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Direction handling increment. RTL-only visual ordering is complete at the current tested scope; full mixed-direction Unicode Bidi, complex script reordering, vertical layout, uncommon Type 2 operators, and CFF2 remain pending.
+
+---
+
+## Code Generation - Type 2 Stem3 Hint Counting
+**Timestamp**: 2026-05-16T00:00:00Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Added escaped Type 2 `hstem3` and `vstem3` handling to the CFF charstring executor so stem3 hint groups contribute to the active hint count used by `hintmask` and `cntrmask`. Added a regression test that exercises `hintmask` alignment after `hstem3`."
+**Verification**:
+- `zig fmt src/type2_charstring.zig src/cff_types.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff-stem3.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-stem3.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 3 - CFF Type 2 operator coverage. The uncommon Type 2 hint-group increment is complete at the current tested scope; CFF2, full mixed-direction Unicode Bidi, complex script reordering, and vertical layout remain pending.
+
+---
+
+## Code Generation - Type 2 SetCurrentPoint
+**Timestamp**: 2026-05-16T00:00:00Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Added escaped Type 2 `setcurrentpoint` handling to the CFF charstring executor so fonts can reposition the current point without emitting a drawing command. Added a regression test proving that subsequent path commands use the updated point."
+**Verification**:
+- `zig fmt src/type2_charstring.zig src/cff_types.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff-setcurrentpoint.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-setcurrentpoint.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 3 - CFF Type 2 operator coverage. The uncommon Type 2 current-point increment is complete at the current tested scope; CFF2, full mixed-direction Unicode Bidi, complex script reordering, and vertical layout remain pending.
