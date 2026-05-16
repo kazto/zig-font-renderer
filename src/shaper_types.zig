@@ -18,6 +18,7 @@ pub const ShapeDirection = enum {
     auto,
     ltr,
     rtl,
+    ttb,
 };
 
 pub const ShapedGlyph = struct {

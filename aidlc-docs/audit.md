@@ -823,6 +823,21 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 
 ---
 
+## Code Generation - Vertical Layout
+**Timestamp**: 2026-05-16T00:00:00Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Added explicit top-to-bottom layout support through `ShapeDirection.ttb`, vertical default feature selection, and SVG/CLI plumbing for `--direction ttb`. The shaper now stacks glyphs on the vertical axis, preserves cross-axis positioning from GPOS, and exposes the mode through both the library API and CLI."
+**Verification**:
+- `zig fmt src/shaper.zig src/shaper_types.zig src/svg_renderer.zig src/main.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/fonts-japanese-gothic.ttf --text かな --output /tmp/zig-font-renderer-vertical.svg --font-size 96 --direction ttb`
+- `wc -c /tmp/zig-font-renderer-vertical.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Vertical layout increment. Vertical layout is complete at the current tested scope; full mixed-direction Unicode Bidi, complex script reordering, uncommon Type 2 operators, and CFF2 remain pending.
+
+---
+
 ## Code Generation - Type 2 Stem3 Hint Counting
 **Timestamp**: 2026-05-16T00:00:00Z
 **User Input**: "次の作業をおねがい"

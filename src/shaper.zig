@@ -24,6 +24,19 @@ const default_feature_tags = [_][4]u8{
     "mkmk".*,
 };
 
+const vertical_default_feature_tags = [_][4]u8{
+    "vert".*,
+    "vrt2".*,
+    "ccmp".*,
+    "locl".*,
+    "liga".*,
+    "clig".*,
+    "calt".*,
+    "kern".*,
+    "mark".*,
+    "mkmk".*,
+};
+
 const arabic_default_feature_tags = [_][4]u8{
     "ccmp".*,
     "locl".*,
@@ -38,7 +51,46 @@ const arabic_default_feature_tags = [_][4]u8{
     "mkmk".*,
 };
 
+const vertical_arabic_default_feature_tags = [_][4]u8{
+    "vert".*,
+    "vrt2".*,
+    "ccmp".*,
+    "locl".*,
+    "isol".*,
+    "init".*,
+    "medi".*,
+    "fina".*,
+    "rlig".*,
+    "calt".*,
+    "kern".*,
+    "mark".*,
+    "mkmk".*,
+};
+
 const indic_default_feature_tags = [_][4]u8{
+    "ccmp".*,
+    "locl".*,
+    "nukt".*,
+    "akhn".*,
+    "rphf".*,
+    "blwf".*,
+    "half".*,
+    "pstf".*,
+    "vatu".*,
+    "pres".*,
+    "abvs".*,
+    "blws".*,
+    "psts".*,
+    "haln".*,
+    "calt".*,
+    "kern".*,
+    "mark".*,
+    "mkmk".*,
+};
+
+const vertical_indic_default_feature_tags = [_][4]u8{
+    "vert".*,
+    "vrt2".*,
     "ccmp".*,
     "locl".*,
     "nukt".*,
@@ -134,19 +186,17 @@ pub const ShapeEngine = struct {
             }
         }
 
-        var total_advance: i32 = 0;
-        if (glyphs.items.len > 0) {
-            for (glyphs.items) |glyph| {
-                total_advance = @max(total_advance, glyph.x_offset + glyph.x_advance);
-            }
-        }
-
         const resolved_direction = resolveDirection(options.direction, glyphs.items);
+        const horizontal_total_advance = computeTotalAdvance(glyphs.items, .ltr);
         if (resolved_direction == .rtl) {
-            applyRtlVisualOrder(glyphs.items, total_advance);
+            applyRtlVisualOrder(glyphs.items, horizontal_total_advance);
+        } else if (resolved_direction == .ttb) {
+            applyVerticalLayout(glyphs.items);
         } else if (hasMixedStrongDirections(glyphs.items)) {
             try applyMixedDirectionVisualOrder(allocator, glyphs.items);
         }
+
+        const total_advance = computeTotalAdvance(glyphs.items, resolved_direction);
 
         return .{
             .glyphs = try glyphs.toOwnedSlice(allocator),
@@ -164,9 +214,17 @@ fn resolveLayoutOptions(options: ShapeOptions, glyphs: []const ShapedGlyph) Shap
         resolved.language_tag = inferLanguageTag(glyphs);
     }
     if (resolved.feature_tags == null) {
-        resolved.feature_tags = defaultFeatureTagsForScript(resolved.script_tag);
+        resolved.feature_tags = defaultFeatureTagsForDirectionAndScript(resolved.direction, resolved.script_tag);
     }
     return resolved;
+}
+
+fn defaultFeatureTagsForDirectionAndScript(direction: ShapeDirection, script_tag: ?[4]u8) []const [4]u8 {
+    if (direction == .ttb) {
+        return verticalFeatureTagsForScript(script_tag);
+    }
+
+    return defaultFeatureTagsForScript(script_tag);
 }
 
 fn defaultFeatureTagsForScript(script_tag: ?[4]u8) []const [4]u8 {
@@ -175,6 +233,14 @@ fn defaultFeatureTagsForScript(script_tag: ?[4]u8) []const [4]u8 {
         if (std.mem.eql(u8, &tag, &ot_layout.OtLayout.devanagari_script_tag)) return &indic_default_feature_tags;
     }
     return &default_feature_tags;
+}
+
+fn verticalFeatureTagsForScript(script_tag: ?[4]u8) []const [4]u8 {
+    if (script_tag) |tag| {
+        if (std.mem.eql(u8, &tag, &ot_layout.OtLayout.arabic_script_tag)) return &vertical_arabic_default_feature_tags;
+        if (std.mem.eql(u8, &tag, &ot_layout.OtLayout.devanagari_script_tag)) return &vertical_indic_default_feature_tags;
+    }
+    return &vertical_default_feature_tags;
 }
 
 fn inferScriptTag(glyphs: []const ShapedGlyph) ?[4]u8 {
@@ -247,6 +313,17 @@ fn applyRtlVisualOrder(glyphs: []ShapedGlyph, total_advance: i32) void {
     std.mem.reverse(ShapedGlyph, glyphs);
 }
 
+fn applyVerticalLayout(glyphs: []ShapedGlyph) void {
+    var pen_y: i32 = 0;
+    for (glyphs) |*glyph| {
+        glyph.y_offset += pen_y;
+        const vertical_advance = if (glyph.y_advance != 0) glyph.y_advance else @as(i32, glyph.advance_width);
+        glyph.y_advance = vertical_advance;
+        glyph.x_advance = 0;
+        pen_y += vertical_advance;
+    }
+}
+
 fn applyMixedDirectionVisualOrder(
     allocator: std.mem.Allocator,
     glyphs: []ShapedGlyph,
@@ -285,7 +362,7 @@ fn appendVisualRun(
     run_direction: ShapeDirection,
 ) !void {
     switch (run_direction) {
-        .ltr, .auto => {
+        .ltr, .auto, .ttb => {
             for (run) |glyph| {
                 try visual_glyphs.append(allocator, glyph);
             }
@@ -317,6 +394,7 @@ fn hasMixedStrongDirections(glyphs: []const ShapedGlyph) bool {
             switch (direction) {
                 .ltr => saw_ltr = true,
                 .rtl => saw_rtl = true,
+                .ttb => {},
                 .auto => {},
             }
             if (saw_ltr and saw_rtl) return true;
@@ -324,6 +402,23 @@ fn hasMixedStrongDirections(glyphs: []const ShapedGlyph) bool {
     }
 
     return false;
+}
+
+fn computeTotalAdvance(glyphs: []const ShapedGlyph, direction: ShapeDirection) i32 {
+    var total_advance: i32 = 0;
+    switch (direction) {
+        .ttb => {
+            for (glyphs) |glyph| {
+                total_advance = @max(total_advance, glyph.y_offset + glyph.y_advance);
+            }
+        },
+        .ltr, .rtl, .auto => {
+            for (glyphs) |glyph| {
+                total_advance = @max(total_advance, glyph.x_offset + glyph.x_advance);
+            }
+        },
+    }
+    return total_advance;
 }
 
 fn strongDirectionForCodepoint(codepoint: u21) ?ShapeDirection {
@@ -423,6 +518,21 @@ test "mixed direction visual order reverses RTL runs inside LTR text" {
     try std.testing.expectEqual(@as(i32, 170), glyphs[2].x_offset);
     try std.testing.expectEqual(@as(u16, 4), glyphs[3].glyph_id);
     try std.testing.expectEqual(@as(i32, 240), glyphs[3].x_offset);
+}
+
+test "vertical layout stacks glyphs downward" {
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 12, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'B', .glyph_id = 2, .cluster = 1, .x_offset = 18, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    applyVerticalLayout(&glyphs);
+
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].y_offset);
+    try std.testing.expectEqual(@as(i32, 80), glyphs[0].y_advance);
+    try std.testing.expectEqual(@as(i32, 80), glyphs[1].y_offset);
+    try std.testing.expectEqual(@as(i32, 70), glyphs[1].y_advance);
+    try std.testing.expectEqual(@as(i32, 150), computeTotalAdvance(&glyphs, .ttb));
 }
 
 test "OpenType layout lookup collection filters by feature tag" {
@@ -539,6 +649,15 @@ test "shape options assign default feature policy" {
     const resolved = resolveLayoutOptions(.{}, &glyphs);
     try std.testing.expect(resolved.feature_tags != null);
     try std.testing.expectEqualSlices(u8, &"liga".*, &resolved.feature_tags.?[2]);
+}
+
+test "vertical direction assigns vertical feature policy" {
+    const glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0x304B, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+    const resolved = resolveLayoutOptions(.{ .direction = .ttb }, &glyphs);
+    try std.testing.expect(hasFeatureTag(resolved.feature_tags.?, "vert".*));
+    try std.testing.expect(hasFeatureTag(resolved.feature_tags.?, "vrt2".*));
 }
 
 test "shape options keep caller-provided feature tags" {

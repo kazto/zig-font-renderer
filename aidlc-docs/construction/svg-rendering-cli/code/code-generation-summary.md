@@ -17,7 +17,7 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 
 - Created `src/svg_renderer.zig`
   - Defines `SvgRenderer` and `SvgError`.
-  - Defines `RenderOptions` for SVG sizing.
+  - Defines `RenderOptions` for SVG sizing and shaping direction.
   - Resolves glyph byte ranges with `loca`.
   - Reads glyph header bounds and computes shaped text bounds.
   - Decodes simple TrueType `glyf` contours.
@@ -54,7 +54,7 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Modified `src/main.zig`
   - Adds `--output <svg-file>`.
   - Adds `--font-size <px>` and `--quiet`.
-  - Adds `--margin <px>`, `--fill <color>`, and `--background <color>`.
+  - Adds `--margin <px>`, `--fill <color>`, `--background <color>`, and `--direction <auto|ltr|rtl|ttb>`.
   - Writes SVG when `--font`, `--text`, and `--output` are supplied.
   - Suppresses metadata output by default when writing SVG files.
   - Routes SVG output through the high-level `renderToSvg` API.
@@ -149,6 +149,10 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed; CFF SVG output still renders after closepath and othersubr compatibility support.
 - Command: `wc -c /tmp/zig-font-renderer-cff-closepath-othersubr.svg`
 - Result: `1196 /tmp/zig-font-renderer-cff-closepath-othersubr.svg`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/fonts-japanese-gothic.ttf --text かな --output /tmp/zig-font-renderer-vertical.svg --font-size 96 --direction ttb`
+- Result: Passed; generated SVG through the new vertical shaping direction path.
+- Command: `wc -c /tmp/zig-font-renderer-vertical.svg`
+- Result: `2189 /tmp/zig-font-renderer-vertical.svg`
 - Command: `git diff --check`
 - Result: Passed
 

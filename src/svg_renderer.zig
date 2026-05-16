@@ -90,6 +90,7 @@ pub const RenderOptions = struct {
     margin_px: f64 = default_margin_px,
     fill: []const u8 = "black",
     background: ?[]const u8 = null,
+    shape: shaper.ShapeOptions = .{},
 };
 
 const Point = struct {
@@ -204,7 +205,7 @@ pub const SvgRenderer = struct {
         _ = self;
 
         const engine = shaper.ShapeEngine.init();
-        var shaped = try engine.shapeText(allocator, face, text);
+        var shaped = try engine.shapeTextWithOptions(allocator, face, text, options.shape);
         defer shaped.deinit(allocator);
 
         const bounds = try textBounds(face, shaped);

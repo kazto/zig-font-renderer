@@ -23,10 +23,11 @@
 - When no feature tags are provided, the shaping engine applies a conservative default feature policy for common shaping features, with Arabic and Indic-specific additions.
 - When direction is automatic and the input contains only strong RTL codepoints plus neutral characters, shaped glyphs are mirrored into RTL visual order after positioning.
 - Mixed strong LTR/RTL text remains in input order until full Unicode Bidi handling is implemented.
+- When direction is explicitly top-to-bottom, shaped glyphs stack on the vertical axis while preserving cross-axis positioning from GPOS.
 - Legacy `kern` remains a fallback when GPOS is absent or does not apply an adjustment.
 - Cluster indexes follow input codepoint order.
 
 ## Deferred Rules
 
 - Complex script reordering is not applied.
-- Full mixed-direction Unicode Bidi and vertical layout are not applied.
+- Full mixed-direction Unicode Bidi is not applied.

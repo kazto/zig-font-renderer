@@ -18,6 +18,7 @@ const CliOptions = struct {
     margin_px: f64 = 8.0,
     fill: []const u8 = "black",
     background: ?[]const u8 = null,
+    direction: zfr.ShapeDirection = .auto,
     quiet: bool = false,
     help: bool = false,
 };
@@ -73,6 +74,7 @@ pub fn main() !void {
                 .margin_px = options.margin_px,
                 .fill = options.fill,
                 .background = options.background,
+                .shape = .{ .direction = options.direction },
             });
         } else {
             var loaded = try loadFaceOrExit(allocator, stderr, options.font_path);
@@ -118,6 +120,7 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
     var margin_px: f64 = 8.0;
     var fill: []const u8 = "black";
     var background: ?[]const u8 = null;
+    var direction: zfr.ShapeDirection = .auto;
     var quiet = false;
     var positional_count: u8 = 0;
 
@@ -184,6 +187,13 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
             continue;
         }
 
+        if (std.mem.eql(u8, arg, "--direction")) {
+            index += 1;
+            if (index >= args.len) return CliError.MissingOptionValue;
+            direction = parseDirection(args[index]) catch return CliError.UnknownOption;
+            continue;
+        }
+
         if (std.mem.startsWith(u8, arg, "-")) return CliError.UnknownOption;
 
         switch (positional_count) {
@@ -202,6 +212,7 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
         .margin_px = margin_px,
         .fill = fill,
         .background = background,
+        .direction = direction,
         .quiet = quiet,
     };
 }
@@ -217,10 +228,18 @@ fn cliErrorMessage(err: CliError) []const u8 {
     };
 }
 
+fn parseDirection(value: []const u8) !zfr.ShapeDirection {
+    if (std.mem.eql(u8, value, "auto")) return .auto;
+    if (std.mem.eql(u8, value, "ltr")) return .ltr;
+    if (std.mem.eql(u8, value, "rtl")) return .rtl;
+    if (std.mem.eql(u8, value, "ttb") or std.mem.eql(u8, value, "vertical")) return .ttb;
+    return error.UnknownOption;
+}
+
 fn printUsage(writer: *std.Io.Writer) !void {
     try writer.print(
         \\Usage:
-        \\  zig_font_renderer --font <font-file> [--text <utf8-text>] [--output <svg-file>] [--font-size <px>] [--margin <px>] [--fill <color>] [--background <color>] [--quiet]
+        \\  zig_font_renderer --font <font-file> [--text <utf8-text>] [--output <svg-file>] [--font-size <px>] [--margin <px>] [--fill <color>] [--background <color>] [--direction <auto|ltr|rtl|ttb>] [--quiet]
         \\  zig_font_renderer <font-file> [utf8-text]
         \\
         \\Prints data currently available from the Unit 1 font parser:
@@ -340,4 +359,16 @@ test "parse rejects invalid font size" {
 test "parse rejects invalid margin" {
     const args = [_][]const u8{ "zig_font_renderer", "--font", "font.ttf", "--margin", "-1" };
     try std.testing.expectError(CliError.InvalidMargin, parseArgs(&args));
+}
+
+test "parse accepts vertical direction" {
+    const args = [_][]const u8{
+        "zig_font_renderer",
+        "--font",
+        "font.otf",
+        "--direction",
+        "ttb",
+    };
+    const options = try parseArgs(&args);
+    try std.testing.expectEqual(zfr.ShapeDirection.ttb, options.direction);
 }
