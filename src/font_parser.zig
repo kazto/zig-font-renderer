@@ -18,6 +18,7 @@ const Sfnt = struct {
 
 const TableTags = struct {
     const cff = "CFF ".*;
+    const cff2 = "CFF2".*;
     const cmap = "cmap".*;
     const glyf = "glyf".*;
     const head = "head".*;
@@ -193,7 +194,7 @@ pub const Face = struct {
         const hhea = try requiredTable(data, tables, TableTags.hhea);
         _ = try requiredTable(data, tables, TableTags.hmtx);
         _ = try requiredTable(data, tables, TableTags.cmap);
-        if (findTable(tables, TableTags.glyf) == null and findTable(tables, TableTags.cff) == null) {
+        if (findTable(tables, TableTags.glyf) == null and findTable(tables, TableTags.cff) == null and findTable(tables, TableTags.cff2) == null) {
             return ParserError.MissingMandatoryTable;
         }
 

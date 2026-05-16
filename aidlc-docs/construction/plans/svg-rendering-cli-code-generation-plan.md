@@ -123,6 +123,13 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Track accumulated parent component points while expanding composites.
   - Align component point indexes to referenced parent point indexes before path emission.
 
+- [x] Step 20: Add initial CFF2 outline rendering path
+  - Accept `CFF2` as an outline-bearing table when `glyf`/`CFF ` are absent.
+  - Parse CFF2 header, Top DICT, CFF2 INDEX structures, global subrs, CharStrings, FDArray, FDSelect, and Private Subrs at the non-variation scope.
+  - Reuse the Type 2 executor for CFF2 charstrings and close top-level paths at charstring EOF.
+  - Keep CFF2 variation `blend` processing explicitly unsupported.
+  - Verify existing CFF1 SVG output still succeeds.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
@@ -136,9 +143,10 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] CFF charstrings can be reached and basic Type 2 operators can be converted to SVG path commands.
 - [x] CFF subroutine-backed glyphs can be expanded for basic Type 2 outlines.
 - [x] CID-keyed CFF glyphs can select glyph-specific local subroutines via FDSelect.
+- [x] Non-variation CFF2 charstrings can be reached and converted through the SVG outline path.
 - [x] Common CFF Type 2 curve operators and hint masks are handled.
 - [x] Type 2 flex operators are emitted as cubic SVG paths.
 - [x] Type 2 calculation and stack operators can feed subsequent drawing operands.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
-- [x] CFF2 and full typography remain explicitly deferred.
+- [x] CFF2 variation blending and full typography remain explicitly deferred.

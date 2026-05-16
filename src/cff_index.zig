@@ -5,6 +5,7 @@ const types = @import("cff_types.zig");
 const Cff = types.Cff;
 pub const CffIndex = types.CffIndex;
 const readU16 = binary_reader.readU16;
+const readU32 = binary_reader.readU32;
 const readI16 = binary_reader.readI16;
 const readI32 = binary_reader.readI32;
 
@@ -29,7 +30,7 @@ const cff_real_number_placeholder = 0;
 
 pub fn readCffIndex(data: []const u8) font_parser.ParserError!CffIndex {
     if (data.len < Cff.index_count_size) return font_parser.ParserError.InvalidTable;
-    const count = try readU16(data, cff_index_count_offset);
+    const count: u32 = try readU16(data, cff_index_count_offset);
     if (count == Cff.index_empty_count) {
         return .{
             .data = data,
@@ -63,7 +64,43 @@ pub fn readCffIndex(data: []const u8) font_parser.ParserError!CffIndex {
     };
 }
 
-pub fn getCffIndexObject(index: CffIndex, object_index: u16) font_parser.ParserError![]const u8 {
+pub fn readCff2Index(data: []const u8) font_parser.ParserError!CffIndex {
+    if (data.len < Cff.index2_count_size) return font_parser.ParserError.InvalidTable;
+    const count = try readU32(data, cff_index_count_offset);
+    if (count == Cff.index_empty_count) {
+        return .{
+            .data = data,
+            .count = Cff.index_empty_count,
+            .off_size = Cff.index_empty_off_size,
+            .offsets_offset = Cff.index2_count_size,
+            .object_data_offset = Cff.index2_count_size,
+            .end_offset = Cff.index2_count_size,
+        };
+    }
+
+    if (data.len < Cff.index2_count_size + Cff.index_off_size_size) return font_parser.ParserError.InvalidTable;
+    const off_size = data[Cff.index2_off_size_offset];
+    if (off_size == Cff.index_empty_off_size or off_size > Cff.max_offset_size) return font_parser.ParserError.InvalidTable;
+    const offsets_offset = Cff.index2_count_size + Cff.index_off_size_size;
+    const object_data_offset = offsets_offset + (@as(usize, count) + Cff.index_first_object_offset) * @as(usize, off_size);
+    if (object_data_offset > data.len) return font_parser.ParserError.InvalidTable;
+
+    const last_offset = try readCffOffset(data, offsets_offset + @as(usize, count) * @as(usize, off_size), off_size);
+    if (last_offset == Cff.zero_offset) return font_parser.ParserError.InvalidTable;
+    const end_offset = object_data_offset + @as(usize, last_offset) - Cff.index_first_object_offset;
+    if (end_offset > data.len) return font_parser.ParserError.InvalidTable;
+
+    return .{
+        .data = data,
+        .count = count,
+        .off_size = off_size,
+        .offsets_offset = offsets_offset,
+        .object_data_offset = object_data_offset,
+        .end_offset = end_offset,
+    };
+}
+
+pub fn getCffIndexObject(index: CffIndex, object_index: u32) font_parser.ParserError![]const u8 {
     if (object_index >= index.count) return font_parser.ParserError.InvalidGlyphId;
     const offset_size = @as(usize, index.off_size);
     const start_offset = try readCffOffset(index.data, index.offsets_offset + @as(usize, object_index) * offset_size, index.off_size);

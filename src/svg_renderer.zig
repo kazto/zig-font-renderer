@@ -3,13 +3,14 @@ const binary_reader = @import("binary_reader.zig");
 const cff_outline = @import("cff_outline.zig");
 const font_parser = @import("font_parser.zig");
 const shaper = @import("shaper.zig");
+const svg_color = @import("svg_color.zig");
+const svg_geometry = @import("svg_geometry.zig");
 
 const readU16 = binary_reader.readU16;
 const readI16 = binary_reader.readI16;
 const readU32 = binary_reader.readU32;
 
-pub const SvgError = font_parser.ParserError || shaper.ShapeError || cff_outline.CffError || error{
-    InvalidSvgColor,
+pub const SvgError = font_parser.ParserError || shaper.ShapeError || cff_outline.CffError || svg_color.SvgColorError || error{
     UnsupportedCffOutlines,
     UnsupportedCompositeGlyph,
     MissingText,
@@ -32,6 +33,15 @@ const test_composite_glyf_offset = 58;
 const test_composite_glyph_count = 2;
 const test_composite_point_match_count = 2;
 const test_simple_component_offset = 74;
+
+const Point = svg_geometry.Point;
+const GlyphRange = svg_geometry.GlyphRange;
+const Transform = svg_geometry.Transform;
+const TransformedPoint = svg_geometry.TransformedPoint;
+const SimpleGlyphOutline = svg_geometry.SimpleGlyphOutline;
+const Bounds = svg_geometry.Bounds;
+const midpoint = svg_geometry.midpoint;
+const readF2Dot14 = svg_geometry.readF2Dot14;
 
 const TableTags = struct {
     const cff = "CFF ".*;
@@ -96,7 +106,6 @@ const CompositeGlyph = struct {
     const scale_size = 2;
     const xy_scale_size = 4;
     const matrix_2x2_size = 8;
-    const f2dot14_one = 0x4000;
 };
 
 pub const RenderOptions = struct {
@@ -105,94 +114,6 @@ pub const RenderOptions = struct {
     fill: []const u8 = "black",
     background: ?[]const u8 = null,
     shape: shaper.ShapeOptions = .{},
-};
-
-const Point = struct {
-    x: i16,
-    y: i16,
-    on_curve: bool,
-};
-
-const GlyphRange = struct {
-    start: usize,
-    end: usize,
-};
-
-const Transform = struct {
-    xx: f64 = 1.0,
-    yx: f64 = 0.0,
-    xy: f64 = 0.0,
-    yy: f64 = 1.0,
-    dx: f64 = 0.0,
-    dy: f64 = 0.0,
-
-    fn translate(x: i32, y: i32) Transform {
-        return .{ .dx = @floatFromInt(x), .dy = @floatFromInt(y) };
-    }
-
-    fn compose(self: Transform, inner: Transform) Transform {
-        return .{
-            .xx = self.xx * inner.xx + self.xy * inner.yx,
-            .xy = self.xx * inner.xy + self.xy * inner.yy,
-            .yx = self.yx * inner.xx + self.yy * inner.yx,
-            .yy = self.yx * inner.xy + self.yy * inner.yy,
-            .dx = self.xx * inner.dx + self.xy * inner.dy + self.dx,
-            .dy = self.yx * inner.dx + self.yy * inner.dy + self.dy,
-        };
-    }
-
-    fn apply(self: Transform, x: i32, y: i32) TransformedPoint {
-        const fx: f64 = @floatFromInt(x);
-        const fy: f64 = @floatFromInt(y);
-        return .{
-            .x = self.xx * fx + self.xy * fy + self.dx,
-            .y = self.yx * fx + self.yy * fy + self.dy,
-        };
-    }
-
-    fn applyPoint(self: Transform, point: TransformedPoint) TransformedPoint {
-        return .{
-            .x = self.xx * point.x + self.xy * point.y + self.dx,
-            .y = self.yx * point.x + self.yy * point.y + self.dy,
-        };
-    }
-};
-
-const TransformedPoint = struct {
-    x: f64,
-    y: f64,
-};
-
-const SimpleGlyphOutline = struct {
-    end_points: []u16,
-    points: []Point,
-
-    fn deinit(self: SimpleGlyphOutline, allocator: std.mem.Allocator) void {
-        allocator.free(self.end_points);
-        allocator.free(self.points);
-    }
-};
-
-const Bounds = struct {
-    min_x: i32,
-    min_y: i32,
-    max_x: i32,
-    max_y: i32,
-
-    fn width(self: Bounds) i32 {
-        return @max(1, self.max_x - self.min_x);
-    }
-
-    fn height(self: Bounds) i32 {
-        return @max(1, self.max_y - self.min_y);
-    }
-
-    fn include(self: *Bounds, other: Bounds) void {
-        self.min_x = @min(self.min_x, other.min_x);
-        self.min_y = @min(self.min_y, other.min_y);
-        self.max_x = @max(self.max_x, other.max_x);
-        self.max_y = @max(self.max_y, other.max_y);
-    }
 };
 
 pub const SvgRenderer = struct {
@@ -228,8 +149,8 @@ pub const SvgRenderer = struct {
         const height_px = @as(f64, @floatFromInt(bounds.height())) * scale + options.margin_px * 2.0;
         const translate_x = options.margin_px - @as(f64, @floatFromInt(bounds.min_x)) * scale;
         const translate_y = options.margin_px + @as(f64, @floatFromInt(bounds.max_y)) * scale;
-        try validateSvgColor(options.fill);
-        if (options.background) |background| try validateSvgColor(background);
+        try svg_color.validate(options.fill);
+        if (options.background) |background| try svg_color.validate(background);
 
         var output = std.ArrayList(u8).empty;
         errdefer output.deinit(allocator);
@@ -282,14 +203,6 @@ fn glyphTransform(face: font_parser.Face, glyph: shaper.ShapedGlyph, direction: 
     return Transform.translate(glyph.x_offset, glyph.y_offset - vertical_origin_y);
 }
 
-fn validateSvgColor(value: []const u8) SvgError!void {
-    if (value.len == 0) return SvgError.InvalidSvgColor;
-    for (value) |char| {
-        const valid = std.ascii.isAlphanumeric(char) or char == '#' or char == '-' or char == '_' or char == '(' or char == ')' or char == ',' or char == '.' or char == '%' or char == ' ';
-        if (!valid) return SvgError.InvalidSvgColor;
-    }
-}
-
 fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText, direction: shaper.ShapeDirection) SvgError!Bounds {
     var maybe_bounds: ?Bounds = null;
 
@@ -324,7 +237,7 @@ fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText, direction: shap
 }
 
 fn glyphBounds(face: font_parser.Face, glyph_id: u16) SvgError!?Bounds {
-    if (face.getTable(TableTags.glyf) == null and face.getTable(TableTags.cff) != null) {
+    if (face.getTable(TableTags.glyf) == null and (face.getTable(TableTags.cff) != null or face.getTable(TableTags.cff2) != null)) {
         const metric = try face.getHMetric(glyph_id);
         return .{
             .min_x = 0,
@@ -362,6 +275,16 @@ fn appendGlyphPath(
     if (face.getTable(TableTags.glyf) == null) {
         if (face.getTable(TableTags.cff)) |cff| {
             return cff_outline.appendGlyphPath(writer, cff, glyph_id, .{
+                .xx = transform.xx,
+                .yx = transform.yx,
+                .xy = transform.xy,
+                .yy = transform.yy,
+                .dx = transform.dx,
+                .dy = transform.dy,
+            });
+        }
+        if (face.getTable(TableTags.cff2)) |cff2| {
+            return cff_outline.appendCff2GlyphPath(writer, cff2, glyph_id, .{
                 .xx = transform.xx,
                 .yx = transform.yx,
                 .xy = transform.xy,
@@ -728,9 +651,6 @@ fn appendContourPath(writer: std.ArrayList(u8).Writer, contour: []const Point, t
 
 fn glyphRange(face: font_parser.Face, glyph_id: u16) SvgError!GlyphRange {
     if (glyph_id >= face.num_glyphs) return font_parser.ParserError.InvalidGlyphId;
-    if (face.getTable(TableTags.glyf) == null and face.getTable(TableTags.cff2) != null) {
-        return SvgError.UnsupportedCffOutlines;
-    }
 
     const head = try face.requireTable(TableTags.head);
     const loca = try face.requireTable(TableTags.loca);
@@ -766,28 +686,6 @@ fn readCoordinateDelta(data: []const u8, offset: *usize, flag: u8, short_mask: u
     const value = try readI16(data, offset.*);
     offset.* += 2;
     return value;
-}
-
-fn midpoint(a: i16, b: i16) i32 {
-    return @divTrunc(@as(i32, a) + @as(i32, b), 2);
-}
-
-fn readF2Dot14(data: []const u8, offset: usize) font_parser.ParserError!f64 {
-    const raw = try readI16(data, offset);
-    return @as(f64, @floatFromInt(raw)) / @as(f64, @floatFromInt(CompositeGlyph.f2dot14_one));
-}
-
-test "midpoint uses integer midpoint" {
-    try std.testing.expectEqual(@as(i32, 15), midpoint(10, 20));
-    try std.testing.expectEqual(@as(i32, -5), midpoint(-10, 0));
-}
-
-test "transform compose applies nested composite placement" {
-    const parent = Transform.translate(10, 20);
-    const child = Transform{ .xx = 0.5, .yy = 0.5, .dx = 4, .dy = 6 };
-    const point = parent.compose(child).apply(100, 200);
-    try std.testing.expectEqual(@as(f64, 64.0), point.x);
-    try std.testing.expectEqual(@as(f64, 126.0), point.y);
 }
 
 test "glyph transform includes vertical shaping offset" {
@@ -859,19 +757,21 @@ test "glyph transform applies vertical origin from VORG" {
     try std.testing.expectEqual(@as(f64, test_vertical_origin_result_y), point.y);
 }
 
-test "read F2Dot14 scale values" {
-    const one = [_]u8{ 0x40, 0x00 };
-    const half = [_]u8{ 0x20, 0x00 };
-    try std.testing.expectEqual(@as(f64, 1.0), try readF2Dot14(&one, 0));
-    try std.testing.expectEqual(@as(f64, 0.5), try readF2Dot14(&half, 0));
-}
-
-test "CFF2 outlines return explicit unsupported error" {
-    const data = [_]u8{};
+test "CFF2 outline path emits through charstring renderer" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const data = [_]u8{
+        2,   0,   5,   0,   2,
+        150, 17,  0,   0,   0,
+        0,   0,   0,   0,   1,
+        1,   1,   7,   139, 139,
+        21,  189, 139, 5,
+    };
     const tables = [_]font_parser.TableMetadata{.{
         .tag = TableTags.cff2,
         .offset = 0,
-        .length = 0,
+        .length = data.len,
     }};
     const face = font_parser.Face{
         .data = &data,
@@ -885,7 +785,8 @@ test "CFF2 outlines return explicit unsupported error" {
         .cmap = null,
     };
 
-    try std.testing.expectError(SvgError.UnsupportedCffOutlines, glyphRange(face, 0));
+    try appendGlyphPath(std.testing.allocator, writer, face, 0, Transform{}, 0);
+    try std.testing.expectEqualStrings("    <path d=\"M 0.00 0.00 L 50.00 0.00 Z \"/>\n", output.items);
 }
 
 test "composite glyph parser rejects point-matched first component" {
@@ -962,10 +863,4 @@ test "composite glyph parser aligns point-matched components" {
 
     try appendCompositeGlyphPaths(allocator, writer, face, &glyph, Transform{}, 0);
     try std.testing.expectEqual(@as(usize, test_composite_point_match_count), std.mem.count(u8, output.items, "M 20.00 30.00"));
-}
-
-test "svg color validation rejects attribute-breaking characters" {
-    try std.testing.expectError(SvgError.InvalidSvgColor, validateSvgColor("\"red\""));
-    try validateSvgColor("#1d4ed8");
-    try validateSvgColor("rgb(10, 20, 30)");
 }

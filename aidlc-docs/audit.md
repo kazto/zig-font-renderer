@@ -911,3 +911,33 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-cff-closepath-othersubr.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 3 - CFF Type 2 operator coverage. The compatibility opcode batch is complete at the current tested scope; CFF2, full mixed-direction Unicode Bidi, complex script reordering, and vertical layout remain pending.
+
+---
+
+## Code Generation - Initial CFF2 Outline Path
+**Timestamp**: 2026-05-16T21:29:49+09:00
+**User Input**: "AIDLCにもとづき、次の作業をおねがい。できれば大きめな単位で実装を進めて。"
+**AI Response**: "Implemented an initial non-variation CFF2 outline rendering path as a larger Unit 3 increment. The renderer now accepts `CFF2` as an outline table, parses CFF2 header/Top DICT/CFF2 INDEX/CharStrings/FDArray/FDSelect/Private Subrs, reuses the Type 2 executor for CFF2 charstrings, closes CFF2 top-level paths at EOF, and keeps variation `blend` explicitly unsupported."
+**Verification**:
+- `zig fmt src/cff_types.zig src/cff_index.zig src/cff_context.zig src/cff_outline.zig src/type2_charstring.zig src/font_parser.zig src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff2-batch-cff1.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff2-batch-cff1.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 3 - CFF/CFF2 outline coverage. Initial non-variation CFF2 outline routing is complete at the tested synthetic scope; CFF2 variation `blend`, full Unicode Bidi, and complex script reordering remain pending.
+
+---
+
+## Refactoring - Shaper / Type2 / SVG Module Split
+**Timestamp**: 2026-05-16T21:50:49+09:00
+**User Input**: "do it"
+**AI Response**: "Split oversized source files into focused internal modules while preserving public facades. `shaper.zig` now delegates feature policy and direction layout to dedicated modules, `type2_charstring.zig` delegates escaped stack/calculation/othersubr compatibility operators, and `svg_renderer.zig` delegates shared geometry and SVG color validation helpers."
+**Verification**:
+- `zig fmt src/shaper.zig src/shaper_features.zig src/shaper_direction.zig src/type2_charstring.zig src/type2_stack_ops.zig src/svg_renderer.zig src/svg_geometry.zig src/svg_color.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-refactor-av.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-refactor-av.svg`
+- `git diff --check`
+**Context**: Construction Phase - Cross-unit source organization refactoring. Public import paths remain `shaper.zig`, `type2_charstring.zig`, and `svg_renderer.zig`; new helper modules are internal to those facades.

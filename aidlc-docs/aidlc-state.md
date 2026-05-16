@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Brownfield
 - **Start Date**: 2026-04-27T00:00:00Z
-- **Current Stage**: CONSTRUCTION - Unit 2: Shaping Engine - Vertical Origin Review
+- **Current Stage**: CONSTRUCTION - Unit 3: CFF2 Outline Review
 
 ## Execution Plan Summary
 - **Total Stages**: 14 (Total workflow stages including those executed/skipped)
@@ -83,13 +83,15 @@
 - [x] Unit 3: Code Generation - TYPE 2 STEM3 HINT COUNTING (2026-05-16)
 - [x] Unit 3: Code Generation - TYPE 2 SETCURRENTPOINT (2026-05-16)
 - [x] Unit 3: Code Generation - TYPE 2 CLOSURE / OTHERSUBR COMPATIBILITY (2026-05-16)
+- [x] Unit 3: Code Generation - INITIAL CFF2 OUTLINE PATH (2026-05-16)
+- [x] Cross-Unit Refactoring - SHAPER / TYPE2 / SVG MODULE SPLIT (2026-05-16)
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - PLACEHOLDER
 
 ## Current Status
 - **Lifecycle Phase**: CONSTRUCTION
-- **Current Stage**: Unit 2: Shaping Engine - Vertical Origin Review
-- **Last Completed**: Unit 2: Vertical Origin
+- **Current Stage**: CONSTRUCTION - Source Organization Review
+- **Last Completed**: Cross-Unit Refactoring - Shaper / Type2 / SVG Module Split
 - **Next Stage**: Unit 2: Remaining complex script reordering or Unit 3: Remaining Type 2 Operators/CFF2
-- **Status**: Shaping supports basic cmap shaping, coarse automatic script/language tag inference, conservative default feature policy, RTL-only visual ordering, mixed RTL run reordering inside predominantly LTR text, explicit top-to-bottom vertical layout, optional vertical metric lookup from `vhea`/`vmtx`, optional vertical origin lookup from `VORG`, legacy kern fallback, GSUB/GPOS lookup handling (Single, Alternate, Ligature, Contextual Formats 1/2/3, Chained Contextual Formats 1/2/3, Single/Pair Adjustment, Mark-to-Base, Mark-to-Ligature with cluster-based component selection, and Mark-to-Mark) at the tested scope, contextual sub-lookups that change glyph stream length, checked OpenType Layout offsets, and caller-provided selection options; SVG output supports TrueType and CFF outlines with styling, transforms, positioned glyph offsets from shaping, transformed composite glyphs, vertical-origin-aware glyph transforms, and point-matched TrueType composite components at the tested scope; CFF support includes subroutines, flex, calculation operators, CID-keyed local subroutine resolution, stem3 hint counting for mask alignment, Type 2 `setcurrentpoint`, `closepath`, and othersubr/pop compatibility. Full mixed-direction Unicode Bidi, complex script reordering, uncommon Type 2 operators, and CFF2 remain pending.
+- **Status**: Shaping supports basic cmap shaping, coarse automatic script/language tag inference, conservative default feature policy, RTL-only visual ordering, mixed RTL run reordering inside predominantly LTR text, explicit top-to-bottom vertical layout, optional vertical metric lookup from `vhea`/`vmtx`, optional vertical origin lookup from `VORG`, legacy kern fallback, GSUB/GPOS lookup handling (Single, Alternate, Ligature, Contextual Formats 1/2/3, Chained Contextual Formats 1/2/3, Single/Pair Adjustment, Mark-to-Base, Mark-to-Ligature with cluster-based component selection, and Mark-to-Mark) at the tested scope, contextual sub-lookups that change glyph stream length, checked OpenType Layout offsets, and caller-provided selection options; SVG output supports TrueType and CFF outlines with styling, transforms, positioned glyph offsets from shaping, transformed composite glyphs, vertical-origin-aware glyph transforms, and point-matched TrueType composite components at the tested scope; CFF support includes subroutines, flex, calculation operators, CID-keyed local subroutine resolution, stem3 hint counting for mask alignment, Type 2 `setcurrentpoint`, `closepath`, and othersubr/pop compatibility; initial non-variation CFF2 support can parse CFF2 INDEX/Top DICT/CharStrings/FDArray/FDSelect/Private Subrs and route charstrings through SVG outline rendering. Source organization now keeps `shaper.zig` as a smaller public facade with feature policy and direction helpers split out, moves Type 2 stack/calculation compatibility operators into their own module, and extracts SVG geometry/color helpers from the renderer. Full Unicode Bidi, complex script reordering, CFF2 variation `blend`, and remaining full typography coverage remain pending.

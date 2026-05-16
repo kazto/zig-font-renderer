@@ -11,8 +11,10 @@ pub const Cff = struct {
     pub const header_min_size = 4;
     pub const header_size_offset = 2;
     pub const index_count_size = 2;
+    pub const index2_count_size = 4;
     pub const index_off_size_size = 1;
     pub const index_off_size_offset = 2;
+    pub const index2_off_size_offset = 4;
     pub const index_first_object_offset = 1;
     pub const index_empty_count = 0;
     pub const index_empty_off_size = 0;
@@ -30,6 +32,14 @@ pub const Cff = struct {
     pub const operand_stack_max = 48;
     pub const transient_array_size = 32;
     pub const max_subr_depth = 16;
+};
+
+pub const Cff2 = struct {
+    pub const header_min_size = 5;
+    pub const header_size_offset = 2;
+    pub const top_dict_length_offset = 3;
+    pub const top_dict_data_offset = 5;
+    pub const top_dict_variation_store_operator = 24;
 };
 
 pub const Type2 = struct {
@@ -78,6 +88,7 @@ pub const Type2 = struct {
     pub const return_op = 11;
     pub const escape = 12;
     pub const endchar = 14;
+    pub const blend = 16;
     pub const hstemhm = 18;
     pub const hintmask = 19;
     pub const cntrmask = 20;
@@ -118,7 +129,7 @@ pub const TransformedPoint = struct {
 
 pub const CffIndex = struct {
     data: []const u8,
-    count: u16,
+    count: u32,
     off_size: u8,
     offsets_offset: usize,
     object_data_offset: usize,
@@ -132,6 +143,7 @@ pub const CffContext = struct {
     local_subrs: ?CffIndex = null,
     fd_array_offset: ?usize = null,
     fd_select_offset: ?usize = null,
+    is_cff2: bool = false,
 };
 
 pub const TopDictInfo = struct {

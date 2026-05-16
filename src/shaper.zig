@@ -5,6 +5,8 @@ const ot_layout = @import("ot_layout.zig");
 const gsub = @import("gsub.zig");
 const gpos = @import("gpos.zig");
 const kern = @import("kern.zig");
+const shaper_direction = @import("shaper_direction.zig");
+const shaper_features = @import("shaper_features.zig");
 const test_utils = @import("shaper_test_utils.zig");
 
 pub const ShapeError = types.ShapeError;
@@ -12,159 +14,6 @@ pub const ShapeDirection = types.ShapeDirection;
 pub const ShapeOptions = types.ShapeOptions;
 pub const ShapedGlyph = types.ShapedGlyph;
 pub const ShapedText = types.ShapedText;
-
-const default_feature_tags = [_][4]u8{
-    "ccmp".*,
-    "locl".*,
-    "liga".*,
-    "clig".*,
-    "calt".*,
-    "kern".*,
-    "mark".*,
-    "mkmk".*,
-};
-
-const vertical_default_feature_tags = [_][4]u8{
-    "vert".*,
-    "vrt2".*,
-    "ccmp".*,
-    "locl".*,
-    "liga".*,
-    "clig".*,
-    "calt".*,
-    "kern".*,
-    "mark".*,
-    "mkmk".*,
-};
-
-const arabic_default_feature_tags = [_][4]u8{
-    "ccmp".*,
-    "locl".*,
-    "isol".*,
-    "init".*,
-    "medi".*,
-    "fina".*,
-    "rlig".*,
-    "calt".*,
-    "kern".*,
-    "mark".*,
-    "mkmk".*,
-};
-
-const vertical_arabic_default_feature_tags = [_][4]u8{
-    "vert".*,
-    "vrt2".*,
-    "ccmp".*,
-    "locl".*,
-    "isol".*,
-    "init".*,
-    "medi".*,
-    "fina".*,
-    "rlig".*,
-    "calt".*,
-    "kern".*,
-    "mark".*,
-    "mkmk".*,
-};
-
-const indic_default_feature_tags = [_][4]u8{
-    "ccmp".*,
-    "locl".*,
-    "nukt".*,
-    "akhn".*,
-    "rphf".*,
-    "blwf".*,
-    "half".*,
-    "pstf".*,
-    "vatu".*,
-    "pres".*,
-    "abvs".*,
-    "blws".*,
-    "psts".*,
-    "haln".*,
-    "calt".*,
-    "kern".*,
-    "mark".*,
-    "mkmk".*,
-};
-
-const vertical_indic_default_feature_tags = [_][4]u8{
-    "vert".*,
-    "vrt2".*,
-    "ccmp".*,
-    "locl".*,
-    "nukt".*,
-    "akhn".*,
-    "rphf".*,
-    "blwf".*,
-    "half".*,
-    "pstf".*,
-    "vatu".*,
-    "pres".*,
-    "abvs".*,
-    "blws".*,
-    "psts".*,
-    "haln".*,
-    "calt".*,
-    "kern".*,
-    "mark".*,
-    "mkmk".*,
-};
-
-const UnicodeRange = struct {
-    const latin_script_start = 0x0041;
-    const latin_script_end = 0x024F;
-    const greek_script_start = 0x0370;
-    const greek_script_end = 0x03FF;
-    const cyrillic_script_start = 0x0400;
-    const cyrillic_script_end = 0x052F;
-    const hebrew_script_start = 0x0590;
-    const hebrew_script_end = 0x05FF;
-    const arabic_script_first_start = 0x0600;
-    const arabic_script_first_end = 0x06FF;
-    const arabic_script_second_start = 0x0750;
-    const arabic_script_second_end = 0x077F;
-    const arabic_script_third_start = 0x08A0;
-    const arabic_script_third_end = 0x08FF;
-    const devanagari_script_start = 0x0900;
-    const devanagari_script_end = 0x097F;
-    const thai_script_start = 0x0E00;
-    const thai_script_end = 0x0E7F;
-    const kana_script_start = 0x3040;
-    const kana_script_end = 0x30FF;
-    const kana_extension_start = 0x31F0;
-    const kana_extension_end = 0x31FF;
-    const han_script_start = 0x3400;
-    const han_script_end = 0x9FFF;
-    const han_compatibility_start = 0xF900;
-    const han_compatibility_end = 0xFAFF;
-    const hangul_script_start = 0xAC00;
-    const hangul_script_end = 0xD7AF;
-    const hangul_jamo_start = 0x1100;
-    const hangul_jamo_end = 0x11FF;
-    const hangul_compatibility_jamo_start = 0x3130;
-    const hangul_compatibility_jamo_end = 0x318F;
-
-    const arabic_rtl_start = 0x0590;
-    const arabic_rtl_end = 0x08FF;
-    const arabic_presentation_a_start = 0xFB1D;
-    const arabic_presentation_a_end = 0xFDFF;
-    const arabic_presentation_b_start = 0xFE70;
-    const arabic_presentation_b_end = 0xFEFF;
-    const extended_arabic_rtl_start = 0x10800;
-    const extended_arabic_rtl_end = 0x10FFF;
-
-    const latin_ltr_start = 0x0041;
-    const latin_ltr_end = 0x02AF;
-    const greek_cyrillic_ltr_start = 0x0370;
-    const greek_cyrillic_ltr_end = 0x052F;
-    const broad_ltr_start = 0x0900;
-    const broad_ltr_end = 0x1FFF;
-    const cjk_ltr_start = 0x3040;
-    const cjk_ltr_end = 0xA7FF;
-    const hangul_ltr_start = 0xAC00;
-    const hangul_ltr_end = 0xD7AF;
-};
 
 pub const ShapeEngine = struct {
     pub fn init() ShapeEngine {
@@ -212,7 +61,7 @@ pub const ShapeEngine = struct {
             });
         }
 
-        const layout_options = resolveLayoutOptions(options, glyphs.items);
+        const layout_options = shaper_features.resolveLayoutOptions(options, glyphs.items);
 
         // 1. GSUB substitutions
         try gsub.Gsub.apply(allocator, face, &glyphs, layout_options);
@@ -245,17 +94,17 @@ pub const ShapeEngine = struct {
             }
         }
 
-        const resolved_direction = resolveDirection(options.direction, glyphs.items);
-        const horizontal_total_advance = computeTotalAdvance(glyphs.items, .ltr);
+        const resolved_direction = shaper_direction.resolveDirection(options.direction, glyphs.items);
+        const horizontal_total_advance = shaper_direction.computeTotalAdvance(glyphs.items, .ltr);
         if (resolved_direction == .rtl) {
-            applyRtlVisualOrder(glyphs.items, horizontal_total_advance);
+            shaper_direction.applyRtlVisualOrder(glyphs.items, horizontal_total_advance);
         } else if (resolved_direction == .ttb) {
-            applyVerticalLayout(glyphs.items);
-        } else if (hasMixedStrongDirections(glyphs.items)) {
-            try applyMixedDirectionVisualOrder(allocator, glyphs.items);
+            shaper_direction.applyVerticalLayout(glyphs.items);
+        } else if (shaper_direction.hasMixedStrongDirections(glyphs.items)) {
+            try shaper_direction.applyMixedDirectionVisualOrder(allocator, glyphs.items);
         }
 
-        const total_advance = computeTotalAdvance(glyphs.items, resolved_direction);
+        const total_advance = shaper_direction.computeTotalAdvance(glyphs.items, resolved_direction);
 
         return .{
             .glyphs = try glyphs.toOwnedSlice(allocator),
@@ -263,243 +112,6 @@ pub const ShapeEngine = struct {
         };
     }
 };
-
-fn resolveLayoutOptions(options: ShapeOptions, glyphs: []const ShapedGlyph) ShapeOptions {
-    var resolved = options;
-    if (resolved.script_tag == null) {
-        resolved.script_tag = inferScriptTag(glyphs);
-    }
-    if (resolved.language_tag == null) {
-        resolved.language_tag = inferLanguageTag(glyphs);
-    }
-    if (resolved.feature_tags == null) {
-        resolved.feature_tags = defaultFeatureTagsForDirectionAndScript(resolved.direction, resolved.script_tag);
-    }
-    return resolved;
-}
-
-fn defaultFeatureTagsForDirectionAndScript(direction: ShapeDirection, script_tag: ?[4]u8) []const [4]u8 {
-    if (direction == .ttb) {
-        return verticalFeatureTagsForScript(script_tag);
-    }
-
-    return defaultFeatureTagsForScript(script_tag);
-}
-
-fn defaultFeatureTagsForScript(script_tag: ?[4]u8) []const [4]u8 {
-    if (script_tag) |tag| {
-        if (std.mem.eql(u8, &tag, &ot_layout.OtLayout.arabic_script_tag)) return &arabic_default_feature_tags;
-        if (std.mem.eql(u8, &tag, &ot_layout.OtLayout.devanagari_script_tag)) return &indic_default_feature_tags;
-    }
-    return &default_feature_tags;
-}
-
-fn verticalFeatureTagsForScript(script_tag: ?[4]u8) []const [4]u8 {
-    if (script_tag) |tag| {
-        if (std.mem.eql(u8, &tag, &ot_layout.OtLayout.arabic_script_tag)) return &vertical_arabic_default_feature_tags;
-        if (std.mem.eql(u8, &tag, &ot_layout.OtLayout.devanagari_script_tag)) return &vertical_indic_default_feature_tags;
-    }
-    return &vertical_default_feature_tags;
-}
-
-fn inferScriptTag(glyphs: []const ShapedGlyph) ?[4]u8 {
-    for (glyphs) |glyph| {
-        if (scriptTagForCodepoint(glyph.codepoint)) |tag| return tag;
-    }
-    return null;
-}
-
-fn inferLanguageTag(glyphs: []const ShapedGlyph) ?[4]u8 {
-    for (glyphs) |glyph| {
-        if (languageTagForCodepoint(glyph.codepoint)) |tag| return tag;
-    }
-    return null;
-}
-
-fn scriptTagForCodepoint(codepoint: u21) ?[4]u8 {
-    if (isInRange(codepoint, UnicodeRange.latin_script_start, UnicodeRange.latin_script_end)) return ot_layout.OtLayout.latin_script_tag;
-    if (isInRange(codepoint, UnicodeRange.greek_script_start, UnicodeRange.greek_script_end)) return ot_layout.OtLayout.greek_script_tag;
-    if (isInRange(codepoint, UnicodeRange.cyrillic_script_start, UnicodeRange.cyrillic_script_end)) return ot_layout.OtLayout.cyrillic_script_tag;
-    if (isInRange(codepoint, UnicodeRange.hebrew_script_start, UnicodeRange.hebrew_script_end)) return ot_layout.OtLayout.hebrew_script_tag;
-    if (isInRange(codepoint, UnicodeRange.arabic_script_first_start, UnicodeRange.arabic_script_first_end) or isInRange(codepoint, UnicodeRange.arabic_script_second_start, UnicodeRange.arabic_script_second_end) or isInRange(codepoint, UnicodeRange.arabic_script_third_start, UnicodeRange.arabic_script_third_end)) return ot_layout.OtLayout.arabic_script_tag;
-    if (isInRange(codepoint, UnicodeRange.devanagari_script_start, UnicodeRange.devanagari_script_end)) return ot_layout.OtLayout.devanagari_script_tag;
-    if (isInRange(codepoint, UnicodeRange.thai_script_start, UnicodeRange.thai_script_end)) return ot_layout.OtLayout.thai_script_tag;
-    if (isInRange(codepoint, UnicodeRange.kana_script_start, UnicodeRange.kana_script_end) or isInRange(codepoint, UnicodeRange.kana_extension_start, UnicodeRange.kana_extension_end)) return ot_layout.OtLayout.kana_script_tag;
-    if (isInRange(codepoint, UnicodeRange.han_script_start, UnicodeRange.han_script_end) or isInRange(codepoint, UnicodeRange.han_compatibility_start, UnicodeRange.han_compatibility_end)) return ot_layout.OtLayout.han_script_tag;
-    if (isInRange(codepoint, UnicodeRange.hangul_script_start, UnicodeRange.hangul_script_end) or isInRange(codepoint, UnicodeRange.hangul_jamo_start, UnicodeRange.hangul_jamo_end) or isInRange(codepoint, UnicodeRange.hangul_compatibility_jamo_start, UnicodeRange.hangul_compatibility_jamo_end)) return ot_layout.OtLayout.hangul_script_tag;
-    return null;
-}
-
-fn languageTagForCodepoint(codepoint: u21) ?[4]u8 {
-    if (isTurkishSpecificLatin(codepoint)) return ot_layout.OtLayout.turkish_language_tag;
-    if (isInRange(codepoint, UnicodeRange.hebrew_script_start, UnicodeRange.hebrew_script_end)) return ot_layout.OtLayout.hebrew_language_tag;
-    if (isInRange(codepoint, UnicodeRange.arabic_script_first_start, UnicodeRange.arabic_script_first_end) or isInRange(codepoint, UnicodeRange.arabic_script_second_start, UnicodeRange.arabic_script_second_end) or isInRange(codepoint, UnicodeRange.arabic_script_third_start, UnicodeRange.arabic_script_third_end)) return ot_layout.OtLayout.arabic_language_tag;
-    if (isInRange(codepoint, UnicodeRange.thai_script_start, UnicodeRange.thai_script_end)) return ot_layout.OtLayout.thai_language_tag;
-    if (isInRange(codepoint, UnicodeRange.kana_script_start, UnicodeRange.kana_script_end) or isInRange(codepoint, UnicodeRange.kana_extension_start, UnicodeRange.kana_extension_end)) return ot_layout.OtLayout.japanese_language_tag;
-    if (isInRange(codepoint, UnicodeRange.hangul_script_start, UnicodeRange.hangul_script_end) or isInRange(codepoint, UnicodeRange.hangul_jamo_start, UnicodeRange.hangul_jamo_end) or isInRange(codepoint, UnicodeRange.hangul_compatibility_jamo_start, UnicodeRange.hangul_compatibility_jamo_end)) return ot_layout.OtLayout.korean_language_tag;
-    return null;
-}
-
-fn isTurkishSpecificLatin(codepoint: u21) bool {
-    return codepoint == 0x011E or codepoint == 0x011F or
-        codepoint == 0x0130 or codepoint == 0x0131 or
-        codepoint == 0x015E or codepoint == 0x015F;
-}
-
-fn isInRange(codepoint: u21, start: u21, end: u21) bool {
-    return codepoint >= start and codepoint <= end;
-}
-
-fn resolveDirection(direction: ShapeDirection, glyphs: []const ShapedGlyph) ShapeDirection {
-    if (direction != .auto) return direction;
-
-    var saw_rtl = false;
-    for (glyphs) |glyph| {
-        if (isStrongRtlCodepoint(glyph.codepoint)) {
-            saw_rtl = true;
-        } else if (isStrongLtrCodepoint(glyph.codepoint)) {
-            return .ltr;
-        }
-    }
-
-    return if (saw_rtl) .rtl else .ltr;
-}
-
-fn applyRtlVisualOrder(glyphs: []ShapedGlyph, total_advance: i32) void {
-    for (glyphs) |*glyph| {
-        glyph.x_offset = total_advance - (glyph.x_offset + glyph.x_advance);
-    }
-    std.mem.reverse(ShapedGlyph, glyphs);
-}
-
-fn applyVerticalLayout(glyphs: []ShapedGlyph) void {
-    var pen_y: i32 = 0;
-    for (glyphs) |*glyph| {
-        glyph.y_offset += pen_y;
-        const vertical_advance = if (glyph.y_advance != 0) glyph.y_advance else @as(i32, glyph.advance_width);
-        glyph.y_advance = vertical_advance;
-        glyph.x_advance = 0;
-        pen_y += vertical_advance;
-    }
-}
-
-fn applyMixedDirectionVisualOrder(
-    allocator: std.mem.Allocator,
-    glyphs: []ShapedGlyph,
-) !void {
-    var visual_glyphs = std.ArrayList(ShapedGlyph).empty;
-    defer visual_glyphs.deinit(allocator);
-
-    var run_start: usize = 0;
-    var run_direction: ShapeDirection = .ltr;
-    var index: usize = 0;
-    while (index < glyphs.len) : (index += 1) {
-        if (strongDirectionForCodepoint(glyphs[index].codepoint)) |direction| {
-            if (index == run_start) {
-                run_direction = direction;
-                continue;
-            }
-            if (direction != run_direction) {
-                try appendVisualRun(allocator, &visual_glyphs, glyphs[run_start..index], run_direction);
-                run_start = index;
-                run_direction = direction;
-            }
-        }
-    }
-
-    try appendVisualRun(allocator, &visual_glyphs, glyphs[run_start..], run_direction);
-
-    for (visual_glyphs.items, 0..) |glyph, out_index| {
-        glyphs[out_index] = glyph;
-    }
-}
-
-fn appendVisualRun(
-    allocator: std.mem.Allocator,
-    visual_glyphs: *std.ArrayList(ShapedGlyph),
-    run: []const ShapedGlyph,
-    run_direction: ShapeDirection,
-) !void {
-    switch (run_direction) {
-        .ltr, .auto, .ttb => {
-            for (run) |glyph| {
-                try visual_glyphs.append(allocator, glyph);
-            }
-        },
-        .rtl => {
-            const run_start = run[0].x_offset;
-            var run_end = run[0].x_offset + run[0].x_advance;
-            for (run[1..]) |glyph| {
-                run_end = @max(run_end, glyph.x_offset + glyph.x_advance);
-            }
-
-            var index: usize = run.len;
-            while (index > 0) : (index -= 1) {
-                const glyph = run[index - 1];
-                var visual_glyph = glyph;
-                visual_glyph.x_offset = run_start + (run_end - (glyph.x_offset + glyph.x_advance));
-                try visual_glyphs.append(allocator, visual_glyph);
-            }
-        },
-    }
-}
-
-fn hasMixedStrongDirections(glyphs: []const ShapedGlyph) bool {
-    var saw_ltr = false;
-    var saw_rtl = false;
-
-    for (glyphs) |glyph| {
-        if (strongDirectionForCodepoint(glyph.codepoint)) |direction| {
-            switch (direction) {
-                .ltr => saw_ltr = true,
-                .rtl => saw_rtl = true,
-                .ttb => {},
-                .auto => {},
-            }
-            if (saw_ltr and saw_rtl) return true;
-        }
-    }
-
-    return false;
-}
-
-fn computeTotalAdvance(glyphs: []const ShapedGlyph, direction: ShapeDirection) i32 {
-    var total_advance: i32 = 0;
-    switch (direction) {
-        .ttb => {
-            for (glyphs) |glyph| {
-                total_advance = @max(total_advance, glyph.y_offset + glyph.y_advance);
-            }
-        },
-        .ltr, .rtl, .auto => {
-            for (glyphs) |glyph| {
-                total_advance = @max(total_advance, glyph.x_offset + glyph.x_advance);
-            }
-        },
-    }
-    return total_advance;
-}
-
-fn strongDirectionForCodepoint(codepoint: u21) ?ShapeDirection {
-    if (isStrongRtlCodepoint(codepoint)) return .rtl;
-    if (isStrongLtrCodepoint(codepoint)) return .ltr;
-    return null;
-}
-
-fn isStrongRtlCodepoint(codepoint: u21) bool {
-    return isInRange(codepoint, UnicodeRange.arabic_rtl_start, UnicodeRange.arabic_rtl_end) or
-        isInRange(codepoint, UnicodeRange.arabic_presentation_a_start, UnicodeRange.arabic_presentation_a_end) or
-        isInRange(codepoint, UnicodeRange.arabic_presentation_b_start, UnicodeRange.arabic_presentation_b_end) or
-        isInRange(codepoint, UnicodeRange.extended_arabic_rtl_start, UnicodeRange.extended_arabic_rtl_end);
-}
-
-fn isStrongLtrCodepoint(codepoint: u21) bool {
-    return isInRange(codepoint, UnicodeRange.latin_ltr_start, UnicodeRange.latin_ltr_end) or
-        isInRange(codepoint, UnicodeRange.greek_cyrillic_ltr_start, UnicodeRange.greek_cyrillic_ltr_end) or
-        isInRange(codepoint, UnicodeRange.broad_ltr_start, UnicodeRange.broad_ltr_end) or
-        isInRange(codepoint, UnicodeRange.cjk_ltr_start, UnicodeRange.cjk_ltr_end) or
-        isInRange(codepoint, UnicodeRange.hangul_ltr_start, UnicodeRange.hangul_ltr_end);
-}
 
 test "detects whether GPOS changed positioning" {
     const unchanged = [_]ShapedGlyph{.{
@@ -529,69 +141,6 @@ test "detects whether GPOS changed positioning" {
         .kern_adjustment = 0,
     }};
     try std.testing.expect(kern.hasGposAdjustment(&adjusted));
-}
-
-test "automatic direction uses RTL for RTL-only text" {
-    const rtl = [_]ShapedGlyph{
-        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
-        .{ .codepoint = 0x05D1, .glyph_id = 2, .cluster = 1, .x_offset = 100, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
-    };
-    const mixed = [_]ShapedGlyph{
-        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
-        .{ .codepoint = 'A', .glyph_id = 2, .cluster = 1, .x_offset = 100, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
-    };
-
-    try std.testing.expectEqual(ShapeDirection.rtl, resolveDirection(.auto, &rtl));
-    try std.testing.expectEqual(ShapeDirection.ltr, resolveDirection(.auto, &mixed));
-}
-
-test "RTL visual order mirrors horizontal positions" {
-    var glyphs = [_]ShapedGlyph{
-        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
-        .{ .codepoint = 0x05D1, .glyph_id = 2, .cluster = 1, .x_offset = 100, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
-    };
-
-    applyRtlVisualOrder(&glyphs, 180);
-
-    try std.testing.expectEqual(@as(u16, 2), glyphs[0].glyph_id);
-    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
-    try std.testing.expectEqual(@as(u16, 1), glyphs[1].glyph_id);
-    try std.testing.expectEqual(@as(i32, 80), glyphs[1].x_offset);
-}
-
-test "mixed direction visual order reverses RTL runs inside LTR text" {
-    var glyphs = [_]ShapedGlyph{
-        .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
-        .{ .codepoint = 0x05D0, .glyph_id = 2, .cluster = 1, .x_offset = 80, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
-        .{ .codepoint = 0x05D1, .glyph_id = 3, .cluster = 2, .x_offset = 150, .y_offset = 0, .x_advance = 90, .y_advance = 0, .advance_width = 90, .lsb = 0, .kern_adjustment = 0 },
-        .{ .codepoint = 'B', .glyph_id = 4, .cluster = 3, .x_offset = 240, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
-    };
-
-    try applyMixedDirectionVisualOrder(std.testing.allocator, &glyphs);
-
-    try std.testing.expectEqual(@as(u16, 1), glyphs[0].glyph_id);
-    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
-    try std.testing.expectEqual(@as(u16, 3), glyphs[1].glyph_id);
-    try std.testing.expectEqual(@as(i32, 80), glyphs[1].x_offset);
-    try std.testing.expectEqual(@as(u16, 2), glyphs[2].glyph_id);
-    try std.testing.expectEqual(@as(i32, 170), glyphs[2].x_offset);
-    try std.testing.expectEqual(@as(u16, 4), glyphs[3].glyph_id);
-    try std.testing.expectEqual(@as(i32, 240), glyphs[3].x_offset);
-}
-
-test "vertical layout stacks glyphs downward" {
-    var glyphs = [_]ShapedGlyph{
-        .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 12, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
-        .{ .codepoint = 'B', .glyph_id = 2, .cluster = 1, .x_offset = 18, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
-    };
-
-    applyVerticalLayout(&glyphs);
-
-    try std.testing.expectEqual(@as(i32, 0), glyphs[0].y_offset);
-    try std.testing.expectEqual(@as(i32, 80), glyphs[0].y_advance);
-    try std.testing.expectEqual(@as(i32, 80), glyphs[1].y_offset);
-    try std.testing.expectEqual(@as(i32, 70), glyphs[1].y_advance);
-    try std.testing.expectEqual(@as(i32, 150), computeTotalAdvance(&glyphs, .ttb));
 }
 
 test "OpenType layout lookup collection filters by feature tag" {
@@ -676,89 +225,6 @@ test "OpenType layout lookup collection can choose non-default language" {
     try std.testing.expectEqual(@as(u16, 5), lookup_indices.items[0]);
 }
 
-test "shape options infer script from text when unspecified" {
-    const glyphs = [_]ShapedGlyph{
-        .{ .codepoint = 0x304B, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
-    };
-    const resolved = resolveLayoutOptions(.{}, &glyphs);
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.kana_script_tag, &resolved.script_tag.?);
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.japanese_language_tag, &resolved.language_tag.?);
-}
-
-test "shape options keep caller-provided script tag" {
-    const glyphs = [_]ShapedGlyph{
-        .{ .codepoint = 0x304B, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
-    };
-    const resolved = resolveLayoutOptions(.{ .script_tag = ot_layout.OtLayout.latin_script_tag }, &glyphs);
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.latin_script_tag, &resolved.script_tag.?);
-}
-
-test "shape options keep caller-provided language tag" {
-    const glyphs = [_]ShapedGlyph{
-        .{ .codepoint = 0x304B, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
-    };
-    const resolved = resolveLayoutOptions(.{ .language_tag = ot_layout.OtLayout.turkish_language_tag }, &glyphs);
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.turkish_language_tag, &resolved.language_tag.?);
-}
-
-test "shape options assign default feature policy" {
-    const glyphs = [_]ShapedGlyph{
-        .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
-    };
-    const resolved = resolveLayoutOptions(.{}, &glyphs);
-    try std.testing.expect(resolved.feature_tags != null);
-    try std.testing.expectEqualSlices(u8, &"liga".*, &resolved.feature_tags.?[2]);
-}
-
-test "vertical direction assigns vertical feature policy" {
-    const glyphs = [_]ShapedGlyph{
-        .{ .codepoint = 0x304B, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
-    };
-    const resolved = resolveLayoutOptions(.{ .direction = .ttb }, &glyphs);
-    try std.testing.expect(hasFeatureTag(resolved.feature_tags.?, "vert".*));
-    try std.testing.expect(hasFeatureTag(resolved.feature_tags.?, "vrt2".*));
-}
-
-test "shape options keep caller-provided feature tags" {
-    const glyphs = [_]ShapedGlyph{
-        .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
-    };
-    const selected = [_][4]u8{"salt".*};
-    const resolved = resolveLayoutOptions(.{ .feature_tags = &selected }, &glyphs);
-    try std.testing.expectEqualSlices(u8, &"salt".*, &resolved.feature_tags.?[0]);
-}
-
-test "default feature policy varies by script" {
-    const arabic_tags = defaultFeatureTagsForScript(ot_layout.OtLayout.arabic_script_tag);
-    try std.testing.expect(hasFeatureTag(arabic_tags, "init".*));
-    try std.testing.expect(hasFeatureTag(arabic_tags, "fina".*));
-
-    const indic_tags = defaultFeatureTagsForScript(ot_layout.OtLayout.devanagari_script_tag);
-    try std.testing.expect(hasFeatureTag(indic_tags, "half".*));
-    try std.testing.expect(hasFeatureTag(indic_tags, "haln".*));
-}
-
-test "script inference maps common Unicode ranges" {
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.latin_script_tag, &(scriptTagForCodepoint('A').?));
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.arabic_script_tag, &(scriptTagForCodepoint(0x0627).?));
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.han_script_tag, &(scriptTagForCodepoint(0x6F22).?));
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.hangul_script_tag, &(scriptTagForCodepoint(0xD55C).?));
-}
-
-fn hasFeatureTag(tags: []const [4]u8, needle: [4]u8) bool {
-    for (tags) |tag| {
-        if (std.mem.eql(u8, &tag, &needle)) return true;
-    }
-    return false;
-}
-
-test "language inference maps common Unicode ranges" {
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.turkish_language_tag, &(languageTagForCodepoint(0x0130).?));
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.arabic_language_tag, &(languageTagForCodepoint(0x0627).?));
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.japanese_language_tag, &(languageTagForCodepoint(0x304B).?));
-    try std.testing.expectEqualSlices(u8, &ot_layout.OtLayout.korean_language_tag, &(languageTagForCodepoint(0xD55C).?));
-}
-
 test "OpenType layout lookup collection filters to default feature policy" {
     var data = [_]u8{0} ** 100;
     test_utils.writeU16(&data, ot_layout.OtLayout.script_list_offset, 10);
@@ -793,7 +259,7 @@ test "OpenType layout lookup collection filters to default feature policy" {
     const glyphs = [_]ShapedGlyph{
         .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
     };
-    const resolved = resolveLayoutOptions(.{}, &glyphs);
+    const resolved = shaper_features.resolveLayoutOptions(.{}, &glyphs);
     var lookup_indices = try ot_layout.OtLayout.collectLookupIndices(std.testing.allocator, &data, resolved);
     defer lookup_indices.deinit(std.testing.allocator);
 
@@ -837,7 +303,7 @@ test "OpenType layout lookup collection uses inferred language when present" {
     const glyphs = [_]ShapedGlyph{
         .{ .codepoint = 0x0130, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
     };
-    const resolved = resolveLayoutOptions(.{ .script_tag = ot_layout.OtLayout.latin_script_tag }, &glyphs);
+    const resolved = shaper_features.resolveLayoutOptions(.{ .script_tag = ot_layout.OtLayout.latin_script_tag }, &glyphs);
     var lookup_indices = try ot_layout.OtLayout.collectLookupIndices(std.testing.allocator, &data, resolved);
     defer lookup_indices.deinit(std.testing.allocator);
 
