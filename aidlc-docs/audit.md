@@ -941,3 +941,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-refactor-av.svg`
 - `git diff --check`
 **Context**: Construction Phase - Cross-unit source organization refactoring. Public import paths remain `shaper.zig`, `type2_charstring.zig`, and `svg_renderer.zig`; new helper modules are internal to those facades.
+
+---
+
+## Code Generation - CFF2 Default-Instance Blend
+**Timestamp**: 2026-05-16T22:11:01+09:00
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Added default-instance CFF2 `blend` support. The CFF2 context now records the Top DICT Variation Store offset, parses Item Variation Store metadata to obtain the variation region count, and the Type 2 executor handles `blend` by preserving default operands while dropping variation deltas. Non-default variation interpolation remains deferred."
+**Verification**:
+- `zig fmt src/cff_types.zig src/cff_context.zig src/type2_charstring.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff2-blend-cff1.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff2-blend-cff1.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 3 - CFF2 variation coverage. Default-instance `blend` handling is complete at the tested synthetic scope; non-default variation interpolation, full Unicode Bidi, and complex script reordering remain pending.

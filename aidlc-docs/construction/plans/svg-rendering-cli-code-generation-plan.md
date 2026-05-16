@@ -130,6 +130,13 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Keep CFF2 variation `blend` processing explicitly unsupported.
   - Verify existing CFF1 SVG output still succeeds.
 
+- [x] Step 21: Add CFF2 default-instance blend handling
+  - Read the CFF2 Top DICT Variation Store offset.
+  - Parse Item Variation Store metadata enough to obtain the variation region count.
+  - Handle Type 2 `blend` by preserving default operands and dropping variation deltas for default-instance rendering.
+  - Keep non-default variation interpolation deferred.
+  - Verify existing CFF1 SVG output still succeeds.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
@@ -144,9 +151,10 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] CFF subroutine-backed glyphs can be expanded for basic Type 2 outlines.
 - [x] CID-keyed CFF glyphs can select glyph-specific local subroutines via FDSelect.
 - [x] Non-variation CFF2 charstrings can be reached and converted through the SVG outline path.
+- [x] CFF2 `blend` charstrings can render at the default instance by ignoring variation deltas.
 - [x] Common CFF Type 2 curve operators and hint masks are handled.
 - [x] Type 2 flex operators are emitted as cubic SVG paths.
 - [x] Type 2 calculation and stack operators can feed subsequent drawing operands.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
-- [x] CFF2 variation blending and full typography remain explicitly deferred.
+- [x] CFF2 non-default variation interpolation and full typography remain explicitly deferred.

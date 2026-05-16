@@ -10,6 +10,7 @@ pub const CffIndex = types.CffIndex;
 const TopDictInfo = types.TopDictInfo;
 const CffError = types.CffError;
 const readU16 = binary_reader.readU16;
+const readU32 = binary_reader.readU32;
 const readCffIndex = cff_index.readCffIndex;
 const readCff2Index = cff_index.readCff2Index;
 const getCffIndexObject = cff_index.getCffIndexObject;
@@ -29,6 +30,14 @@ const fd_select_format3_range_size = 3;
 const fd_select_format3_fd_index_offset = 2;
 const fd_select_format3_next_range_offset = 3;
 const fd_select_format3_sentinel_size = 2;
+const variation_store_min_size = 8;
+const variation_store_region_list_offset = 2;
+const variation_store_item_data_count_offset = 6;
+const variation_store_item_data_offset_size = 4;
+const variation_region_list_axis_count_offset = 0;
+const variation_region_list_region_count_offset = 2;
+const variation_region_list_header_size = 4;
+const variation_region_axis_region_size = 6;
 
 pub fn parseCffContext(cff: []const u8) CffError!CffContext {
     if (cff.len < Cff.header_min_size) return font_parser.ParserError.InvalidTable;
@@ -85,6 +94,10 @@ pub fn parseCff2Context(cff2: []const u8) CffError!CffContext {
     const charstrings_offset = top_dict_info.charstrings_offset orelse return font_parser.ParserError.MissingMandatoryTable;
     if (charstrings_offset >= cff2.len) return font_parser.ParserError.InvalidTable;
     const charstrings = try readCff2Index(cff2[charstrings_offset..]);
+    const cff2_blend_region_count = if (top_dict_info.variation_store_offset) |variation_store_offset| blk: {
+        if (variation_store_offset >= cff2.len) return font_parser.ParserError.InvalidTable;
+        break :blk try readCff2VariationRegionCount(cff2[variation_store_offset..]);
+    } else null;
 
     return .{
         .cff = cff2,
@@ -93,6 +106,7 @@ pub fn parseCff2Context(cff2: []const u8) CffError!CffContext {
         .local_subrs = null,
         .fd_array_offset = top_dict_info.fd_array_offset,
         .fd_select_offset = top_dict_info.fd_select_offset,
+        .cff2_blend_region_count = cff2_blend_region_count,
         .is_cff2 = true,
     };
 }
@@ -156,7 +170,7 @@ pub fn readCff2TopDictInfo(dict: []const u8) CffError!TopDictInfo {
     var offset: usize = 0;
     while (offset < dict.len) {
         const byte = dict[offset];
-        if (isCffDictOperator(byte)) {
+        if (isCffDictOperator(byte) or byte == Cff2.top_dict_variation_store_operator) {
             offset += 1;
             if (byte == Cff.dict_escape_operator) {
                 if (offset >= dict.len) return font_parser.ParserError.InvalidTable;
@@ -185,6 +199,7 @@ pub fn readCff2TopDictInfo(dict: []const u8) CffError!TopDictInfo {
                 if (stack_len < top_dict_single_operand_count) return font_parser.ParserError.InvalidTable;
                 const value = stack[stack_len - top_dict_single_operand_count];
                 if (value < 0) return font_parser.ParserError.InvalidTable;
+                result.variation_store_offset = @intCast(value);
             }
             stack_len = stack_empty;
             continue;
@@ -196,6 +211,22 @@ pub fn readCff2TopDictInfo(dict: []const u8) CffError!TopDictInfo {
         stack_len += 1;
     }
     return result;
+}
+
+pub fn readCff2VariationRegionCount(data: []const u8) CffError!u16 {
+    if (data.len < variation_store_min_size) return font_parser.ParserError.InvalidTable;
+    const region_list_offset = try readU32(data, variation_store_region_list_offset);
+    const item_data_count = try readU16(data, variation_store_item_data_count_offset);
+    const item_data_offsets_end = variation_store_min_size + @as(usize, item_data_count) * variation_store_item_data_offset_size;
+    if (item_data_offsets_end > data.len or region_list_offset > data.len) return font_parser.ParserError.InvalidTable;
+
+    const region_list = data[region_list_offset..];
+    if (region_list.len < variation_region_list_header_size) return font_parser.ParserError.InvalidTable;
+    const axis_count = try readU16(region_list, variation_region_list_axis_count_offset);
+    const region_count = try readU16(region_list, variation_region_list_region_count_offset);
+    const region_data_len = @as(usize, axis_count) * @as(usize, region_count) * variation_region_axis_region_size;
+    if (variation_region_list_header_size + region_data_len > region_list.len) return font_parser.ParserError.InvalidTable;
+    return region_count;
 }
 
 pub fn readCffPrivateSubrsOffset(dict: []const u8) CffError!?usize {

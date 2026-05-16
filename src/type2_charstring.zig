@@ -5,6 +5,7 @@ const stack_ops = @import("type2_stack_ops.zig");
 const types = @import("cff_types.zig");
 
 const Cff = types.Cff;
+const Cff2 = types.Cff2;
 const Type2 = types.Type2;
 pub const Transform = types.Transform;
 const CffContext = types.CffContext;
@@ -32,6 +33,7 @@ const optional_width_operand_count = 1;
 const hint_mask_rounding = 7;
 const hint_mask_bits_per_byte = 8;
 const type2_false = 0;
+const blend_min_operand_count = 1;
 const zero_delta = 0;
 const subr_bias_low_count_threshold = 1240;
 const subr_bias_medium_count_threshold = 33900;
@@ -213,7 +215,7 @@ pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []co
                 if (state.subpath_open) try writer.print("Z ", .{});
                 return;
             },
-            Type2.blend => return CffError.UnsupportedCffOperator,
+            Type2.blend => try executeCff2Blend(state, context),
             Type2.escape => {
                 if (offset >= charstring.len) return font_parser.ParserError.InvalidTable;
                 const escaped_operator = charstring[offset];
@@ -278,6 +280,19 @@ fn applyStemHintCount(state: *Type2State, is_cff2: bool) CffError!void {
     const width_operands: usize = if (!is_cff2 and (state.stack_len % hint_stem_operand_count) == optional_width_operand_count) optional_width_operand_count else stack_empty;
     state.hint_count += (state.stack_len - width_operands) / hint_stem_operand_count;
     state.stack_len = stack_empty;
+}
+
+fn executeCff2Blend(state: *Type2State, context: CffContext) CffError!void {
+    if (!context.is_cff2 or state.stack_len < blend_min_operand_count) return font_parser.ParserError.InvalidTable;
+    const region_count = context.cff2_blend_region_count orelse return font_parser.ParserError.InvalidTable;
+    const blend_count_raw = state.stack[state.stack_len - stack_single_operand];
+    if (blend_count_raw <= type2_false) return font_parser.ParserError.InvalidTable;
+    const blend_count: usize = @intCast(blend_count_raw);
+    const operand_count = stack_single_operand + blend_count * (@as(usize, region_count) + stack_single_operand);
+    if (operand_count > state.stack_len) return font_parser.ParserError.InvalidTable;
+
+    const base = state.stack_len - operand_count;
+    state.stack_len = base + blend_count;
 }
 
 fn executeType2SetCurrentPoint(state: *Type2State) CffError!void {
@@ -378,6 +393,7 @@ const readCff2Index = cff_index.readCff2Index;
 const readCffTopDictInfo = cff_context.readCffTopDictInfo;
 const readCff2TopDictInfo = cff_context.readCff2TopDictInfo;
 const readCffFdSelect = cff_context.readCffFdSelect;
+const readCff2VariationRegionCount = cff_context.readCff2VariationRegionCount;
 
 test "CFF INDEX reads object slices" {
     const data = [_]u8{
@@ -431,6 +447,30 @@ test "CFF2 top dict reads CharStrings, FDArray, and FDSelect offsets" {
     try std.testing.expectEqual(@as(?usize, 11), info.charstrings_offset);
     try std.testing.expectEqual(@as(?usize, 50), info.fd_array_offset);
     try std.testing.expectEqual(@as(?usize, 60), info.fd_select_offset);
+}
+
+test "CFF2 top dict reads variation store offset" {
+    const dict = [_]u8{ 247, 12, Cff2.top_dict_variation_store_operator };
+    const info = try readCff2TopDictInfo(&dict);
+    try std.testing.expectEqual(@as(?usize, 120), info.variation_store_offset);
+}
+
+test "CFF2 variation store exposes region count" {
+    const variation_store = [_]u8{
+        0x00, 0x01,
+        0x00, 0x00,
+        0x00, 0x08,
+        0x00, 0x00,
+        0x00, 0x01,
+        0x00, 0x02,
+        0x00, 0x00,
+        0x40, 0x00,
+        0x40, 0x00,
+        0x00, 0x00,
+        0x40, 0x00,
+        0x40, 0x00,
+    };
+    try std.testing.expectEqual(@as(u16, 2), try readCff2VariationRegionCount(&variation_store));
 }
 
 test "CFF FDSelect format 0 maps glyph IDs" {
@@ -590,6 +630,30 @@ test "Type2 closepath closes the active contour once" {
         139,             139,           Type2.rmoveto,
         189,             139,           Type2.rlineto,
         Type2.closepath, Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 Z ", output.items);
+}
+
+test "CFF2 blend keeps default operands for default instance" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+        .cff2_blend_region_count = 2,
+        .is_cff2 = true,
+    };
+    const charstring = [_]u8{
+        139, 139,         Type2.rmoveto,
+        189, 139,         140,
+        141, 142,         143,
+        141, Type2.blend, Type2.rlineto,
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
