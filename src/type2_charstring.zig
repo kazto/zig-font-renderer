@@ -83,6 +83,9 @@ pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []co
                 const point = transform.apply(state.x, state.y);
                 try writer.print("M {d:.2} {d:.2} ", .{ point.x, point.y });
                 state.has_current_point = true;
+                state.subpath_start_x = state.x;
+                state.subpath_start_y = state.y;
+                state.subpath_open = true;
                 state.stack_len = stack_empty;
             },
             Type2.hmoveto => {
@@ -91,6 +94,9 @@ pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []co
                 const point = transform.apply(state.x, state.y);
                 try writer.print("M {d:.2} {d:.2} ", .{ point.x, point.y });
                 state.has_current_point = true;
+                state.subpath_start_x = state.x;
+                state.subpath_start_y = state.y;
+                state.subpath_open = true;
                 state.stack_len = stack_empty;
             },
             Type2.vmoveto => {
@@ -99,6 +105,9 @@ pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []co
                 const point = transform.apply(state.x, state.y);
                 try writer.print("M {d:.2} {d:.2} ", .{ point.x, point.y });
                 state.has_current_point = true;
+                state.subpath_start_x = state.x;
+                state.subpath_start_y = state.y;
+                state.subpath_open = true;
                 state.stack_len = stack_empty;
             },
             Type2.rlineto => {
@@ -128,6 +137,15 @@ pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []co
                 var index: usize = 0;
                 while (index < state.stack_len) : (index += curve_operand_count) {
                     try emitType2Curve(writer, transform, state, state.stack[index], state.stack[index + 1], state.stack[index + 2], state.stack[index + 3], state.stack[index + 4], state.stack[index + 5]);
+                }
+                state.stack_len = stack_empty;
+            },
+            Type2.closepath => {
+                if (state.subpath_open) {
+                    try writer.print("Z ", .{});
+                    state.x = state.subpath_start_x;
+                    state.y = state.subpath_start_y;
+                    state.subpath_open = false;
                 }
                 state.stack_len = stack_empty;
             },
@@ -194,7 +212,7 @@ pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []co
             Type2.callgsubr => try executeCffSubroutine(writer, transform, context, context.global_subrs, state, depth + 1),
             Type2.return_op => return,
             Type2.endchar => {
-                try writer.print("Z ", .{});
+                if (state.subpath_open) try writer.print("Z ", .{});
                 return;
             },
             Type2.escape => {
@@ -204,6 +222,8 @@ pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []co
                 switch (escaped_operator) {
                     Type2.escaped_dotsection => state.stack_len = stack_empty,
                     Type2.escaped_vstem3, Type2.escaped_hstem3 => applyStemHintCount(state),
+                    Type2.escaped_callothersubr => try executeType2CallOtherSubr(state),
+                    Type2.escaped_pop => try executeType2Pop(state),
                     Type2.escaped_and => try executeType2And(state),
                     Type2.escaped_or => try executeType2Or(state),
                     Type2.escaped_not => try executeType2Not(state),
@@ -415,6 +435,39 @@ fn executeType2SetCurrentPoint(state: *Type2State) CffError!void {
     state.y = state.stack[state.stack_len - stack_single_operand];
     state.has_current_point = true;
     state.stack_len = stack_empty;
+}
+
+fn executeType2CallOtherSubr(state: *Type2State) CffError!void {
+    if (state.stack_len < stack_pair_operand_count) return font_parser.ParserError.InvalidTable;
+    const arg_count_raw = popType2Stack(state);
+    _ = popType2Stack(state);
+    if (arg_count_raw < 0) return font_parser.ParserError.InvalidTable;
+    const arg_count: usize = @intCast(arg_count_raw);
+    if (state.stack_len < arg_count) return font_parser.ParserError.InvalidTable;
+    if (state.othersubr_return_len + arg_count > state.othersubr_return_stack.len) return font_parser.ParserError.InvalidTable;
+
+    var temp: [Cff.operand_stack_max]i32 = undefined;
+    var index: usize = 0;
+    while (index < arg_count) : (index += 1) {
+        temp[index] = popType2Stack(state);
+    }
+
+    var reverse: usize = arg_count;
+    while (reverse > 0) : (reverse -= 1) {
+        state.othersubr_return_stack[state.othersubr_return_len] = temp[reverse - 1];
+        state.othersubr_return_len += 1;
+    }
+}
+
+fn executeType2Pop(state: *Type2State) CffError!void {
+    if (state.othersubr_return_len == 0) return font_parser.ParserError.InvalidTable;
+    const value = state.othersubr_return_stack[0];
+    var index: usize = 1;
+    while (index < state.othersubr_return_len) : (index += 1) {
+        state.othersubr_return_stack[index - 1] = state.othersubr_return_stack[index];
+    }
+    state.othersubr_return_len -= 1;
+    try pushType2Stack(state, value);
 }
 
 fn popType2Stack(state: *Type2State) i32 {
@@ -674,6 +727,51 @@ test "Type2 setcurrentpoint updates the current point" {
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
     try std.testing.expectEqualStrings("M 0.00 0.00 L 12.00 23.00 Z ", output.items);
+}
+
+test "Type2 callothersubr and pop preserve operands" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
+    const charstring = [_]u8{
+        139,               139,               Type2.rmoveto,
+        149,               159,               139,
+        141,               Type2.escape,      Type2.escaped_callothersubr,
+        Type2.escape,      Type2.escaped_pop, Type2.escape,
+        Type2.escaped_pop, 141,               142,
+        Type2.rlineto,     Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 10.00 20.00 L 12.00 23.00 Z ", output.items);
+}
+
+test "Type2 closepath closes the active contour once" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+    };
+    const charstring = [_]u8{
+        139,             139,           Type2.rmoveto,
+        189,             139,           Type2.rlineto,
+        Type2.closepath, Type2.endchar,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 Z ", output.items);
 }
 
 test "Type2 escaped storage and conditional operators feed drawing operands" {

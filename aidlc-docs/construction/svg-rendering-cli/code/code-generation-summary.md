@@ -32,6 +32,8 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Skips Type 2 `hintmask`/`cntrmask` data using the active stem count.
   - Counts escaped Type 2 `hstem3` and `vstem3` hint groups toward `hintmask` length.
   - Applies escaped Type 2 `setcurrentpoint` to update the current path origin without emitting geometry.
+  - Emits SVG path closure for Type 2 `closepath` without forcing a duplicate close at `endchar`.
+  - Preserves compatibility operands through escaped Type 2 `callothersubr` and `pop`.
   - Emits SVG cubic paths for common compact Type 2 curve operators.
   - Emits SVG cubic paths for escaped Type 2 flex operators.
   - Evaluates escaped Type 2 arithmetic, boolean, storage, conditional, and stack manipulation operators.
@@ -143,12 +145,16 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed; CFF SVG output still renders after setcurrentpoint support.
 - Command: `wc -c /tmp/zig-font-renderer-cff-setcurrentpoint.svg`
 - Result: `1196 /tmp/zig-font-renderer-cff-setcurrentpoint.svg`
+- Command: `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff-closepath-othersubr.svg --font-size 96`
+- Result: Passed; CFF SVG output still renders after closepath and othersubr compatibility support.
+- Command: `wc -c /tmp/zig-font-renderer-cff-closepath-othersubr.svg`
+- Result: `1196 /tmp/zig-font-renderer-cff-closepath-othersubr.svg`
 - Command: `git diff --check`
 - Result: Passed
 
 ## Known Limitations
 
 - Point-matched composite glyphs are implemented for tested TrueType component point alignment cases.
-- Some uncommon Type 2 operators beyond compact curves, flex operators, stem3 hint groups, and `setcurrentpoint` are not implemented.
+- Some uncommon Type 2 operators beyond compact curves, flex operators, stem3 hint groups, `setcurrentpoint`, `closepath`, and `callothersubr`/`pop` are not implemented.
 - CFF2 outlines are not implemented.
 - Complex shaping remains incomplete.

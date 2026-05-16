@@ -31,6 +31,8 @@
 - Type 2 `hintmask` and `cntrmask` bytes are skipped according to the active stem hint count.
 - Type 2 escaped `hstem3` and `vstem3` operators contribute to the active stem hint count used by `hintmask` and `cntrmask`.
 - Type 2 escaped `setcurrentpoint` updates the current point without emitting a path segment.
+- Type 2 `closepath` closes the active contour without forcing a synthetic new move command.
+- Type 2 escaped `callothersubr` and `pop` preserve compatibility operands for subsequent drawing commands.
 - Common Type 2 compact curve operators `hhcurveto`, `vvcurveto`, `hvcurveto`, `vhcurveto`, `rcurveline`, and `rlinecurve` emit SVG path commands.
 - Type 2 escaped flex operators `hflex`, `flex`, `hflex1`, and `flex1` emit two SVG cubic path commands.
 - Type 2 escaped calculation and stack operators update the operand stack for subsequent path commands.

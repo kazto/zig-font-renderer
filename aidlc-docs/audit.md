@@ -835,3 +835,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-cff-setcurrentpoint.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 3 - CFF Type 2 operator coverage. The uncommon Type 2 current-point increment is complete at the current tested scope; CFF2, full mixed-direction Unicode Bidi, complex script reordering, and vertical layout remain pending.
+
+---
+
+## Code Generation - Type 2 Closure / Othersubr Compatibility
+**Timestamp**: 2026-05-16T00:00:00Z
+**User Input**: "相談なんだけど、もう少し大きな単位で実装を進めることはできる？コミット内容が細かくて、なかなか進捗が出てない。もっと一気に実装してほしい。それでは、次の作業をおねがい"
+**AI Response**: "Expanded the CFF Type 2 executor with contour closure and othersubr compatibility handling. `closepath` now closes the active subpath without forcing a duplicate `endchar` close, and escaped `callothersubr`/`pop` now preserve compatibility operands so subsequent drawing commands can reuse them. Added regression tests for both behaviors."
+**Verification**:
+- `zig fmt src/type2_charstring.zig src/cff_types.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-cff-closepath-othersubr.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-cff-closepath-othersubr.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 3 - CFF Type 2 operator coverage. The compatibility opcode batch is complete at the current tested scope; CFF2, full mixed-direction Unicode Bidi, complex script reordering, and vertical layout remain pending.
