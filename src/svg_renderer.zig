@@ -18,6 +18,20 @@ pub const SvgError = font_parser.ParserError || shaper.ShapeError || cff_outline
 const max_composite_depth = 8;
 const default_font_size_px = 64.0;
 const default_margin_px = 8.0;
+const test_units_per_em = 1000;
+const test_vertical_origin_y = 200;
+const test_vertical_origin_result_y = 193.0;
+const test_vorg_data_length = 14;
+const test_vorg_glyph_id = 7;
+const test_vorg_default_origin_y = 0;
+const test_composite_fixture_length = 90;
+const test_head_index_to_loc_offset = 50;
+const test_loca_table_offset = 52;
+const test_loca_table_length = 6;
+const test_composite_glyf_offset = 58;
+const test_composite_glyph_count = 2;
+const test_composite_point_match_count = 2;
+const test_simple_component_offset = 74;
 
 const TableTags = struct {
     const cff = "CFF ".*;
@@ -247,7 +261,7 @@ pub const SvgRenderer = struct {
         });
 
         for (shaped.glyphs) |glyph| {
-            try appendGlyphPath(allocator, writer, face, glyph.glyph_id, glyphTransform(glyph), 0);
+            try appendGlyphPath(allocator, writer, face, glyph.glyph_id, try glyphTransform(face, glyph, options.shape.direction), 0);
         }
 
         try writer.print(
@@ -260,8 +274,12 @@ pub const SvgRenderer = struct {
     }
 };
 
-fn glyphTransform(glyph: shaper.ShapedGlyph) Transform {
-    return Transform.translate(glyph.x_offset, glyph.y_offset);
+fn glyphTransform(face: font_parser.Face, glyph: shaper.ShapedGlyph, direction: shaper.ShapeDirection) SvgError!Transform {
+    const vertical_origin_y: i32 = if (direction == .ttb)
+        @as(i32, (try face.getVerticalOriginY(glyph.glyph_id)) orelse 0)
+    else
+        0;
+    return Transform.translate(glyph.x_offset, glyph.y_offset - vertical_origin_y);
 }
 
 fn validateSvgColor(value: []const u8) SvgError!void {
@@ -277,11 +295,12 @@ fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText, direction: shap
 
     for (shaped.glyphs) |glyph| {
         const bounds = (try glyphBounds(face, glyph.glyph_id)) orelse continue;
+        const transform = try glyphTransform(face, glyph, direction);
         const positioned: Bounds = .{
-            .min_x = bounds.min_x + glyph.x_offset,
-            .min_y = bounds.min_y + glyph.y_offset,
-            .max_x = bounds.max_x + glyph.x_offset,
-            .max_y = bounds.max_y + glyph.y_offset,
+            .min_x = bounds.min_x + @as(i32, @intFromFloat(transform.dx)),
+            .min_y = bounds.min_y + @as(i32, @intFromFloat(transform.dy)),
+            .max_x = bounds.max_x + @as(i32, @intFromFloat(transform.dx)),
+            .max_y = bounds.max_y + @as(i32, @intFromFloat(transform.dy)),
         };
 
         if (maybe_bounds) |*current| {
@@ -772,7 +791,18 @@ test "transform compose applies nested composite placement" {
 }
 
 test "glyph transform includes vertical shaping offset" {
-    const transform = glyphTransform(.{
+    const face = font_parser.Face{
+        .data = &[_]u8{},
+        .units_per_em = test_units_per_em,
+        .num_glyphs = 1,
+        .tables = &[_]font_parser.TableMetadata{},
+        .number_of_h_metrics = 1,
+        .number_of_v_metrics = null,
+        .vorg_default_vert_origin_y = null,
+        .vorg = null,
+        .cmap = null,
+    };
+    const transform = try glyphTransform(face, .{
         .codepoint = 'A',
         .glyph_id = 1,
         .cluster = 0,
@@ -783,10 +813,50 @@ test "glyph transform includes vertical shaping offset" {
         .advance_width = 100,
         .lsb = 0,
         .kern_adjustment = 0,
-    });
+    }, .ltr);
     const point = transform.apply(10, 20);
     try std.testing.expectEqual(@as(f64, 22.0), point.x);
     try std.testing.expectEqual(@as(f64, 54.0), point.y);
+}
+
+test "glyph transform applies vertical origin from VORG" {
+    const data = [_]u8{
+        0x00, 0x01, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x01,
+        0x00, 0x00, 0x00, 0x07,
+        0x00, 0x07,
+    };
+    const tables = [_]font_parser.TableMetadata{.{
+        .tag = "VORG".*,
+        .offset = 0,
+        .length = test_vorg_data_length,
+    }};
+    const face = font_parser.Face{
+        .data = &data,
+        .units_per_em = test_units_per_em,
+        .num_glyphs = 8,
+        .tables = &tables,
+        .number_of_h_metrics = 1,
+        .number_of_v_metrics = null,
+        .vorg_default_vert_origin_y = test_vorg_default_origin_y,
+        .vorg = tables[0],
+        .cmap = null,
+    };
+    const transform = try glyphTransform(face, .{
+        .codepoint = 'A',
+        .glyph_id = test_vorg_glyph_id,
+        .cluster = 0,
+        .x_offset = 0,
+        .y_offset = test_vertical_origin_y,
+        .x_advance = 100,
+        .y_advance = 0,
+        .advance_width = 100,
+        .lsb = 0,
+        .kern_adjustment = 0,
+    }, .ttb);
+    const point = transform.apply(0, 0);
+    try std.testing.expectEqual(@as(f64, 0.0), point.x);
+    try std.testing.expectEqual(@as(f64, test_vertical_origin_result_y), point.y);
 }
 
 test "read F2Dot14 scale values" {
@@ -805,11 +875,13 @@ test "CFF2 outlines return explicit unsupported error" {
     }};
     const face = font_parser.Face{
         .data = &data,
-        .units_per_em = 1000,
+        .units_per_em = test_units_per_em,
         .num_glyphs = 1,
         .tables = &tables,
         .number_of_h_metrics = 1,
         .number_of_v_metrics = null,
+        .vorg_default_vert_origin_y = null,
+        .vorg = null,
         .cmap = null,
     };
 
@@ -835,17 +907,17 @@ test "composite glyph parser rejects point-matched first component" {
 
 test "composite glyph parser aligns point-matched components" {
     const allocator = std.testing.allocator;
-    var data = [_]u8{0} ** 90;
-    data[50] = 0;
-    data[51] = 0;
-    data[52] = 0;
-    data[53] = 0;
-    data[54] = 0;
-    data[55] = 8;
-    data[56] = 0;
-    data[57] = 16;
+    var data = [_]u8{0} ** test_composite_fixture_length;
+    data[test_head_index_to_loc_offset] = 0;
+    data[test_head_index_to_loc_offset + 1] = 0;
+    data[test_loca_table_offset] = 0;
+    data[test_loca_table_offset + 1] = 0;
+    data[test_loca_table_offset + 2] = 0;
+    data[test_loca_table_offset + 3] = 8;
+    data[test_loca_table_offset + 4] = 0;
+    data[test_loca_table_offset + 5] = 16;
 
-    const glyph0_offset = 58;
+    const glyph0_offset = test_composite_glyf_offset;
     data[glyph0_offset + 1] = 1;
     data[glyph0_offset + 10] = 0;
     data[glyph0_offset + 11] = 0;
@@ -853,7 +925,7 @@ test "composite glyph parser aligns point-matched components" {
     data[glyph0_offset + 13] = 0;
     data[glyph0_offset + 14] = SimpleGlyphFlag.on_curve | SimpleGlyphFlag.x_is_same_or_positive_short | SimpleGlyphFlag.y_is_same_or_positive_short;
 
-    const glyph1_offset = 74;
+    const glyph1_offset = test_simple_component_offset;
     data[glyph1_offset + 1] = 1;
     data[glyph1_offset + 10] = 0;
     data[glyph1_offset + 11] = 0;
@@ -864,16 +936,18 @@ test "composite glyph parser aligns point-matched components" {
 
     const tables = [_]font_parser.TableMetadata{
         .{ .tag = TableTags.head, .offset = 0, .length = 52 },
-        .{ .tag = TableTags.loca, .offset = 52, .length = 6 },
-        .{ .tag = TableTags.glyf, .offset = 58, .length = 32 },
+        .{ .tag = TableTags.loca, .offset = test_loca_table_offset, .length = test_loca_table_length },
+        .{ .tag = TableTags.glyf, .offset = test_composite_glyf_offset, .length = 32 },
     };
     const face = font_parser.Face{
         .data = &data,
-        .units_per_em = 1000,
-        .num_glyphs = 2,
+        .units_per_em = test_units_per_em,
+        .num_glyphs = test_composite_glyph_count,
         .tables = &tables,
         .number_of_h_metrics = 1,
         .number_of_v_metrics = null,
+        .vorg_default_vert_origin_y = null,
+        .vorg = null,
         .cmap = null,
     };
 
@@ -887,7 +961,7 @@ test "composite glyph parser aligns point-matched components" {
     };
 
     try appendCompositeGlyphPaths(allocator, writer, face, &glyph, Transform{}, 0);
-    try std.testing.expectEqual(@as(usize, 2), std.mem.count(u8, output.items, "M 20.00 30.00"));
+    try std.testing.expectEqual(@as(usize, test_composite_point_match_count), std.mem.count(u8, output.items, "M 20.00 30.00"));
 }
 
 test "svg color validation rejects attribute-breaking characters" {

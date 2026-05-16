@@ -24,6 +24,7 @@ const TableTags = struct {
     const hhea = "hhea".*;
     const hmtx = "hmtx".*;
     const maxp = "maxp".*;
+    const vorg = "VORG".*;
     const vhea = "vhea".*;
     const vmtx = "vmtx".*;
     const otto = "OTTO".*;
@@ -47,6 +48,19 @@ const Hhea = struct {
 const Vhea = struct {
     const min_size = 36;
     const number_of_v_metrics_offset = 34;
+};
+
+const Vorg = struct {
+    const min_size = 10;
+    const version_offset = 0;
+    const version_minor_offset = 2;
+    const default_vert_origin_y_offset = 4;
+    const num_vert_origin_y_metrics_offset = 6;
+    const record_size = 4;
+    const glyph_index_offset = 0;
+    const vert_origin_y_offset = 2;
+    const expected_major_version = 1;
+    const expected_minor_version = 0;
 };
 
 const Hmtx = struct {
@@ -142,6 +156,8 @@ pub const Face = struct {
     tables: []const TableMetadata,
     number_of_h_metrics: u16,
     number_of_v_metrics: ?u16,
+    vorg_default_vert_origin_y: ?i16,
+    vorg: ?TableMetadata,
     cmap: ?CmapSelection,
 
     pub fn init(allocator: std.mem.Allocator, data: []const u8) ParserError!Face {
@@ -197,6 +213,15 @@ pub const Face = struct {
             break :blk try readU16(vhea_data, Vhea.number_of_v_metrics_offset);
         } else null;
 
+        const vorg = findTable(tables, TableTags.vorg);
+        const vorg_default_vert_origin_y = if (vorg) |vorg_table| blk: {
+            if (vorg_table.length < Vorg.min_size) return ParserError.InvalidTable;
+            const vorg_data = data[vorg_table.offset..][0..vorg_table.length];
+            if (try readU16(vorg_data, Vorg.version_offset) != Vorg.expected_major_version) return ParserError.InvalidTable;
+            if (try readU16(vorg_data, Vorg.version_minor_offset) != Vorg.expected_minor_version) return ParserError.InvalidTable;
+            break :blk try readI16(vorg_data, Vorg.default_vert_origin_y_offset);
+        } else null;
+
         return .{
             .data = data,
             .units_per_em = units_per_em,
@@ -204,6 +229,8 @@ pub const Face = struct {
             .tables = tables,
             .number_of_h_metrics = number_of_h_metrics,
             .number_of_v_metrics = number_of_v_metrics,
+            .vorg_default_vert_origin_y = vorg_default_vert_origin_y,
+            .vorg = vorg,
             .cmap = try selectCmap(data, tables),
         };
     }
@@ -296,6 +323,33 @@ pub const Face = struct {
             .advance_height = try readU16(vmtx, last_metric_offset),
             .tsb = try readI16(vmtx, tsb_offset),
         };
+    }
+
+    pub fn getVerticalOriginY(self: Face, glyph_id: u16) ParserError!?i16 {
+        const vorg = self.vorg orelse return null;
+        const vorg_data = self.data[vorg.offset..][0..vorg.length];
+        if (vorg_data.len < Vorg.min_size) return ParserError.InvalidTable;
+
+        const count = try readU16(vorg_data, Vorg.num_vert_origin_y_metrics_offset);
+        const records_offset = Vorg.min_size;
+        if (records_offset + @as(usize, count) * Vorg.record_size > vorg_data.len) return ParserError.InvalidTable;
+
+        var low: usize = 0;
+        var high: usize = count;
+        while (low < high) {
+            const mid = low + (high - low) / 2;
+            const record = records_offset + mid * Vorg.record_size;
+            const record_glyph_id = try readU16(vorg_data, record + Vorg.glyph_index_offset);
+            if (glyph_id < record_glyph_id) {
+                high = mid;
+            } else if (glyph_id > record_glyph_id) {
+                low = mid + 1;
+            } else {
+                return try readI16(vorg_data, record + Vorg.vert_origin_y_offset);
+            }
+        }
+
+        return self.vorg_default_vert_origin_y;
     }
 
     pub fn getGlyphInfo(self: Face, codepoint: u32) ParserError!GlyphInfo {
@@ -503,6 +557,8 @@ test "vertical metrics lookup reads vmtx records" {
         .tables = &tables,
         .number_of_h_metrics = 1,
         .number_of_v_metrics = 2,
+        .vorg_default_vert_origin_y = null,
+        .vorg = null,
         .cmap = null,
     };
 

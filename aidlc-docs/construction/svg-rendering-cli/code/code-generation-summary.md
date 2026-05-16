@@ -24,6 +24,7 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Expands composite TrueType glyphs when components use XY offsets.
   - Applies composite uniform scale, separate XY scale, and 2x2 transforms to emitted path coordinates.
   - Aligns point-matched composite TrueType components by resolving component point indexes against accumulated parent component points.
+  - Applies `VORG`-derived vertical origins when rendering top-to-bottom shaped glyphs.
   - Parses CFF INDEX data and Top DICT `CharStrings` offsets.
   - Retrieves CFF Type 2 charstrings by glyph ID.
   - Resolves CID-keyed CFF `FDArray`/`FDSelect` data for glyph-specific local subroutines.
@@ -150,10 +151,10 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed; CFF SVG output still renders after closepath and othersubr compatibility support.
 - Command: `wc -c /tmp/zig-font-renderer-cff-closepath-othersubr.svg`
 - Result: `1196 /tmp/zig-font-renderer-cff-closepath-othersubr.svg`
-- Command: `zig build run -- --font /usr/share/fonts/truetype/fonts-japanese-gothic.ttf --text かな --output /tmp/zig-font-renderer-vertical.svg --font-size 96 --direction ttb`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/fonts-japanese-gothic.ttf --text かな --output /tmp/zig-font-renderer-vertical-origin.svg --font-size 96 --direction ttb`
 - Result: Passed; generated SVG through the new vertical shaping direction path.
-- Command: `wc -c /tmp/zig-font-renderer-vertical.svg`
-- Result: `2189 /tmp/zig-font-renderer-vertical.svg`
+- Command: `wc -c /tmp/zig-font-renderer-vertical-origin.svg`
+- Result: `2189 /tmp/zig-font-renderer-vertical-origin.svg`
 - Command: `git diff --check`
 - Result: Passed
 

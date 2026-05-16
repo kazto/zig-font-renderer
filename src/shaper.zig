@@ -111,6 +111,61 @@ const vertical_indic_default_feature_tags = [_][4]u8{
     "mkmk".*,
 };
 
+const UnicodeRange = struct {
+    const latin_script_start = 0x0041;
+    const latin_script_end = 0x024F;
+    const greek_script_start = 0x0370;
+    const greek_script_end = 0x03FF;
+    const cyrillic_script_start = 0x0400;
+    const cyrillic_script_end = 0x052F;
+    const hebrew_script_start = 0x0590;
+    const hebrew_script_end = 0x05FF;
+    const arabic_script_first_start = 0x0600;
+    const arabic_script_first_end = 0x06FF;
+    const arabic_script_second_start = 0x0750;
+    const arabic_script_second_end = 0x077F;
+    const arabic_script_third_start = 0x08A0;
+    const arabic_script_third_end = 0x08FF;
+    const devanagari_script_start = 0x0900;
+    const devanagari_script_end = 0x097F;
+    const thai_script_start = 0x0E00;
+    const thai_script_end = 0x0E7F;
+    const kana_script_start = 0x3040;
+    const kana_script_end = 0x30FF;
+    const kana_extension_start = 0x31F0;
+    const kana_extension_end = 0x31FF;
+    const han_script_start = 0x3400;
+    const han_script_end = 0x9FFF;
+    const han_compatibility_start = 0xF900;
+    const han_compatibility_end = 0xFAFF;
+    const hangul_script_start = 0xAC00;
+    const hangul_script_end = 0xD7AF;
+    const hangul_jamo_start = 0x1100;
+    const hangul_jamo_end = 0x11FF;
+    const hangul_compatibility_jamo_start = 0x3130;
+    const hangul_compatibility_jamo_end = 0x318F;
+
+    const arabic_rtl_start = 0x0590;
+    const arabic_rtl_end = 0x08FF;
+    const arabic_presentation_a_start = 0xFB1D;
+    const arabic_presentation_a_end = 0xFDFF;
+    const arabic_presentation_b_start = 0xFE70;
+    const arabic_presentation_b_end = 0xFEFF;
+    const extended_arabic_rtl_start = 0x10800;
+    const extended_arabic_rtl_end = 0x10FFF;
+
+    const latin_ltr_start = 0x0041;
+    const latin_ltr_end = 0x02AF;
+    const greek_cyrillic_ltr_start = 0x0370;
+    const greek_cyrillic_ltr_end = 0x052F;
+    const broad_ltr_start = 0x0900;
+    const broad_ltr_end = 0x1FFF;
+    const cjk_ltr_start = 0x3040;
+    const cjk_ltr_end = 0xA7FF;
+    const hangul_ltr_start = 0xAC00;
+    const hangul_ltr_end = 0xD7AF;
+};
+
 pub const ShapeEngine = struct {
     pub fn init() ShapeEngine {
         return .{};
@@ -262,26 +317,26 @@ fn inferLanguageTag(glyphs: []const ShapedGlyph) ?[4]u8 {
 }
 
 fn scriptTagForCodepoint(codepoint: u21) ?[4]u8 {
-    if (isInRange(codepoint, 0x0041, 0x024F)) return ot_layout.OtLayout.latin_script_tag;
-    if (isInRange(codepoint, 0x0370, 0x03FF)) return ot_layout.OtLayout.greek_script_tag;
-    if (isInRange(codepoint, 0x0400, 0x052F)) return ot_layout.OtLayout.cyrillic_script_tag;
-    if (isInRange(codepoint, 0x0590, 0x05FF)) return ot_layout.OtLayout.hebrew_script_tag;
-    if (isInRange(codepoint, 0x0600, 0x06FF) or isInRange(codepoint, 0x0750, 0x077F) or isInRange(codepoint, 0x08A0, 0x08FF)) return ot_layout.OtLayout.arabic_script_tag;
-    if (isInRange(codepoint, 0x0900, 0x097F)) return ot_layout.OtLayout.devanagari_script_tag;
-    if (isInRange(codepoint, 0x0E00, 0x0E7F)) return ot_layout.OtLayout.thai_script_tag;
-    if (isInRange(codepoint, 0x3040, 0x30FF) or isInRange(codepoint, 0x31F0, 0x31FF)) return ot_layout.OtLayout.kana_script_tag;
-    if (isInRange(codepoint, 0x3400, 0x9FFF) or isInRange(codepoint, 0xF900, 0xFAFF)) return ot_layout.OtLayout.han_script_tag;
-    if (isInRange(codepoint, 0xAC00, 0xD7AF) or isInRange(codepoint, 0x1100, 0x11FF) or isInRange(codepoint, 0x3130, 0x318F)) return ot_layout.OtLayout.hangul_script_tag;
+    if (isInRange(codepoint, UnicodeRange.latin_script_start, UnicodeRange.latin_script_end)) return ot_layout.OtLayout.latin_script_tag;
+    if (isInRange(codepoint, UnicodeRange.greek_script_start, UnicodeRange.greek_script_end)) return ot_layout.OtLayout.greek_script_tag;
+    if (isInRange(codepoint, UnicodeRange.cyrillic_script_start, UnicodeRange.cyrillic_script_end)) return ot_layout.OtLayout.cyrillic_script_tag;
+    if (isInRange(codepoint, UnicodeRange.hebrew_script_start, UnicodeRange.hebrew_script_end)) return ot_layout.OtLayout.hebrew_script_tag;
+    if (isInRange(codepoint, UnicodeRange.arabic_script_first_start, UnicodeRange.arabic_script_first_end) or isInRange(codepoint, UnicodeRange.arabic_script_second_start, UnicodeRange.arabic_script_second_end) or isInRange(codepoint, UnicodeRange.arabic_script_third_start, UnicodeRange.arabic_script_third_end)) return ot_layout.OtLayout.arabic_script_tag;
+    if (isInRange(codepoint, UnicodeRange.devanagari_script_start, UnicodeRange.devanagari_script_end)) return ot_layout.OtLayout.devanagari_script_tag;
+    if (isInRange(codepoint, UnicodeRange.thai_script_start, UnicodeRange.thai_script_end)) return ot_layout.OtLayout.thai_script_tag;
+    if (isInRange(codepoint, UnicodeRange.kana_script_start, UnicodeRange.kana_script_end) or isInRange(codepoint, UnicodeRange.kana_extension_start, UnicodeRange.kana_extension_end)) return ot_layout.OtLayout.kana_script_tag;
+    if (isInRange(codepoint, UnicodeRange.han_script_start, UnicodeRange.han_script_end) or isInRange(codepoint, UnicodeRange.han_compatibility_start, UnicodeRange.han_compatibility_end)) return ot_layout.OtLayout.han_script_tag;
+    if (isInRange(codepoint, UnicodeRange.hangul_script_start, UnicodeRange.hangul_script_end) or isInRange(codepoint, UnicodeRange.hangul_jamo_start, UnicodeRange.hangul_jamo_end) or isInRange(codepoint, UnicodeRange.hangul_compatibility_jamo_start, UnicodeRange.hangul_compatibility_jamo_end)) return ot_layout.OtLayout.hangul_script_tag;
     return null;
 }
 
 fn languageTagForCodepoint(codepoint: u21) ?[4]u8 {
     if (isTurkishSpecificLatin(codepoint)) return ot_layout.OtLayout.turkish_language_tag;
-    if (isInRange(codepoint, 0x0590, 0x05FF)) return ot_layout.OtLayout.hebrew_language_tag;
-    if (isInRange(codepoint, 0x0600, 0x06FF) or isInRange(codepoint, 0x0750, 0x077F) or isInRange(codepoint, 0x08A0, 0x08FF)) return ot_layout.OtLayout.arabic_language_tag;
-    if (isInRange(codepoint, 0x0E00, 0x0E7F)) return ot_layout.OtLayout.thai_language_tag;
-    if (isInRange(codepoint, 0x3040, 0x30FF) or isInRange(codepoint, 0x31F0, 0x31FF)) return ot_layout.OtLayout.japanese_language_tag;
-    if (isInRange(codepoint, 0xAC00, 0xD7AF) or isInRange(codepoint, 0x1100, 0x11FF) or isInRange(codepoint, 0x3130, 0x318F)) return ot_layout.OtLayout.korean_language_tag;
+    if (isInRange(codepoint, UnicodeRange.hebrew_script_start, UnicodeRange.hebrew_script_end)) return ot_layout.OtLayout.hebrew_language_tag;
+    if (isInRange(codepoint, UnicodeRange.arabic_script_first_start, UnicodeRange.arabic_script_first_end) or isInRange(codepoint, UnicodeRange.arabic_script_second_start, UnicodeRange.arabic_script_second_end) or isInRange(codepoint, UnicodeRange.arabic_script_third_start, UnicodeRange.arabic_script_third_end)) return ot_layout.OtLayout.arabic_language_tag;
+    if (isInRange(codepoint, UnicodeRange.thai_script_start, UnicodeRange.thai_script_end)) return ot_layout.OtLayout.thai_language_tag;
+    if (isInRange(codepoint, UnicodeRange.kana_script_start, UnicodeRange.kana_script_end) or isInRange(codepoint, UnicodeRange.kana_extension_start, UnicodeRange.kana_extension_end)) return ot_layout.OtLayout.japanese_language_tag;
+    if (isInRange(codepoint, UnicodeRange.hangul_script_start, UnicodeRange.hangul_script_end) or isInRange(codepoint, UnicodeRange.hangul_jamo_start, UnicodeRange.hangul_jamo_end) or isInRange(codepoint, UnicodeRange.hangul_compatibility_jamo_start, UnicodeRange.hangul_compatibility_jamo_end)) return ot_layout.OtLayout.korean_language_tag;
     return null;
 }
 
@@ -432,18 +487,18 @@ fn strongDirectionForCodepoint(codepoint: u21) ?ShapeDirection {
 }
 
 fn isStrongRtlCodepoint(codepoint: u21) bool {
-    return isInRange(codepoint, 0x0590, 0x08FF) or
-        isInRange(codepoint, 0xFB1D, 0xFDFF) or
-        isInRange(codepoint, 0xFE70, 0xFEFF) or
-        isInRange(codepoint, 0x10800, 0x10FFF);
+    return isInRange(codepoint, UnicodeRange.arabic_rtl_start, UnicodeRange.arabic_rtl_end) or
+        isInRange(codepoint, UnicodeRange.arabic_presentation_a_start, UnicodeRange.arabic_presentation_a_end) or
+        isInRange(codepoint, UnicodeRange.arabic_presentation_b_start, UnicodeRange.arabic_presentation_b_end) or
+        isInRange(codepoint, UnicodeRange.extended_arabic_rtl_start, UnicodeRange.extended_arabic_rtl_end);
 }
 
 fn isStrongLtrCodepoint(codepoint: u21) bool {
-    return isInRange(codepoint, 0x0041, 0x02AF) or
-        isInRange(codepoint, 0x0370, 0x052F) or
-        isInRange(codepoint, 0x0900, 0x1FFF) or
-        isInRange(codepoint, 0x3040, 0xA7FF) or
-        isInRange(codepoint, 0xAC00, 0xD7AF);
+    return isInRange(codepoint, UnicodeRange.latin_ltr_start, UnicodeRange.latin_ltr_end) or
+        isInRange(codepoint, UnicodeRange.greek_cyrillic_ltr_start, UnicodeRange.greek_cyrillic_ltr_end) or
+        isInRange(codepoint, UnicodeRange.broad_ltr_start, UnicodeRange.broad_ltr_end) or
+        isInRange(codepoint, UnicodeRange.cjk_ltr_start, UnicodeRange.cjk_ltr_end) or
+        isInRange(codepoint, UnicodeRange.hangul_ltr_start, UnicodeRange.hangul_ltr_end);
 }
 
 test "detects whether GPOS changed positioning" {

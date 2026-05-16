@@ -10,12 +10,15 @@ const CliError = error{
     UnknownOption,
 };
 
+const default_font_size_px = 64.0;
+const default_margin_px = 8.0;
+
 const CliOptions = struct {
     font_path: []const u8,
     text: ?[]const u8,
     output_path: ?[]const u8,
-    font_size_px: f64 = 64.0,
-    margin_px: f64 = 8.0,
+    font_size_px: f64 = default_font_size_px,
+    margin_px: f64 = default_margin_px,
     fill: []const u8 = "black",
     background: ?[]const u8 = null,
     direction: zfr.ShapeDirection = .auto,
@@ -116,8 +119,8 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
     var font_path: ?[]const u8 = null;
     var text: ?[]const u8 = null;
     var output_path: ?[]const u8 = null;
-    var font_size_px: f64 = 64.0;
-    var margin_px: f64 = 8.0;
+    var font_size_px: f64 = default_font_size_px;
+    var margin_px: f64 = default_margin_px;
     var fill: []const u8 = "black";
     var background: ?[]const u8 = null;
     var direction: zfr.ShapeDirection = .auto;
