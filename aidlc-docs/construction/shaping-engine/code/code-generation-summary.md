@@ -6,7 +6,7 @@
 
 ## Scope
 
-Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, caller-provided OpenType Layout script/language/feature selection, coarse automatic script/language tag inference, conservative default feature policy, RTL-only visual ordering, mixed RTL run reordering, and explicit top-to-bottom vertical layout.
+Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, caller-provided OpenType Layout script/language/feature selection, coarse automatic script/language tag inference, conservative default feature policy, RTL-only visual ordering, mixed RTL run reordering, explicit top-to-bottom vertical layout, and optional vertical metric lookup.
 
 ## Application Code
 
@@ -20,7 +20,7 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
   - Infers a coarse OpenType script tag from input Unicode ranges when callers do not provide one, while preserving explicit caller tags.
   - Infers a coarse OpenType language tag for selected Unicode ranges when callers do not provide one, while preserving explicit caller tags.
   - Applies conservative default OpenType features when callers do not provide feature tags, while preserving explicit caller tags.
-  - Adds `ShapeDirection`, automatic RTL-only visual ordering, mixed RTL run reordering in predominantly LTR text, and explicit top-to-bottom vertical layout.
+  - Adds `ShapeDirection`, automatic RTL-only visual ordering, mixed RTL run reordering in predominantly LTR text, explicit top-to-bottom vertical layout, and optional vertical metric lookup from `vhea`/`vmtx`.
   - Shares ScriptList/LangSys/FeatureList lookup index collection between GSUB and GPOS.
   - Validates OpenType Layout offset slices before dereferencing them.
   - Preserves legacy `kern` fallback when GPOS is absent or does not apply an adjustment.

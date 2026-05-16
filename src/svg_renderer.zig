@@ -208,7 +208,7 @@ pub const SvgRenderer = struct {
         var shaped = try engine.shapeTextWithOptions(allocator, face, text, options.shape);
         defer shaped.deinit(allocator);
 
-        const bounds = try textBounds(face, shaped);
+        const bounds = try textBounds(face, shaped, options.shape.direction);
         const scale = options.font_size_px / @as(f64, @floatFromInt(face.units_per_em));
         const width_px = @as(f64, @floatFromInt(bounds.width())) * scale + options.margin_px * 2.0;
         const height_px = @as(f64, @floatFromInt(bounds.height())) * scale + options.margin_px * 2.0;
@@ -272,7 +272,7 @@ fn validateSvgColor(value: []const u8) SvgError!void {
     }
 }
 
-fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText) SvgError!Bounds {
+fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText, direction: shaper.ShapeDirection) SvgError!Bounds {
     var maybe_bounds: ?Bounds = null;
 
     for (shaped.glyphs) |glyph| {
@@ -297,7 +297,10 @@ fn textBounds(face: font_parser.Face, shaped: shaper.ShapedText) SvgError!Bounds
         .max_x = @max(1, shaped.total_advance),
         .max_y = @as(i32, face.units_per_em),
     };
-    bounds.max_x = @max(bounds.max_x, shaped.total_advance);
+    switch (direction) {
+        .ttb => bounds.max_y = @max(bounds.max_y, shaped.total_advance),
+        else => bounds.max_x = @max(bounds.max_x, shaped.total_advance),
+    }
     return bounds;
 }
 
@@ -806,6 +809,7 @@ test "CFF2 outlines return explicit unsupported error" {
         .num_glyphs = 1,
         .tables = &tables,
         .number_of_h_metrics = 1,
+        .number_of_v_metrics = null,
         .cmap = null,
     };
 
@@ -869,6 +873,7 @@ test "composite glyph parser aligns point-matched components" {
         .num_glyphs = 2,
         .tables = &tables,
         .number_of_h_metrics = 1,
+        .number_of_v_metrics = null,
         .cmap = null,
     };
 

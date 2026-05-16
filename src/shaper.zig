@@ -168,6 +168,10 @@ pub const ShapeEngine = struct {
             glyph.advance_width = metric.advance_width;
             glyph.x_advance = @as(i32, metric.advance_width);
             glyph.lsb = metric.lsb;
+            if (options.direction == .ttb) {
+                const vertical_metric = try face.getVMetric(glyph.glyph_id);
+                glyph.y_advance = @as(i32, vertical_metric.advance_height);
+            }
         }
 
         // 2. GPOS positioning

@@ -82,7 +82,7 @@ pub fn main() !void {
             if (!options.quiet) {
                 try printFaceInfo(stdout, options.font_path, loaded.face);
             }
-            try printTextGlyphs(stdout, loaded.face, text);
+            try printTextGlyphs(stdout, loaded.face, text, options.direction);
         }
     } else {
         var loaded = try loadFaceOrExit(allocator, stderr, options.font_path);
@@ -263,12 +263,12 @@ fn printFaceInfo(writer: *std.Io.Writer, font_path: []const u8, face: zfr.Face) 
     }
 }
 
-fn printTextGlyphs(writer: *std.Io.Writer, face: zfr.Face, text: []const u8) !void {
+fn printTextGlyphs(writer: *std.Io.Writer, face: zfr.Face, text: []const u8, direction: zfr.ShapeDirection) !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
 
     const engine = zfr.ShapeEngine.init();
-    var shaped = engine.shapeText(arena.allocator(), face, text) catch |err| {
+    var shaped = engine.shapeTextWithOptions(arena.allocator(), face, text, .{ .direction = direction }) catch |err| {
         try writer.print("\nText glyphs: shaping failed ({s})\n", .{@errorName(err)});
         return;
     };
@@ -277,8 +277,8 @@ fn printTextGlyphs(writer: *std.Io.Writer, face: zfr.Face, text: []const u8) !vo
     try writer.print("\nText glyphs:\n", .{});
     for (shaped.glyphs, 0..) |glyph, index| {
         try writer.print(
-            "  [{d}] cluster={d} U+{X:0>4} glyph_id={d} x_offset={d} x_advance={d} kern={d} lsb={d}\n",
-            .{ index, glyph.cluster, glyph.codepoint, glyph.glyph_id, glyph.x_offset, glyph.x_advance, glyph.kern_adjustment, glyph.lsb },
+            "  [{d}] cluster={d} U+{X:0>4} glyph_id={d} x_offset={d} y_offset={d} x_advance={d} y_advance={d} kern={d} lsb={d}\n",
+            .{ index, glyph.cluster, glyph.codepoint, glyph.glyph_id, glyph.x_offset, glyph.y_offset, glyph.x_advance, glyph.y_advance, glyph.kern_adjustment, glyph.lsb },
         );
     }
     try writer.print("  total_advance={d}\n", .{shaped.total_advance});

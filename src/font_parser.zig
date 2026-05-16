@@ -24,6 +24,8 @@ const TableTags = struct {
     const hhea = "hhea".*;
     const hmtx = "hmtx".*;
     const maxp = "maxp".*;
+    const vhea = "vhea".*;
+    const vmtx = "vmtx".*;
     const otto = "OTTO".*;
 };
 
@@ -40,6 +42,11 @@ const Maxp = struct {
 const Hhea = struct {
     const min_size = 36;
     const number_of_h_metrics_offset = 34;
+};
+
+const Vhea = struct {
+    const min_size = 36;
+    const number_of_v_metrics_offset = 34;
 };
 
 const Hmtx = struct {
@@ -112,6 +119,11 @@ pub const HMetric = struct {
     lsb: i16,
 };
 
+pub const VMetric = struct {
+    advance_height: u16,
+    tsb: i16,
+};
+
 pub const GlyphInfo = struct {
     id: u16,
     advance_width: u16,
@@ -129,6 +141,7 @@ pub const Face = struct {
     num_glyphs: u16,
     tables: []const TableMetadata,
     number_of_h_metrics: u16,
+    number_of_v_metrics: ?u16,
     cmap: ?CmapSelection,
 
     pub fn init(allocator: std.mem.Allocator, data: []const u8) ParserError!Face {
@@ -175,12 +188,22 @@ pub const Face = struct {
         const number_of_h_metrics = try readU16(hhea, Hhea.number_of_h_metrics_offset);
         if (number_of_h_metrics == 0) return ParserError.InvalidTable;
 
+        const vhea = findTable(tables, TableTags.vhea);
+        const vmtx = findTable(tables, TableTags.vmtx);
+        if ((vhea == null) != (vmtx == null)) return ParserError.InvalidTable;
+        const number_of_v_metrics = if (vhea) |vhea_table| blk: {
+            if (vhea_table.length < Vhea.min_size) return ParserError.InvalidTable;
+            const vhea_data = data[vhea_table.offset..][0..vhea_table.length];
+            break :blk try readU16(vhea_data, Vhea.number_of_v_metrics_offset);
+        } else null;
+
         return .{
             .data = data,
             .units_per_em = units_per_em,
             .num_glyphs = num_glyphs,
             .tables = tables,
             .number_of_h_metrics = number_of_h_metrics,
+            .number_of_v_metrics = number_of_v_metrics,
             .cmap = try selectCmap(data, tables),
         };
     }
@@ -235,6 +258,43 @@ pub const Face = struct {
         return .{
             .advance_width = try readU16(hmtx, last_metric_offset),
             .lsb = try readI16(hmtx, lsb_offset),
+        };
+    }
+
+    pub fn getVMetric(self: Face, glyph_id: u16) ParserError!VMetric {
+        if (glyph_id >= self.num_glyphs) return ParserError.InvalidGlyphId;
+
+        const vmtx = self.getTable(TableTags.vmtx) orelse {
+            const metric = try self.getHMetric(glyph_id);
+            return .{ .advance_height = metric.advance_width, .tsb = 0 };
+        };
+
+        const metric_count = self.number_of_v_metrics orelse {
+            const metric = try self.getHMetric(glyph_id);
+            return .{ .advance_height = metric.advance_width, .tsb = 0 };
+        };
+        if (metric_count == 0) return ParserError.InvalidTable;
+
+        const glyph_index = @as(usize, glyph_id);
+        const count = @as(usize, metric_count);
+        if (glyph_index < count) {
+            const offset = glyph_index * Hmtx.long_metric_size;
+            if (offset + Hmtx.long_metric_size > vmtx.len) return ParserError.InvalidTable;
+            return .{
+                .advance_height = try readU16(vmtx, offset),
+                .tsb = try readI16(vmtx, offset + Hmtx.lsb_offset),
+            };
+        }
+
+        const last_metric_offset = (count - 1) * Hmtx.long_metric_size;
+        const tsb_offset = count * Hmtx.long_metric_size + (glyph_index - count) * Hmtx.short_lsb_size;
+        if (last_metric_offset + Hmtx.long_metric_size > vmtx.len or tsb_offset + Hmtx.short_lsb_size > vmtx.len) {
+            return ParserError.InvalidTable;
+        }
+
+        return .{
+            .advance_height = try readU16(vmtx, last_metric_offset),
+            .tsb = try readI16(vmtx, tsb_offset),
         };
     }
 
@@ -423,6 +483,40 @@ test "minimal format 4 cmap parses glyph and metrics" {
     const metric = try face.getHMetric(1);
     try std.testing.expectEqual(@as(u16, 610), metric.advance_width);
     try std.testing.expectEqual(@as(i16, 11), metric.lsb);
+}
+
+test "vertical metrics lookup reads vmtx records" {
+    const data = [_]u8{
+        0x03, 0xE8, 0x00, 0x10,
+        0x03, 0x20, 0x00, 0x20,
+        0x00, 0x30, 0x00, 0x40,
+    };
+    const tables = [_]TableMetadata{.{
+        .tag = TableTags.vmtx,
+        .offset = 0,
+        .length = data.len,
+    }};
+    const face = Face{
+        .data = &data,
+        .units_per_em = 1000,
+        .num_glyphs = 3,
+        .tables = &tables,
+        .number_of_h_metrics = 1,
+        .number_of_v_metrics = 2,
+        .cmap = null,
+    };
+
+    const first = try face.getVMetric(0);
+    try std.testing.expectEqual(@as(u16, 1000), first.advance_height);
+    try std.testing.expectEqual(@as(i16, 16), first.tsb);
+
+    const middle = try face.getVMetric(1);
+    try std.testing.expectEqual(@as(u16, 800), middle.advance_height);
+    try std.testing.expectEqual(@as(i16, 32), middle.tsb);
+
+    const trailing = try face.getVMetric(2);
+    try std.testing.expectEqual(@as(u16, 800), trailing.advance_height);
+    try std.testing.expectEqual(@as(i16, 48), trailing.tsb);
 }
 
 test "format 12 cmap parses UCS-4 glyphs" {

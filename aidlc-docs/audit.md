@@ -838,6 +838,22 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 
 ---
 
+## Code Generation - Vertical Metrics
+**Timestamp**: 2026-05-16T00:00:00Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Extended vertical shaping to read optional `vhea`/`vmtx` tables, use per-glyph advance heights when present, and make SVG bounds direction-aware so top-to-bottom text renders with vertical metrics instead of a horizontal fallback. The CLI text dump now also reports the direction-aware shaping path."
+**Verification**:
+- `zig fmt src/font_parser.zig src/shaper.zig src/shaper_types.zig src/svg_renderer.zig src/main.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/fonts-japanese-gothic.ttf --text かな --output /tmp/zig-font-renderer-vertical-metrics.svg --font-size 96 --direction ttb`
+- `zig build run -- --font /usr/share/fonts/truetype/fonts-japanese-gothic.ttf --text かな --quiet --direction ttb`
+- `wc -c /tmp/zig-font-renderer-vertical-metrics.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Vertical metric increment. Vertical metrics are complete at the current tested scope; full mixed-direction Unicode Bidi, complex script reordering, uncommon Type 2 operators, and CFF2 remain pending.
+
+---
+
 ## Code Generation - Type 2 Stem3 Hint Counting
 **Timestamp**: 2026-05-16T00:00:00Z
 **User Input**: "次の作業をおねがい"

@@ -57,6 +57,7 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Adds `--margin <px>`, `--fill <color>`, `--background <color>`, and `--direction <auto|ltr|rtl|ttb>`.
   - Writes SVG when `--font`, `--text`, and `--output` are supplied.
   - Suppresses metadata output by default when writing SVG files.
+  - Displays direction-aware shaped glyph info, including vertical offsets and advances, when printing text output.
   - Routes SVG output through the high-level `renderToSvg` API.
 
 ## Verification
