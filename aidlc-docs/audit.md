@@ -971,3 +971,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-ttc-cjk.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 1/3 - Font collection input support. TTC first-face loading is complete at the tested scope; selecting non-first TTC faces remains pending.
+
+---
+
+## Refactoring - SVG Glyph Module Split
+**Timestamp**: 2026-05-17T13:17:49+09:00
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Split glyph outline rendering responsibilities out of `svg_renderer.zig` into `svg_glyph.zig`. The renderer remains the public SVG document facade with `SvgRenderer`, `RenderOptions`, and `SvgError`; glyph transforms, text bounds, TrueType outline parsing, composite glyph expansion, and CFF/CFF2 glyph path routing now live in the new internal module. Existing tests for glyph transforms, CFF2 glyph paths, and point-matched composites moved with the implementation."
+**Verification**:
+- `zig fmt src/svg_renderer.zig src/svg_glyph.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-svg-glyph-split.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-svg-glyph-split.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 3 - source organization refactoring. Public SVG API remains stable while the large renderer file is reduced to document assembly and option handling.
