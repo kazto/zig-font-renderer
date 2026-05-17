@@ -986,3 +986,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-svg-glyph-split.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 3 - source organization refactoring. Public SVG API remains stable while the large renderer file is reduced to document assembly and option handling.
+
+---
+
+## Refactoring - Type 2 Path Ops Split
+**Timestamp**: 2026-05-17T13:22:33+09:00
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Split Type 2 path-emission helpers out of `type2_charstring.zig` into `type2_path_ops.zig`. The existing charstring module remains responsible for bytecode scanning, stack dispatch, hint masks, subroutine calls, and CFF2 `blend`; path operators now own cubic emission, alternating curves, flex variants, and `setcurrentpoint`. Public Type 2 entry points remain unchanged."
+**Verification**:
+- `zig fmt src/type2_charstring.zig src/type2_path_ops.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/urw-base35/NimbusSans-Regular.otf --text A --output /tmp/zig-font-renderer-type2-path-split.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-type2-path-split.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 3 - source organization refactoring. This reduces the Type 2 executor's helper surface while preserving the CFF/CFF2 rendering behavior.
