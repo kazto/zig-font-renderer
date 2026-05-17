@@ -1001,3 +1001,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-type2-path-split.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 3 - source organization refactoring. This reduces the Type 2 executor's helper surface while preserving the CFF/CFF2 rendering behavior.
+
+---
+
+## Refactoring - Font cmap Module Split
+**Timestamp**: 2026-05-17T13:27:51+09:00
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Split cmap selection and glyph lookup out of `font_parser.zig` into `font_cmap.zig`, and moved parser public data/error types into `font_types.zig` so the parser facade can re-export the same API without circular imports. `Face.getGlyphId` now delegates to the cmap module while `Face` initialization, metrics, TTC first-face loading, and table access remain in `font_parser.zig`."
+**Verification**:
+- `zig fmt src/font_parser.zig src/font_cmap.zig src/font_types.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc --text 日本 --output /tmp/zig-font-renderer-font-cmap-split.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-font-cmap-split.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 1 - source organization refactoring. Public `font_parser` type names remain available while cmap responsibilities are isolated.
