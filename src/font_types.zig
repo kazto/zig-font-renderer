@@ -2,6 +2,7 @@ const std = @import("std");
 
 pub const ParserError = error{
     InvalidFontFormat,
+    InvalidFaceIndex,
     MissingMandatoryTable,
     TableOutOfBounds,
     InvalidTable,

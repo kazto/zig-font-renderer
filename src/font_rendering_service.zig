@@ -11,6 +11,7 @@ const default_max_font_bytes = 256 * 1024 * 1024;
 pub const RenderToSvgOptions = struct {
     render: svg_renderer.RenderOptions = .{},
     max_font_bytes: usize = default_max_font_bytes,
+    face_index: u32 = 0,
 };
 
 pub fn renderToSvg(
@@ -22,7 +23,7 @@ pub fn renderToSvg(
     const font_data = try std.fs.cwd().readFileAlloc(allocator, font_path, options.max_font_bytes);
     defer allocator.free(font_data);
 
-    var face = try font_parser.Face.init(allocator, font_data);
+    var face = try font_parser.Face.initFaceIndex(allocator, font_data, options.face_index);
     defer face.deinit(allocator);
 
     const renderer = svg_renderer.SvgRenderer.init();

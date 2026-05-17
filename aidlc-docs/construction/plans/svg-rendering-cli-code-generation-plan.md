@@ -137,6 +137,13 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Keep non-default variation interpolation deferred.
   - Verify existing CFF1 SVG output still succeeds.
 
+- [x] Step 22: Add explicit TTC face index selection
+  - Preserve `Face.init` default first-face behavior for existing callers.
+  - Add explicit parser API for selecting a TTC face by zero-based index.
+  - Add CLI and high-level SVG rendering options for selecting non-first TTC faces.
+  - Reject out-of-range face indexes with a specific parser error.
+  - Verify real TTC SVG output using a non-zero face index.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
@@ -152,6 +159,7 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] CID-keyed CFF glyphs can select glyph-specific local subroutines via FDSelect.
 - [x] Non-variation CFF2 charstrings can be reached and converted through the SVG outline path.
 - [x] CFF2 `blend` charstrings can render at the default instance by ignoring variation deltas.
+- [x] Non-first TTC faces can be selected explicitly for parser and SVG rendering paths.
 - [x] Common CFF Type 2 curve operators and hint masks are handled.
 - [x] Type 2 flex operators are emitted as cubic SVG paths.
 - [x] Type 2 calculation and stack operators can feed subsequent drawing operands.

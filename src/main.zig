@@ -2,6 +2,7 @@ const std = @import("std");
 const zfr = @import("zig_font_renderer");
 
 const CliError = error{
+    InvalidFaceIndex,
     InvalidFontSize,
     InvalidMargin,
     MissingFontPath,
@@ -22,6 +23,7 @@ const CliOptions = struct {
     fill: []const u8 = "black",
     background: ?[]const u8 = null,
     direction: zfr.ShapeDirection = .auto,
+    face_index: u32 = 0,
     quiet: bool = false,
     help: bool = false,
 };
@@ -78,9 +80,10 @@ pub fn main() !void {
                 .fill = options.fill,
                 .background = options.background,
                 .shape = .{ .direction = options.direction },
+                .face_index = options.face_index,
             });
         } else {
-            var loaded = try loadFaceOrExit(allocator, stderr, options.font_path);
+            var loaded = try loadFaceOrExit(allocator, stderr, options.font_path, options.face_index);
             defer loaded.deinit(allocator);
             if (!options.quiet) {
                 try printFaceInfo(stdout, options.font_path, loaded.face);
@@ -88,7 +91,7 @@ pub fn main() !void {
             try printTextGlyphs(stdout, loaded.face, text, options.direction);
         }
     } else {
-        var loaded = try loadFaceOrExit(allocator, stderr, options.font_path);
+        var loaded = try loadFaceOrExit(allocator, stderr, options.font_path, options.face_index);
         defer loaded.deinit(allocator);
         if (!options.quiet) {
             try printFaceInfo(stdout, options.font_path, loaded.face);
@@ -97,7 +100,7 @@ pub fn main() !void {
     try stdout.flush();
 }
 
-fn loadFaceOrExit(allocator: std.mem.Allocator, stderr: *std.Io.Writer, font_path: []const u8) !LoadedFace {
+fn loadFaceOrExit(allocator: std.mem.Allocator, stderr: *std.Io.Writer, font_path: []const u8, face_index: u32) !LoadedFace {
     const font_data = std.fs.cwd().readFileAlloc(allocator, font_path, max_font_file_size) catch |err| {
         try stderr.print("error: failed to read font file '{s}': {s}\n", .{ font_path, @errorName(err) });
         try stderr.flush();
@@ -105,7 +108,7 @@ fn loadFaceOrExit(allocator: std.mem.Allocator, stderr: *std.Io.Writer, font_pat
     };
     errdefer allocator.free(font_data);
 
-    const face = zfr.Face.init(allocator, font_data) catch |err| {
+    const face = zfr.Face.initFaceIndex(allocator, font_data, face_index) catch |err| {
         allocator.free(font_data);
         try stderr.print("error: failed to parse font file '{s}': {s}\n", .{ font_path, @errorName(err) });
         try stderr.flush();
@@ -124,6 +127,7 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
     var fill: []const u8 = "black";
     var background: ?[]const u8 = null;
     var direction: zfr.ShapeDirection = .auto;
+    var face_index: u32 = 0;
     var quiet = false;
     var positional_count: u8 = 0;
 
@@ -165,6 +169,13 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
             if (index >= args.len) return CliError.MissingOptionValue;
             font_size_px = std.fmt.parseFloat(f64, args[index]) catch return CliError.InvalidFontSize;
             if (font_size_px <= 0 or !std.math.isFinite(font_size_px)) return CliError.InvalidFontSize;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, "--face-index")) {
+            index += 1;
+            if (index >= args.len) return CliError.MissingOptionValue;
+            face_index = std.fmt.parseInt(u32, args[index], 10) catch return CliError.InvalidFaceIndex;
             continue;
         }
 
@@ -216,12 +227,14 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
         .fill = fill,
         .background = background,
         .direction = direction,
+        .face_index = face_index,
         .quiet = quiet,
     };
 }
 
 fn cliErrorMessage(err: CliError) []const u8 {
     return switch (err) {
+        CliError.InvalidFaceIndex => "invalid face index",
         CliError.InvalidFontSize => "invalid font size",
         CliError.InvalidMargin => "invalid margin",
         CliError.MissingFontPath => "missing font path",
@@ -242,7 +255,7 @@ fn parseDirection(value: []const u8) !zfr.ShapeDirection {
 fn printUsage(writer: *std.Io.Writer) !void {
     try writer.print(
         \\Usage:
-        \\  zig_font_renderer --font <font-file> [--text <utf8-text>] [--output <svg-file>] [--font-size <px>] [--margin <px>] [--fill <color>] [--background <color>] [--direction <auto|ltr|rtl|ttb>] [--quiet]
+        \\  zig_font_renderer --font <font-file> [--face-index <n>] [--text <utf8-text>] [--output <svg-file>] [--font-size <px>] [--margin <px>] [--fill <color>] [--background <color>] [--direction <auto|ltr|rtl|ttb>] [--quiet]
         \\  zig_font_renderer <font-file> [utf8-text]
         \\
         \\Prints data currently available from the Unit 1 font parser:
@@ -293,10 +306,24 @@ fn writeSvg(
     font_path: []const u8,
     text: []const u8,
     output_path: []const u8,
-    render_options: zfr.RenderOptions,
+    options: struct {
+        font_size_px: f64,
+        margin_px: f64,
+        fill: []const u8,
+        background: ?[]const u8,
+        shape: zfr.ShapeOptions,
+        face_index: u32,
+    },
 ) !void {
     const svg = zfr.renderToSvg(allocator, font_path, text, .{
-        .render = render_options,
+        .render = .{
+            .font_size_px = options.font_size_px,
+            .margin_px = options.margin_px,
+            .fill = options.fill,
+            .background = options.background,
+            .shape = options.shape,
+        },
+        .face_index = options.face_index,
     }) catch |err| {
         try stderr.print("error: failed to render SVG: {s}\n", .{@errorName(err)});
         try stderr.flush();
@@ -330,6 +357,8 @@ test "parse named font and text arguments" {
         "out.svg",
         "--font-size",
         "96",
+        "--face-index",
+        "2",
         "--margin",
         "12",
         "--fill",
@@ -343,6 +372,7 @@ test "parse named font and text arguments" {
     try std.testing.expectEqualStrings("A", options.text.?);
     try std.testing.expectEqualStrings("out.svg", options.output_path.?);
     try std.testing.expectEqual(@as(f64, 96.0), options.font_size_px);
+    try std.testing.expectEqual(@as(u32, 2), options.face_index);
     try std.testing.expectEqual(@as(f64, 12.0), options.margin_px);
     try std.testing.expectEqualStrings("#222", options.fill);
     try std.testing.expectEqualStrings("white", options.background.?);
@@ -357,6 +387,11 @@ test "parse rejects missing font path" {
 test "parse rejects invalid font size" {
     const args = [_][]const u8{ "zig_font_renderer", "--font", "font.ttf", "--font-size", "0" };
     try std.testing.expectError(CliError.InvalidFontSize, parseArgs(&args));
+}
+
+test "parse rejects invalid face index" {
+    const args = [_][]const u8{ "zig_font_renderer", "--font", "font.ttc", "--face-index", "-1" };
+    try std.testing.expectError(CliError.InvalidFaceIndex, parseArgs(&args));
 }
 
 test "parse rejects invalid margin" {

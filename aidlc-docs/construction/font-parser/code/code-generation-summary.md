@@ -44,4 +44,5 @@ Implemented Unit 1: Font Parser for US-1 - TrueType/OpenTypeファイルの解�
 - Glyph outline extraction is not implemented in Unit 1.
 - Composite glyph handling is not implemented in Unit 1.
 - CFF outline parsing is not implemented in Unit 1.
+- TTC collections default to face index 0 through `Face.init`; callers can use `Face.initFaceIndex` and `Face.faceCount` for explicit collection face selection.
 - CLI rendering behavior is intentionally deferred to Unit 3; the current CLI only displays parser-extracted data.

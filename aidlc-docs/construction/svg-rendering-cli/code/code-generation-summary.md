@@ -38,6 +38,7 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Emits SVG cubic paths for common compact Type 2 curve operators.
   - Emits SVG cubic paths for escaped Type 2 flex operators.
   - Evaluates escaped Type 2 arithmetic, boolean, storage, conditional, and stack manipulation operators.
+  - Accepts an explicit TTC face index through the high-level rendering service so non-first collection faces can render to SVG.
   - Returns `UnsupportedCffOperator` for remaining Type 2 operators that are not yet implemented.
   - Emits SVG path commands with bounds-based width, height, viewBox, and scaled group transform.
   - Supports glyph fill color, optional background color, and custom margin.
@@ -56,6 +57,7 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
   - Adds `--output <svg-file>`.
   - Adds `--font-size <px>` and `--quiet`.
   - Adds `--margin <px>`, `--fill <color>`, `--background <color>`, and `--direction <auto|ltr|rtl|ttb>`.
+  - Adds `--face-index <n>` for selecting non-first faces in TTC collections.
   - Writes SVG when `--font`, `--text`, and `--output` are supplied.
   - Suppresses metadata output by default when writing SVG files.
   - Displays direction-aware shaped glyph info, including vertical offsets and advances, when printing text output.
@@ -151,6 +153,10 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed; CFF SVG output still renders after closepath and othersubr compatibility support.
 - Command: `wc -c /tmp/zig-font-renderer-cff-closepath-othersubr.svg`
 - Result: `1196 /tmp/zig-font-renderer-cff-closepath-othersubr.svg`
+- Command: `zig build run -- --font /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc --face-index 1 --text 日本 --output /tmp/zig-font-renderer-ttc-face-index.svg --font-size 96`
+- Result: Passed; generated SVG from a non-first TTC face.
+- Command: `wc -c /tmp/zig-font-renderer-ttc-face-index.svg`
+- Result: `1103 /tmp/zig-font-renderer-ttc-face-index.svg`
 - Command: `zig build run -- --font /usr/share/fonts/truetype/fonts-japanese-gothic.ttf --text かな --output /tmp/zig-font-renderer-vertical-origin.svg --font-size 96 --direction ttb`
 - Result: Passed; generated SVG through the new vertical shaping direction path.
 - Command: `wc -c /tmp/zig-font-renderer-vertical-origin.svg`
@@ -162,5 +168,5 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 
 - Point-matched composite glyphs are implemented for tested TrueType component point alignment cases.
 - Some uncommon Type 2 operators beyond compact curves, flex operators, stem3 hint groups, `setcurrentpoint`, `closepath`, and `callothersubr`/`pop` are not implemented.
-- CFF2 outlines are not implemented.
+- CFF2 non-default variation interpolation is not implemented.
 - Complex shaping remains incomplete.

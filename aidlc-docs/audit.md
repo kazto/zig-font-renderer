@@ -1016,3 +1016,19 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-font-cmap-split.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 1 - source organization refactoring. Public `font_parser` type names remain available while cmap responsibilities are isolated.
+
+---
+
+## Code Generation - TTC Face Index Selection
+**Timestamp**: 2026-05-17T13:33:08+09:00
+**User Input**: "AIDLCにもとづき、ロードマップの次の作業をおねがい"
+**AI Response**: "Added explicit TTC face index selection as the next font collection roadmap increment. `Face.init` preserves first-face behavior, `Face.initFaceIndex` selects a zero-based TTC face, `Face.faceCount` exposes collection size, the CLI accepts `--face-index`, and the high-level SVG rendering service forwards `face_index`."
+**Verification**:
+- `zig fmt src/font_types.zig src/font_parser.zig src/font_rendering_service.zig src/main.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc --face-index 1 --text 日本 --output /tmp/zig-font-renderer-ttc-face-index.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-ttc-face-index.svg`
+- `zig build run -- --font /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc --face-index 99 --quiet` (expected `InvalidFaceIndex`)
+- `git diff --check`
+**Context**: Construction Phase - Unit 1/3 - Font collection input support. Non-first TTC face selection is complete at the tested scope; full Unicode Bidi, complex script reordering, CFF2 non-default variation interpolation, and remaining full typography coverage remain pending.

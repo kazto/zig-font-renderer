@@ -97,8 +97,27 @@ pub const Face = struct {
     cmap: ?font_cmap.Selection,
 
     pub fn init(allocator: std.mem.Allocator, data: []const u8) ParserError!Face {
-        const sfnt_offset = try firstSfntOffset(data);
+        const sfnt_offset = try sfntOffsetForFace(data, 0);
         return initSfnt(allocator, data, sfnt_offset);
+    }
+
+    pub fn initFaceIndex(allocator: std.mem.Allocator, data: []const u8, face_index: u32) ParserError!Face {
+        const sfnt_offset = try sfntOffsetForFace(data, face_index);
+        return initSfnt(allocator, data, sfnt_offset);
+    }
+
+    pub fn faceCount(data: []const u8) ParserError!u32 {
+        if (data.len < Sfnt.header_size) return ParserError.InvalidFontFormat;
+
+        const flavor = try readU32(data, 0);
+        if (flavor != tagToU32(Ttc.tag)) return 1;
+        if (data.len < Ttc.header_min_size) return ParserError.InvalidFontFormat;
+
+        const num_fonts = try readU32(data, Ttc.num_fonts_offset);
+        if (num_fonts == 0) return ParserError.InvalidFontFormat;
+        const offset_table_end = Ttc.first_font_offset_offset + @as(usize, num_fonts) * Ttc.font_offset_size;
+        if (offset_table_end > data.len) return ParserError.TableOutOfBounds;
+        return num_fonts;
     }
 
     fn initSfnt(allocator: std.mem.Allocator, data: []const u8, sfnt_offset: usize) ParserError!Face {
@@ -307,21 +326,25 @@ fn findTable(tables: []const TableMetadata, tag: [4]u8) ?TableMetadata {
     return null;
 }
 
-fn firstSfntOffset(data: []const u8) ParserError!usize {
+fn sfntOffsetForFace(data: []const u8, face_index: u32) ParserError!usize {
     if (data.len < Sfnt.header_size) return ParserError.InvalidFontFormat;
 
     const flavor = try readU32(data, 0);
-    if (flavor != tagToU32(Ttc.tag)) return 0;
-    if (data.len < Ttc.header_min_size + Ttc.font_offset_size) return ParserError.InvalidFontFormat;
+    if (flavor != tagToU32(Ttc.tag)) {
+        if (face_index != 0) return ParserError.InvalidFaceIndex;
+        return 0;
+    }
+    if (data.len < Ttc.header_min_size) return ParserError.InvalidFontFormat;
 
     const num_fonts = try readU32(data, Ttc.num_fonts_offset);
     if (num_fonts == 0) return ParserError.InvalidFontFormat;
+    if (face_index >= num_fonts) return ParserError.InvalidFaceIndex;
     const offset_table_end = Ttc.first_font_offset_offset + @as(usize, num_fonts) * Ttc.font_offset_size;
     if (offset_table_end > data.len) return ParserError.TableOutOfBounds;
 
-    const first_offset = try readU32(data, Ttc.first_font_offset_offset);
-    if (first_offset > data.len) return ParserError.TableOutOfBounds;
-    return @intCast(first_offset);
+    const offset = try readU32(data, Ttc.first_font_offset_offset + @as(usize, face_index) * Ttc.font_offset_size);
+    if (offset > data.len) return ParserError.TableOutOfBounds;
+    return @intCast(offset);
 }
 
 fn requiredTable(data: []const u8, tables: []const TableMetadata, tag: [4]u8) ParserError![]const u8 {
@@ -456,6 +479,46 @@ test "TTC collection parses first font face" {
     try std.testing.expectEqual(@as(u16, 1), try face.getGlyphId('A'));
     const metric = try face.getHMetric(1);
     try std.testing.expectEqual(@as(u16, 610), metric.advance_width);
+}
+
+test "TTC collection parses selected font face" {
+    const allocator = std.testing.allocator;
+    const first_sfnt_offset = 32;
+    const second_sfnt_offset = first_sfnt_offset + 288;
+    var data = [_]u8{0} ** (second_sfnt_offset + 288);
+    writeU32(&data, 0, tagToU32(Ttc.tag));
+    writeU16(&data, 4, 1);
+    writeU16(&data, 6, 0);
+    writeU32(&data, 8, 2);
+    writeU32(&data, 12, first_sfnt_offset);
+    writeU32(&data, 16, second_sfnt_offset);
+
+    buildMinimalFont(data[first_sfnt_offset..]);
+    relocateMinimalFontTableOffsets(&data, first_sfnt_offset);
+    buildMinimalFont(data[second_sfnt_offset..]);
+    relocateMinimalFontTableOffsets(&data, second_sfnt_offset);
+    writeU16(&data, second_sfnt_offset + 108 + 18, 2048);
+    writeU16(&data, second_sfnt_offset + 212, 710);
+    writeI16(&data, second_sfnt_offset + 214, 21);
+
+    try std.testing.expectEqual(@as(u32, 2), try Face.faceCount(&data));
+
+    var face = try Face.initFaceIndex(allocator, &data, 1);
+    defer face.deinit(allocator);
+
+    try std.testing.expectEqual(@as(u16, 2048), face.units_per_em);
+    try std.testing.expectEqual(@as(u16, 1), try face.getGlyphId('A'));
+    const metric = try face.getHMetric(1);
+    try std.testing.expectEqual(@as(u16, 710), metric.advance_width);
+    try std.testing.expectEqual(@as(i16, 21), metric.lsb);
+}
+
+test "non-collection rejects non-zero face index" {
+    const allocator = std.testing.allocator;
+    var data = [_]u8{0} ** 288;
+    buildMinimalFont(&data);
+
+    try std.testing.expectError(ParserError.InvalidFaceIndex, Face.initFaceIndex(allocator, &data, 1));
 }
 
 fn buildMinimalFont(data: []u8) void {
