@@ -50,6 +50,13 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Preserve legacy `kern` fallback when a GPOS table exists but no GPOS adjustment is applied.
   - Add focused tests for checked slicing and GPOS adjustment detection.
 
+- [x] Step 8: Add Arabic joining-form GSUB feature gating
+  - Classify Arabic glyphs into isolated, initial, medial, and final joining forms.
+  - Treat transparent Arabic marks as non-breaking for joining decisions.
+  - Apply `isol`, `init`, `medi`, and `fina` GSUB single substitutions only to glyphs matching the corresponding joining form.
+  - Continue applying non-positional Arabic features through the existing GSUB lookup path.
+  - Verify with synthetic GSUB data and a real Arabic font SVG smoke test.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
@@ -59,4 +66,5 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - [x] Pair adjustments (GPOS Type 2) are applied, correctly adjusting advances between glyphs.
 - [x] `ShapedGlyph` records reflect substitutions and adjustments.
 - [x] Legacy `kern` table still works as a fallback if GPOS is missing or produces no adjustment.
+- [x] Arabic positional GSUB features are gated by computed joining form.
 - [x] Existing parser and SVG rendering tests pass.

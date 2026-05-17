@@ -3,6 +3,7 @@ const binary_reader = @import("binary_reader.zig");
 const font_parser = @import("font_parser.zig");
 const chained_contextual = @import("gsub_chained_contextual.zig");
 const ot_layout = @import("ot_layout.zig");
+const shaper_arabic = @import("shaper_arabic.zig");
 const types = @import("shaper_types.zig");
 const test_utils = @import("shaper_test_utils.zig");
 
@@ -11,6 +12,18 @@ const readI16 = binary_reader.readI16;
 const LayoutError = types.LayoutError;
 const ShapeOptions = types.ShapeOptions;
 const ShapedGlyph = types.ShapedGlyph;
+
+const ArabicFeature = struct {
+    tag: [4]u8,
+    form: shaper_arabic.JoiningForm,
+};
+
+const arabic_positional_features = [_]ArabicFeature{
+    .{ .tag = "isol".*, .form = .isolated },
+    .{ .tag = "init".*, .form = .initial },
+    .{ .tag = "medi".*, .form = .medial },
+    .{ .tag = "fina".*, .form = .final },
+};
 
 const GsubLookupType = enum(u16) {
     single_substitution = 1,
@@ -245,7 +258,47 @@ pub const Gsub = struct {
         const lookup_list_off = try readU16(data, ot_layout.OtLayout.lookup_list_offset);
         const lookup_list_data = try ot_layout.sliceFrom(data, lookup_list_off);
 
+        if (isArabicScript(options.script_tag) and options.feature_tags != null) {
+            try applyArabicJoiningFeatures(allocator, face, data, lookup_list_data, glyphs, options);
+            return;
+        }
+
         var lookup_indices = try ot_layout.OtLayout.collectLookupIndices(allocator, data, options);
+        defer lookup_indices.deinit(allocator);
+        for (lookup_indices.items) |lookup_index| {
+            try applyLookup(allocator, face, lookup_list_data, lookup_index, glyphs, 0);
+        }
+    }
+
+    fn applyArabicJoiningFeatures(allocator: std.mem.Allocator, face: font_parser.Face, data: []const u8, lookup_list_data: []const u8, glyphs: *std.ArrayList(ShapedGlyph), options: ShapeOptions) LayoutError!void {
+        const joining_forms = try shaper_arabic.computeJoiningForms(allocator, glyphs.items);
+        defer allocator.free(joining_forms);
+
+        for (arabic_positional_features) |feature| {
+            if (!featureIsEnabled(options.feature_tags.?, feature.tag)) continue;
+            var selected = [_][4]u8{feature.tag};
+            var feature_options = options;
+            feature_options.feature_tags = &selected;
+
+            var lookup_indices = try ot_layout.OtLayout.collectLookupIndices(allocator, data, feature_options);
+            defer lookup_indices.deinit(allocator);
+            for (lookup_indices.items) |lookup_index| {
+                try applyLookupForJoiningForm(allocator, face, lookup_list_data, lookup_index, glyphs, joining_forms, feature.form, 0);
+            }
+        }
+
+        var remaining_features = std.ArrayList([4]u8).empty;
+        defer remaining_features.deinit(allocator);
+        for (options.feature_tags.?) |tag| {
+            if (!isArabicPositionalFeature(tag)) {
+                try remaining_features.append(allocator, tag);
+            }
+        }
+        if (remaining_features.items.len == 0) return;
+
+        var remaining_options = options;
+        remaining_options.feature_tags = remaining_features.items;
+        var lookup_indices = try ot_layout.OtLayout.collectLookupIndices(allocator, data, remaining_options);
         defer lookup_indices.deinit(allocator);
         for (lookup_indices.items) |lookup_index| {
             try applyLookup(allocator, face, lookup_list_data, lookup_index, glyphs, 0);
@@ -274,6 +327,24 @@ pub const Gsub = struct {
             } else if (lookup_type == @intFromEnum(GsubLookupType.chained_contextual_substitution)) {
                 try applyChainedContextualSubstitution(allocator, face, lookup_list, subtable_data, glyphs, depth);
             }
+        }
+    }
+
+    fn applyLookupForJoiningForm(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, index: u16, glyphs: *std.ArrayList(ShapedGlyph), forms: []const shaper_arabic.JoiningForm, target_form: shaper_arabic.JoiningForm, depth: usize) LayoutError!void {
+        if (depth >= max_recursion_depth) return font_parser.ParserError.InvalidTable;
+        _ = allocator;
+        _ = face;
+
+        const lookup_off = try ot_layout.OtLayout.getLookupOffset(lookup_list, index);
+        const lookup_data = try ot_layout.sliceFrom(lookup_list, lookup_off);
+        const lookup_type = try readU16(lookup_data, ot_layout.OtLayout.lookup_type_offset);
+        if (lookup_type != @intFromEnum(GsubLookupType.single_substitution)) return;
+
+        const subtable_count = try readU16(lookup_data, ot_layout.OtLayout.lookup_subtable_count_offset);
+        for (0..subtable_count) |i| {
+            const subtable_off = try readU16(lookup_data, ot_layout.OtLayout.lookup_subtable_offsets_offset + i * 2);
+            const subtable_data = try ot_layout.sliceFrom(lookup_data, subtable_off);
+            try applySingleSubstitutionForJoiningForm(subtable_data, glyphs, forms, target_form);
         }
     }
 
@@ -342,19 +413,27 @@ pub const Gsub = struct {
     }
 
     pub fn applySingleSubstitution(subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph)) font_parser.ParserError!void {
+        try applySingleSubstitutionForJoiningForm(subtable, glyphs, null, .none);
+    }
+
+    fn applySingleSubstitutionForJoiningForm(subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph), forms: ?[]const shaper_arabic.JoiningForm, target_form: shaper_arabic.JoiningForm) font_parser.ParserError!void {
         const format = try readU16(subtable, single_format_offset);
         const coverage_off = try readU16(subtable, single_coverage_offset);
         const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
 
-        for (glyphs.items) |*glyph| {
-            if (try ot_layout.Coverage.getIndex(coverage_data, glyph.glyph_id)) |index| {
+        for (glyphs.items, 0..) |*glyph, index| {
+            if (forms) |joining_forms| {
+                if (index >= joining_forms.len) return font_parser.ParserError.InvalidTable;
+                if (joining_forms[index] != target_form) continue;
+            }
+            if (try ot_layout.Coverage.getIndex(coverage_data, glyph.glyph_id)) |coverage_index| {
                 if (format == 1) {
                     const delta = try readI16(subtable, single_f1_delta_offset);
                     glyph.glyph_id = @intCast(@mod(@as(i32, glyph.glyph_id) + delta, 65536));
                 } else if (format == 2) {
                     const count = try readU16(subtable, single_f2_count_offset);
-                    if (index >= count) return font_parser.ParserError.InvalidTable;
-                    glyph.glyph_id = try readU16(subtable, single_f2_substitutes_offset + @as(usize, index) * 2);
+                    if (coverage_index >= count) return font_parser.ParserError.InvalidTable;
+                    glyph.glyph_id = try readU16(subtable, single_f2_substitutes_offset + @as(usize, coverage_index) * 2);
                 }
             }
         }
@@ -385,6 +464,47 @@ pub const Gsub = struct {
     }
 };
 
+fn isArabicScript(script_tag: ?[4]u8) bool {
+    const tag = script_tag orelse return false;
+    return std.mem.eql(u8, &tag, &ot_layout.OtLayout.arabic_script_tag);
+}
+
+fn featureIsEnabled(tags: []const [4]u8, needle: [4]u8) bool {
+    for (tags) |tag| {
+        if (std.mem.eql(u8, &tag, &needle)) return true;
+    }
+    return false;
+}
+
+fn isArabicPositionalFeature(tag: [4]u8) bool {
+    for (arabic_positional_features) |feature| {
+        if (std.mem.eql(u8, &tag, &feature.tag)) return true;
+    }
+    return false;
+}
+
+fn writeFeatureTable(data: []u8, offset: usize, lookup_index: u16) void {
+    test_utils.writeU16(data, offset, 0);
+    test_utils.writeU16(data, offset + 2, 1);
+    test_utils.writeU16(data, offset + 4, lookup_index);
+}
+
+fn writeSingleLookup(data: []u8, offset: usize, source_gid: u16, target_gid: u16) void {
+    test_utils.writeU16(data, offset, @intFromEnum(GsubLookupType.single_substitution));
+    test_utils.writeU16(data, offset + 2, 0);
+    test_utils.writeU16(data, offset + 4, 1);
+    test_utils.writeU16(data, offset + 6, 8);
+
+    const subtable_offset = offset + 8;
+    test_utils.writeU16(data, subtable_offset, 2);
+    test_utils.writeU16(data, subtable_offset + 2, 8);
+    test_utils.writeU16(data, subtable_offset + 4, 1);
+    test_utils.writeU16(data, subtable_offset + 6, target_gid);
+    test_utils.writeU16(data, subtable_offset + 8, 1);
+    test_utils.writeU16(data, subtable_offset + 10, 1);
+    test_utils.writeU16(data, subtable_offset + 12, source_gid);
+}
+
 test "gsub alternate substitution" {
     var subtable = [_]u8{0} ** 20;
     test_utils.writeU16(&subtable, 0, 1); // format
@@ -408,6 +528,84 @@ test "gsub alternate substitution" {
 
     try Gsub.applyAlternateSubstitution(&subtable, &glyphs);
     try std.testing.expectEqual(@as(u16, 20), glyphs.items[0].glyph_id);
+}
+
+test "Arabic positional features apply only to matching joining forms" {
+    var data = [_]u8{0} ** 220;
+    test_utils.writeU16(&data, ot_layout.OtLayout.script_list_offset, 10);
+    test_utils.writeU16(&data, ot_layout.OtLayout.feature_list_offset, 40);
+    test_utils.writeU16(&data, ot_layout.OtLayout.lookup_list_offset, 96);
+
+    test_utils.writeU16(&data, 10, 1);
+    data[12..16].* = ot_layout.OtLayout.arabic_script_tag;
+    test_utils.writeU16(&data, 16, 8);
+    test_utils.writeU16(&data, 18, 4);
+    test_utils.writeU16(&data, 20, 0);
+    test_utils.writeU16(&data, 22, 0);
+    test_utils.writeU16(&data, 24, ot_layout.OtLayout.required_feature_none);
+    test_utils.writeU16(&data, 26, 4);
+    test_utils.writeU16(&data, 28, 0);
+    test_utils.writeU16(&data, 30, 1);
+    test_utils.writeU16(&data, 32, 2);
+    test_utils.writeU16(&data, 34, 3);
+
+    test_utils.writeU16(&data, 40, 4);
+    data[42..46].* = "isol".*;
+    test_utils.writeU16(&data, 46, 26);
+    data[48..52].* = "init".*;
+    test_utils.writeU16(&data, 52, 32);
+    data[54..58].* = "medi".*;
+    test_utils.writeU16(&data, 58, 38);
+    data[60..64].* = "fina".*;
+    test_utils.writeU16(&data, 64, 44);
+
+    writeFeatureTable(&data, 66, 0);
+    writeFeatureTable(&data, 72, 1);
+    writeFeatureTable(&data, 78, 2);
+    writeFeatureTable(&data, 84, 3);
+
+    test_utils.writeU16(&data, 96, 4);
+    test_utils.writeU16(&data, 98, 10);
+    test_utils.writeU16(&data, 100, 32);
+    test_utils.writeU16(&data, 102, 54);
+    test_utils.writeU16(&data, 104, 76);
+    writeSingleLookup(&data, 106, 10, 99);
+    writeSingleLookup(&data, 128, 10, 11);
+    writeSingleLookup(&data, 150, 10, 12);
+    writeSingleLookup(&data, 172, 20, 21);
+
+    const tables = [_]font_parser.TableMetadata{.{
+        .tag = ot_layout.TableTags.gsub,
+        .offset = 0,
+        .length = data.len,
+    }};
+    const face = font_parser.Face{
+        .data = &data,
+        .units_per_em = 1000,
+        .num_glyphs = 128,
+        .tables = &tables,
+        .number_of_h_metrics = 1,
+        .number_of_v_metrics = null,
+        .vorg_default_vert_origin_y = null,
+        .vorg = null,
+        .cmap = null,
+    };
+
+    var glyphs = std.ArrayList(ShapedGlyph).empty;
+    defer glyphs.deinit(std.testing.allocator);
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 0x0645, .glyph_id = 10, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 0x0645, .glyph_id = 10, .cluster = 1, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 0x0627, .glyph_id = 20, .cluster = 2, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+
+    const features = [_][4]u8{ "isol".*, "init".*, "medi".*, "fina".* };
+    try Gsub.apply(std.testing.allocator, face, &glyphs, .{
+        .script_tag = ot_layout.OtLayout.arabic_script_tag,
+        .feature_tags = &features,
+    });
+
+    try std.testing.expectEqual(@as(u16, 11), glyphs.items[0].glyph_id);
+    try std.testing.expectEqual(@as(u16, 12), glyphs.items[1].glyph_id);
+    try std.testing.expectEqual(@as(u16, 21), glyphs.items[2].glyph_id);
 }
 
 test "gsub chained contextual substitution format 3" {

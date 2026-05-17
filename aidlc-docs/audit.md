@@ -1032,3 +1032,19 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build run -- --font /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc --face-index 99 --quiet` (expected `InvalidFaceIndex`)
 - `git diff --check`
 **Context**: Construction Phase - Unit 1/3 - Font collection input support. Non-first TTC face selection is complete at the tested scope; full Unicode Bidi, complex script reordering, CFF2 non-default variation interpolation, and remaining full typography coverage remain pending.
+
+---
+
+## Code Generation - Arabic Joining GSUB Features
+**Timestamp**: 2026-05-17T13:43:14+09:00
+**User Input**: "次の作業をおねがい。実装単位を大きめにして、テンポよく進めて。"
+**AI Response**: "Implemented a larger Unit 2 complex-script increment for Arabic joining. Added `shaper_arabic.zig` for joining-form classification, including transparent mark handling, and updated GSUB application so Arabic `isol`, `init`, `medi`, and `fina` single-substitution lookups are applied only to glyph positions with matching joining forms. Non-positional features continue through the existing lookup path."
+**Verification**:
+- `zig fmt src/shaper_arabic.zig src/gsub.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf --text سلام --output /tmp/zig-font-renderer-arabic-joining.svg --font-size 96`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf --text سلام --quiet`
+- `wc -c /tmp/zig-font-renderer-arabic-joining.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Complex script shaping increment. Arabic joining-form positional GSUB feature gating is complete at the tested scope; full Unicode Bidi algorithm coverage, Indic syllable reordering, CFF2 non-default variation interpolation, and remaining full typography coverage remain pending.
