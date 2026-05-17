@@ -97,7 +97,7 @@ pub const ShapeEngine = struct {
         const resolved_direction = shaper_direction.resolveDirection(options.direction, glyphs.items);
         const horizontal_total_advance = shaper_direction.computeTotalAdvance(glyphs.items, .ltr);
         if (resolved_direction == .rtl) {
-            shaper_direction.applyRtlVisualOrder(glyphs.items, horizontal_total_advance);
+            try shaper_direction.applyRtlVisualOrder(allocator, glyphs.items, horizontal_total_advance);
         } else if (resolved_direction == .ttb) {
             shaper_direction.applyVerticalLayout(glyphs.items);
         } else if (shaper_direction.hasMixedStrongDirections(glyphs.items)) {

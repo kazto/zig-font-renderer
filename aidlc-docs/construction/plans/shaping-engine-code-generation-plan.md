@@ -57,6 +57,13 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Continue applying non-positional Arabic features through the existing GSUB lookup path.
   - Verify with synthetic GSUB data and a real Arabic font SVG smoke test.
 
+- [x] Step 9: Preserve weak LTR numeric runs inside RTL visual ordering
+  - Split RTL visual runs into directional groups.
+  - Preserve ASCII and Arabic-Indic digit sequence order inside RTL runs.
+  - Continue mirroring RTL glyph groups across the run span.
+  - Reuse the same grouping for RTL-only and mixed-direction visual ordering.
+  - Verify with unit tests and a real Arabic text plus digits SVG smoke test.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
@@ -67,4 +74,5 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - [x] `ShapedGlyph` records reflect substitutions and adjustments.
 - [x] Legacy `kern` table still works as a fallback if GPOS is missing or produces no adjustment.
 - [x] Arabic positional GSUB features are gated by computed joining form.
+- [x] RTL numeric runs preserve their internal LTR order in visual output.
 - [x] Existing parser and SVG rendering tests pass.

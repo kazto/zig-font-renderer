@@ -1048,3 +1048,19 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-arabic-joining.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Complex script shaping increment. Arabic joining-form positional GSUB feature gating is complete at the tested scope; full Unicode Bidi algorithm coverage, Indic syllable reordering, CFF2 non-default variation interpolation, and remaining full typography coverage remain pending.
+
+---
+
+## Code Generation - RTL Numeric Run Bidi Heuristic
+**Timestamp**: 2026-05-17T13:47:53+09:00
+**User Input**: "次の作業をおねがい。実装単位を大きめにして、テンポよく進めて。"
+**AI Response**: "Expanded the Unit 2 bidirectional text heuristic. RTL visual ordering now splits RTL runs into directional groups so weak LTR numeric runs keep their internal order while surrounding RTL glyph groups continue to mirror across the run span. The same grouping is used for RTL-only text and RTL runs inside mixed-direction text."
+**Verification**:
+- `zig fmt src/shaper_direction.zig src/shaper.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf --text سلام123 --quiet`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf --text سلام123 --output /tmp/zig-font-renderer-rtl-digits.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-rtl-digits.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Bidi handling increment. RTL digit-run preservation is complete at the tested scope; full Unicode Bidi algorithm coverage, Indic syllable reordering, CFF2 non-default variation interpolation, and remaining full typography coverage remain pending.

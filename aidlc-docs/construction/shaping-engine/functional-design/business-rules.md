@@ -21,8 +21,8 @@
 - When no script tag is provided, the shaping engine infers a coarse OpenType script tag from the first supported Unicode script range in the input and falls back to DFLT/latn if that script is absent from the font.
 - When no language tag is provided, the shaping engine infers a coarse OpenType language tag for selected scripts/languages and falls back to the default LangSys if that language is absent from the font.
 - When no feature tags are provided, the shaping engine applies a conservative default feature policy for common shaping features, with Arabic and Indic-specific additions.
-- When direction is automatic and the input contains only strong RTL codepoints plus neutral characters, shaped glyphs are mirrored into RTL visual order after positioning.
-- Mixed strong LTR/RTL text remains in input order until full Unicode Bidi handling is implemented.
+- When direction is automatic and the input contains only strong RTL codepoints plus neutral and weak numeric characters, shaped glyphs are mirrored into RTL visual order after positioning while preserving the internal order of ASCII and Arabic-Indic digit runs.
+- Mixed strong LTR/RTL text reverses RTL runs inside predominantly LTR text and preserves internal numeric run order inside those RTL runs.
 - When direction is explicitly top-to-bottom, shaped glyphs stack on the vertical axis while preserving cross-axis positioning from GPOS.
 - Legacy `kern` remains a fallback when GPOS is absent or does not apply an adjustment.
 - Cluster indexes follow input codepoint order.
@@ -30,4 +30,4 @@
 ## Deferred Rules
 
 - Complex script reordering is not applied.
-- Full mixed-direction Unicode Bidi is not applied.
+- Full mixed-direction Unicode Bidi beyond the current run-level heuristic is not applied.

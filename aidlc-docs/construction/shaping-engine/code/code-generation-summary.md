@@ -6,7 +6,7 @@
 
 ## Scope
 
-Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, caller-provided OpenType Layout script/language/feature selection, coarse automatic script/language tag inference, conservative default feature policy, Arabic joining-form positional GSUB gating, RTL-only visual ordering, mixed RTL run reordering, explicit top-to-bottom vertical layout, optional vertical metric lookup, and optional vertical origin lookup.
+Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, caller-provided OpenType Layout script/language/feature selection, coarse automatic script/language tag inference, conservative default feature policy, Arabic joining-form positional GSUB gating, RTL visual ordering with preserved numeric run order, mixed RTL run reordering, explicit top-to-bottom vertical layout, optional vertical metric lookup, and optional vertical origin lookup.
 
 ## Application Code
 
@@ -21,7 +21,7 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
   - Infers a coarse OpenType language tag for selected Unicode ranges when callers do not provide one, while preserving explicit caller tags.
   - Applies conservative default OpenType features when callers do not provide feature tags, while preserving explicit caller tags.
   - Classifies Arabic joining forms and applies `isol`/`init`/`medi`/`fina` GSUB single substitutions only to matching glyph positions.
-  - Adds `ShapeDirection`, automatic RTL-only visual ordering, mixed RTL run reordering in predominantly LTR text, explicit top-to-bottom vertical layout, optional vertical metric lookup from `vhea`/`vmtx`, and optional vertical origin lookup from `VORG`.
+  - Adds `ShapeDirection`, automatic RTL visual ordering with ASCII and Arabic-Indic digit-run preservation, mixed RTL run reordering in predominantly LTR text, explicit top-to-bottom vertical layout, optional vertical metric lookup from `vhea`/`vmtx`, and optional vertical origin lookup from `VORG`.
   - Shares ScriptList/LangSys/FeatureList lookup index collection between GSUB and GPOS.
   - Validates OpenType Layout offset slices before dereferencing them.
   - Preserves legacy `kern` fallback when GPOS is absent or does not apply an adjustment.
@@ -72,7 +72,11 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
 - Result: Passed after adding Arabic joining-form GSUB feature gating.
 - Command: `wc -c /tmp/zig-font-renderer-arabic-joining.svg`
 - Result: `4076 /tmp/zig-font-renderer-arabic-joining.svg`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf --text سلام123 --output /tmp/zig-font-renderer-rtl-digits.svg --font-size 96`
+- Result: Passed after preserving weak LTR numeric run order inside RTL visual ordering.
+- Command: `wc -c /tmp/zig-font-renderer-rtl-digits.svg`
+- Result: `5976 /tmp/zig-font-renderer-rtl-digits.svg`
 
 ## Known Limitations
 
-- Full Unicode Bidi algorithm coverage and Indic syllable reordering are not implemented.
+- Full Unicode Bidi algorithm coverage beyond the current heuristic and Indic syllable reordering are not implemented.
