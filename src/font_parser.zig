@@ -16,6 +16,14 @@ const Sfnt = struct {
     const truetype_flavor = 0x00010000;
 };
 
+const Ttc = struct {
+    const tag = "ttcf".*;
+    const header_min_size = 12;
+    const num_fonts_offset = 8;
+    const first_font_offset_offset = 12;
+    const font_offset_size = 4;
+};
+
 const TableTags = struct {
     const cff = "CFF ".*;
     const cff2 = "CFF2".*;
@@ -162,22 +170,27 @@ pub const Face = struct {
     cmap: ?CmapSelection,
 
     pub fn init(allocator: std.mem.Allocator, data: []const u8) ParserError!Face {
-        if (data.len < Sfnt.header_size) return ParserError.InvalidFontFormat;
+        const sfnt_offset = try firstSfntOffset(data);
+        return initSfnt(allocator, data, sfnt_offset);
+    }
 
-        const flavor = try readU32(data, 0);
+    fn initSfnt(allocator: std.mem.Allocator, data: []const u8, sfnt_offset: usize) ParserError!Face {
+        if (sfnt_offset > data.len or data.len - sfnt_offset < Sfnt.header_size) return ParserError.InvalidFontFormat;
+
+        const flavor = try readU32(data, sfnt_offset);
         if (flavor != Sfnt.truetype_flavor and flavor != tagToU32(TableTags.otto)) {
             return ParserError.InvalidFontFormat;
         }
 
-        const num_tables = try readU16(data, Sfnt.num_tables_offset);
-        const directory_len = Sfnt.header_size + @as(usize, num_tables) * Sfnt.table_record_size;
+        const num_tables = try readU16(data, sfnt_offset + Sfnt.num_tables_offset);
+        const directory_len = sfnt_offset + Sfnt.header_size + @as(usize, num_tables) * Sfnt.table_record_size;
         if (directory_len > data.len) return ParserError.TableOutOfBounds;
 
         const tables = allocator.alloc(TableMetadata, num_tables) catch return ParserError.InvalidTable;
         errdefer allocator.free(tables);
 
         for (tables, 0..) |*table, index| {
-            const record_offset = Sfnt.header_size + index * Sfnt.table_record_size;
+            const record_offset = sfnt_offset + Sfnt.header_size + index * Sfnt.table_record_size;
             const offset = try readU32(data, record_offset + Sfnt.table_record_offset_offset);
             const length = try readU32(data, record_offset + Sfnt.table_record_length_offset);
             try validateRange(data, offset, length);
@@ -369,6 +382,23 @@ fn findTable(tables: []const TableMetadata, tag: [4]u8) ?TableMetadata {
         if (std.mem.eql(u8, &table.tag, &tag)) return table;
     }
     return null;
+}
+
+fn firstSfntOffset(data: []const u8) ParserError!usize {
+    if (data.len < Sfnt.header_size) return ParserError.InvalidFontFormat;
+
+    const flavor = try readU32(data, 0);
+    if (flavor != tagToU32(Ttc.tag)) return 0;
+    if (data.len < Ttc.header_min_size + Ttc.font_offset_size) return ParserError.InvalidFontFormat;
+
+    const num_fonts = try readU32(data, Ttc.num_fonts_offset);
+    if (num_fonts == 0) return ParserError.InvalidFontFormat;
+    const offset_table_end = Ttc.first_font_offset_offset + @as(usize, num_fonts) * Ttc.font_offset_size;
+    if (offset_table_end > data.len) return ParserError.TableOutOfBounds;
+
+    const first_offset = try readU32(data, Ttc.first_font_offset_offset);
+    if (first_offset > data.len) return ParserError.TableOutOfBounds;
+    return @intCast(first_offset);
 }
 
 fn requiredTable(data: []const u8, tables: []const TableMetadata, tag: [4]u8) ParserError![]const u8 {
@@ -605,6 +635,28 @@ test "format 12 cmap parses UCS-4 glyphs" {
     try std.testing.expectEqual(@as(u16, 0), try face.getGlyphId(0x1F601));
 }
 
+test "TTC collection parses first font face" {
+    const allocator = std.testing.allocator;
+    const sfnt_offset = 32;
+    var data = [_]u8{0} ** (sfnt_offset + 288);
+    writeU32(&data, 0, tagToU32(Ttc.tag));
+    writeU16(&data, 4, 1);
+    writeU16(&data, 6, 0);
+    writeU32(&data, 8, 1);
+    writeU32(&data, 12, sfnt_offset);
+
+    buildMinimalFont(data[sfnt_offset..]);
+    relocateMinimalFontTableOffsets(&data, sfnt_offset);
+
+    var face = try Face.init(allocator, &data);
+    defer face.deinit(allocator);
+
+    try std.testing.expectEqual(@as(u16, 1000), face.units_per_em);
+    try std.testing.expectEqual(@as(u16, 1), try face.getGlyphId('A'));
+    const metric = try face.getHMetric(1);
+    try std.testing.expectEqual(@as(u16, 610), metric.advance_width);
+}
+
 fn buildMinimalFont(data: []u8) void {
     writeU32(data, 0, 0x00010000);
     writeU16(data, 4, 6);
@@ -644,6 +696,17 @@ fn buildMinimalFont(data: []u8) void {
     writeU16(data, 254, 'A');
     writeI16(data, 256, -64);
     writeU16(data, 258, 0);
+}
+
+fn relocateMinimalFontTableOffsets(data: []u8, sfnt_offset: usize) void {
+    var record_offset = sfnt_offset + Sfnt.header_size;
+    var index: usize = 0;
+    while (index < 6) : (index += 1) {
+        const table_offset_offset = record_offset + Sfnt.table_record_offset_offset;
+        const current = std.mem.readInt(u32, data[table_offset_offset..][0..4], .big);
+        writeU32(data, table_offset_offset, current + @as(u32, @intCast(sfnt_offset)));
+        record_offset += Sfnt.table_record_size;
+    }
 }
 
 fn writeRecord(data: []u8, offset: usize, tag: [4]u8, table_offset: u32, length: u32) void {

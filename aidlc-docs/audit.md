@@ -956,3 +956,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-cff2-blend-cff1.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 3 - CFF2 variation coverage. Default-instance `blend` handling is complete at the tested synthetic scope; non-default variation interpolation, full Unicode Bidi, and complex script reordering remain pending.
+
+---
+
+## Code Generation - TTC First Face Support
+**Timestamp**: 2026-05-17T13:09:20+09:00
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Added TTC collection support to the font parser by detecting `ttcf`, validating the collection offset table, and loading the first sfnt face through the existing `Face.init` API. Existing table access remains unchanged because TTC table offsets are kept absolute. Added a regression test and verified SVG generation from `NotoSansCJK-Regular.ttc`."
+**Verification**:
+- `zig fmt src/font_parser.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc --text 日本 --output /tmp/zig-font-renderer-ttc-cjk.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-ttc-cjk.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 1/3 - Font collection input support. TTC first-face loading is complete at the tested scope; selecting non-first TTC faces remains pending.
