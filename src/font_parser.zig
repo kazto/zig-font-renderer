@@ -2,6 +2,7 @@ const std = @import("std");
 const binary_reader = @import("binary_reader.zig");
 const font_cmap = @import("font_cmap.zig");
 const font_types = @import("font_types.zig");
+const font_variations = @import("font_variations.zig");
 
 const readU16 = binary_reader.readU16;
 const readI16 = binary_reader.readI16;
@@ -12,6 +13,7 @@ pub const TableMetadata = font_types.TableMetadata;
 pub const HMetric = font_types.HMetric;
 pub const VMetric = font_types.VMetric;
 pub const GlyphInfo = font_types.GlyphInfo;
+pub const VariationCoord = font_types.VariationCoord;
 
 const Sfnt = struct {
     const header_size = 12;
@@ -39,6 +41,8 @@ const TableTags = struct {
     const head = "head".*;
     const hhea = "hhea".*;
     const hmtx = "hmtx".*;
+    const avar = "avar".*;
+    const fvar = "fvar".*;
     const maxp = "maxp".*;
     const vorg = "VORG".*;
     const vhea = "vhea".*;
@@ -207,6 +211,11 @@ pub const Face = struct {
 
     pub fn requireTable(self: Face, tag: [4]u8) ParserError![]const u8 {
         return self.getTable(tag) orelse ParserError.MissingMandatoryTable;
+    }
+
+    pub fn normalizedVariationCoords(self: Face, allocator: std.mem.Allocator, coords: []const VariationCoord) (ParserError || std.mem.Allocator.Error)![]f64 {
+        const fvar = try self.requireTable(TableTags.fvar);
+        return font_variations.normalizeCoords(allocator, fvar, self.getTable(TableTags.avar), coords);
     }
 
     pub fn getGlyphId(self: Face, codepoint: u32) ParserError!u16 {

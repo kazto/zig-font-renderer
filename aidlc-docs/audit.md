@@ -1125,3 +1125,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build`
 - `git diff --check`
 **Context**: Construction Phase - Unit 3 - CFF2 variation coverage. Non-default CFF2 `blend` interpolation is complete at the tested core/API scope with caller-provided normalized coordinates; `fvar`/`avar` normalization, named instance selection, full Unicode Bidi, and full Indic syllable shaping remain pending.
+
+---
+
+## Code Generation - fvar/avar Variation Coord Normalization
+**Timestamp**: 2026-05-18T15:06:05+09:00
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented the next CFF2 variation integration increment. Added `font_variations.zig` for `fvar` axis min/default/max normalization and optional `avar` segment-map interpolation, exposed `VariationCoord` and `Face.normalizedVariationCoords`, and added `RenderOptions.variation_coords` so SVG rendering callers can provide design-space variation coordinates instead of pre-normalized CFF2 coordinates."
+**Verification**:
+- `zig fmt src/font_types.zig src/font_variations.zig src/font_parser.zig src/root.zig src/svg_renderer.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font '/usr/share/fonts/truetype/ubuntu/UbuntuSans[wdth,wght].ttf' --text A --output /tmp/zig-font-renderer-fvar-smoke.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-fvar-smoke.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 1/3 - Variation coordinate normalization. Design-space variation coordinate normalization through `fvar` and optional `avar` is complete at the tested API scope; CFF2 named instance selection, full Unicode Bidi, and full Indic syllable shaping remain pending.

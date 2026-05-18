@@ -10,6 +10,7 @@ pub const GlyphInfo = font_parser.GlyphInfo;
 pub const HMetric = font_parser.HMetric;
 pub const ParserError = font_parser.ParserError;
 pub const TableMetadata = font_parser.TableMetadata;
+pub const VariationCoord = font_parser.VariationCoord;
 
 pub const ShapeEngine = shaper.ShapeEngine;
 pub const ShapeError = shaper.ShapeError;

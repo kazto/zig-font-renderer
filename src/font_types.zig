@@ -32,6 +32,11 @@ pub const GlyphInfo = struct {
     lsb: i16,
 };
 
+pub const VariationCoord = struct {
+    tag: [4]u8,
+    value: f64,
+};
+
 test {
     _ = std;
 }

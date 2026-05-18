@@ -15,6 +15,7 @@ pub const RenderOptions = struct {
     fill: []const u8 = "black",
     background: ?[]const u8 = null,
     shape: shaper.ShapeOptions = .{},
+    variation_coords: []const font_parser.VariationCoord = &.{},
     cff2_variation_coords: []const f64 = &.{},
 };
 
@@ -53,6 +54,12 @@ pub const SvgRenderer = struct {
         const translate_y = options.margin_px + @as(f64, @floatFromInt(bounds.max_y)) * scale;
         try svg_color.validate(options.fill);
         if (options.background) |background| try svg_color.validate(background);
+        const normalized_variation_coords = if (options.variation_coords.len > 0)
+            try face.normalizedVariationCoords(allocator, options.variation_coords)
+        else
+            null;
+        defer if (normalized_variation_coords) |coords| allocator.free(coords);
+        const cff2_variation_coords = normalized_variation_coords orelse options.cff2_variation_coords;
 
         var output = std.ArrayList(u8).empty;
         errdefer output.deinit(allocator);
@@ -85,7 +92,7 @@ pub const SvgRenderer = struct {
 
         for (shaped.glyphs) |glyph| {
             const transform = try svg_glyph.glyphTransform(face, glyph, options.shape.direction);
-            try svg_glyph.appendGlyphPath(allocator, writer, face, glyph.glyph_id, transform, 0, options.cff2_variation_coords);
+            try svg_glyph.appendGlyphPath(allocator, writer, face, glyph.glyph_id, transform, 0, cff2_variation_coords);
         }
 
         try writer.print(
