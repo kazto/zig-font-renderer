@@ -1080,3 +1080,19 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-devanagari-prebase.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Complex script shaping increment. Indic pre-base matra visual reordering is complete at the tested scope; full Indic syllable shaping/reordering, full Unicode Bidi algorithm coverage, CFF2 non-default variation interpolation, and remaining full typography coverage remain pending.
+
+---
+
+## Refactoring - GSUB Module Split
+**Timestamp**: 2026-05-18T12:46:14+09:00
+**User Input**: "src/gsub.zig ファイル分割"
+**AI Response**: "Split GSUB responsibilities out of `src/gsub.zig` into focused modules: `gsub_single.zig`, `gsub_alternate.zig`, `gsub_ligature.zig`, `gsub_contextual.zig`, and `gsub_lookup.zig`. Kept `src/gsub.zig` as the public facade and lookup dispatcher, preserving existing `Gsub` entry points and tests."
+**Verification**:
+- `zig fmt src/gsub.zig src/gsub_lookup.zig src/gsub_single.zig src/gsub_alternate.zig src/gsub_ligature.zig src/gsub_contextual.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf --text سلام --output /tmp/zig-font-renderer-gsub-split-arabic.svg --font-size 96`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
+- `wc -c /tmp/zig-font-renderer-gsub-split-arabic.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Source organization refactoring. Public `src/gsub.zig` remains the GSUB facade while individual GSUB lookup families now live in focused modules.

@@ -2,16 +2,21 @@ const std = @import("std");
 const binary_reader = @import("binary_reader.zig");
 const font_parser = @import("font_parser.zig");
 const chained_contextual = @import("gsub_chained_contextual.zig");
+const gsub_alternate = @import("gsub_alternate.zig");
+const gsub_contextual = @import("gsub_contextual.zig");
+const gsub_ligature = @import("gsub_ligature.zig");
+const gsub_lookup = @import("gsub_lookup.zig");
+const gsub_single = @import("gsub_single.zig");
 const ot_layout = @import("ot_layout.zig");
 const shaper_arabic = @import("shaper_arabic.zig");
 const types = @import("shaper_types.zig");
 const test_utils = @import("shaper_test_utils.zig");
 
 const readU16 = binary_reader.readU16;
-const readI16 = binary_reader.readI16;
 const LayoutError = types.LayoutError;
 const ShapeOptions = types.ShapeOptions;
 const ShapedGlyph = types.ShapedGlyph;
+const GsubLookupType = gsub_lookup.GsubLookupType;
 
 const ArabicFeature = struct {
     tag: [4]u8,
@@ -25,230 +30,31 @@ const arabic_positional_features = [_]ArabicFeature{
     .{ .tag = "fina".*, .form = .final },
 };
 
-const GsubLookupType = enum(u16) {
-    single_substitution = 1,
-    alternate_substitution = 3,
-    ligature_substitution = 4,
-    contextual_substitution = 5,
-    chained_contextual_substitution = 6,
-};
-
 pub const Gsub = struct {
     pub const max_recursion_depth = 16;
 
-    const single_format_offset = 0;
-    const single_coverage_offset = 2;
-    const single_f1_delta_offset = 4;
-    const single_f2_count_offset = 4;
-    const single_f2_substitutes_offset = 6;
-
-    const lig_coverage_offset = 2;
-    const lig_set_count_offset = 4;
-    const lig_set_offsets_offset = 6;
-    const lig_set_ligature_count_offset = 0;
-    const lig_set_lig_offsets_offset = 2;
-    const lig_glyph_offset = 0;
-    const lig_comp_count_offset = 2;
-    const lig_comp_ids_offset = 4;
-
-    const alt_format_offset = 0;
-    const alt_coverage_offset = 2;
-    const alt_set_count_offset = 4;
-    const alt_set_offsets_offset = 6;
-    const alt_set_glyph_count_offset = 0;
-    const alt_set_alternate_glyphs_offset = 2;
-
-    const context_format_offset = 0;
-    const context_f1_coverage_offset = 2;
-    const context_f1_rule_set_count_offset = 4;
-    const context_f1_rule_set_offsets_offset = 6;
-    const context_rule_set_count_offset = 0;
-    const context_rule_set_offsets_offset = 2;
-    const context_rule_glyph_count_offset = 0;
-    const context_rule_subst_count_offset = 2;
-    const context_rule_input_sequence_offset = 4;
-    const context_f2_coverage_offset = 2;
-    const context_f2_class_def_offset = 4;
-    const context_f2_class_set_count_offset = 6;
-    const context_f2_class_set_offsets_offset = 8;
-    const context_class_set_count_offset = 0;
-    const context_class_set_offsets_offset = 2;
-    const context_class_rule_glyph_count_offset = 0;
-    const context_class_rule_subst_count_offset = 2;
-    const context_class_rule_input_sequence_offset = 4;
     const subst_record_size = 4;
     const subst_record_sequence_index_offset = 0;
     const subst_record_lookup_index_offset = 2;
 
     pub fn applyAlternateSubstitution(subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph)) font_parser.ParserError!void {
-        const format = try readU16(subtable, alt_format_offset);
-        if (format != 1) return;
-
-        const coverage_off = try readU16(subtable, alt_coverage_offset);
-        const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
-        const alt_set_count = try readU16(subtable, alt_set_count_offset);
-
-        for (glyphs.items) |*glyph| {
-            const index = try ot_layout.Coverage.getIndex(coverage_data, glyph.glyph_id) orelse continue;
-            if (index >= alt_set_count) return font_parser.ParserError.InvalidTable;
-
-            const alt_set_off = try readU16(subtable, alt_set_offsets_offset + @as(usize, index) * 2);
-            const alt_set_data = try ot_layout.sliceFrom(subtable, alt_set_off);
-            const glyph_count = try readU16(alt_set_data, alt_set_glyph_count_offset);
-            if (glyph_count == 0) continue;
-
-            // Default to the first alternate
-            glyph.glyph_id = try readU16(alt_set_data, alt_set_alternate_glyphs_offset);
-        }
+        try gsub_alternate.apply(subtable, glyphs);
     }
 
     pub fn applyContextualSubstitution(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph), depth: usize) LayoutError!void {
-        const format = try readU16(subtable, context_format_offset);
-        if (format == 1) {
-            try applyContextualFormat1(allocator, face, lookup_list, subtable, glyphs, depth);
-        } else if (format == 2) {
-            try applyContextualFormat2(allocator, face, lookup_list, subtable, glyphs, depth);
-        } else if (format == 3) {
-            try applyContextualFormat3(allocator, face, lookup_list, subtable, glyphs, depth);
-        }
+        try gsub_contextual.apply(allocator, face, lookup_list, subtable, glyphs, depth, applySubstitutionRecords);
     }
 
     pub fn applyContextualFormat1(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph), depth: usize) LayoutError!void {
-        const coverage_off = try readU16(subtable, context_f1_coverage_offset);
-        const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
-        const rule_set_count = try readU16(subtable, context_f1_rule_set_count_offset);
-
-        var i: usize = 0;
-        while (i < glyphs.items.len) {
-            const coverage_index = try ot_layout.Coverage.getIndex(coverage_data, glyphs.items[i].glyph_id) orelse {
-                i += 1;
-                continue;
-            };
-            if (coverage_index >= rule_set_count) return font_parser.ParserError.InvalidTable;
-
-            const rule_set_off = try readU16(subtable, context_f1_rule_set_offsets_offset + @as(usize, coverage_index) * 2);
-            if (rule_set_off == 0) {
-                i += 1;
-                continue;
-            }
-
-            const rule_set = try ot_layout.sliceFrom(subtable, rule_set_off);
-            const rule_count = try readU16(rule_set, context_rule_set_count_offset);
-            var matched_len: ?u16 = null;
-
-            for (0..rule_count) |rule_idx| {
-                const rule_off = try readU16(rule_set, context_rule_set_offsets_offset + rule_idx * 2);
-                const rule = try ot_layout.sliceFrom(rule_set, rule_off);
-                const glyph_count = try readU16(rule, context_rule_glyph_count_offset);
-                const subst_count = try readU16(rule, context_rule_subst_count_offset);
-                if (glyph_count == 0 or i + glyph_count > glyphs.items.len) continue;
-
-                var matches = true;
-                for (1..glyph_count) |input_idx| {
-                    const expected_gid = try readU16(rule, context_rule_input_sequence_offset + (input_idx - 1) * 2);
-                    if (glyphs.items[i + input_idx].glyph_id != expected_gid) {
-                        matches = false;
-                        break;
-                    }
-                }
-                if (!matches) continue;
-
-                const subst_records_offset = context_rule_input_sequence_offset + @as(usize, glyph_count - 1) * 2;
-                const subst_records = try ot_layout.sliceRange(rule, subst_records_offset, @as(usize, subst_count) * subst_record_size);
-                try applySubstitutionRecords(allocator, face, lookup_list, subst_records, subst_count, glyphs, i, depth);
-                matched_len = glyph_count;
-                break;
-            }
-
-            if (matched_len) |len| {
-                i += len;
-            } else {
-                i += 1;
-            }
-        }
+        try gsub_contextual.applyFormat1(allocator, face, lookup_list, subtable, glyphs, depth, applySubstitutionRecords);
     }
 
     pub fn applyContextualFormat2(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph), depth: usize) LayoutError!void {
-        const coverage_off = try readU16(subtable, context_f2_coverage_offset);
-        const class_def_off = try readU16(subtable, context_f2_class_def_offset);
-        const class_set_count = try readU16(subtable, context_f2_class_set_count_offset);
-        const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
-        const class_def = try ot_layout.sliceFrom(subtable, class_def_off);
-
-        var i: usize = 0;
-        while (i < glyphs.items.len) {
-            if (try ot_layout.Coverage.getIndex(coverage_data, glyphs.items[i].glyph_id) == null) {
-                i += 1;
-                continue;
-            }
-
-            const first_class = try ot_layout.ClassDef.getClass(class_def, glyphs.items[i].glyph_id);
-            if (first_class >= class_set_count) return font_parser.ParserError.InvalidTable;
-
-            const class_set_off = try readU16(subtable, context_f2_class_set_offsets_offset + @as(usize, first_class) * 2);
-            if (class_set_off == 0) {
-                i += 1;
-                continue;
-            }
-
-            const class_set = try ot_layout.sliceFrom(subtable, class_set_off);
-            const class_rule_count = try readU16(class_set, context_class_set_count_offset);
-            var matched_len: ?u16 = null;
-
-            for (0..class_rule_count) |rule_idx| {
-                const class_rule_off = try readU16(class_set, context_class_set_offsets_offset + rule_idx * 2);
-                const class_rule = try ot_layout.sliceFrom(class_set, class_rule_off);
-                const glyph_count = try readU16(class_rule, context_class_rule_glyph_count_offset);
-                const subst_count = try readU16(class_rule, context_class_rule_subst_count_offset);
-                if (glyph_count == 0 or i + glyph_count > glyphs.items.len) continue;
-
-                var matches = true;
-                for (1..glyph_count) |input_idx| {
-                    const expected_class = try readU16(class_rule, context_class_rule_input_sequence_offset + (input_idx - 1) * 2);
-                    const actual_class = try ot_layout.ClassDef.getClass(class_def, glyphs.items[i + input_idx].glyph_id);
-                    if (actual_class != expected_class) {
-                        matches = false;
-                        break;
-                    }
-                }
-                if (!matches) continue;
-
-                const subst_records_offset = context_class_rule_input_sequence_offset + @as(usize, glyph_count - 1) * 2;
-                const subst_records = try ot_layout.sliceRange(class_rule, subst_records_offset, @as(usize, subst_count) * subst_record_size);
-                try applySubstitutionRecords(allocator, face, lookup_list, subst_records, subst_count, glyphs, i, depth);
-                matched_len = glyph_count;
-                break;
-            }
-
-            if (matched_len) |len| {
-                i += len;
-            } else {
-                i += 1;
-            }
-        }
+        try gsub_contextual.applyFormat2(allocator, face, lookup_list, subtable, glyphs, depth, applySubstitutionRecords);
     }
 
     pub fn applyContextualFormat3(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph), depth: usize) LayoutError!void {
-        var offset: usize = 2;
-
-        const input_count = try readU16(subtable, offset);
-        offset += 2;
-        const input_coverages = try ot_layout.sliceRange(subtable, offset, @as(usize, input_count) * 2);
-        offset += @as(usize, input_count) * 2;
-
-        const subst_count = try readU16(subtable, offset);
-        offset += 2;
-        const subst_records = try ot_layout.sliceRange(subtable, offset, @as(usize, subst_count) * 4);
-
-        var i: usize = 0;
-        while (i < glyphs.items.len) {
-            if (try chained_contextual.matchFormat3(subtable, &[_]u8{}, input_coverages, &[_]u8{}, glyphs.items, i)) {
-                try applySubstitutionRecords(allocator, face, lookup_list, subst_records, subst_count, glyphs, i, depth);
-                i += input_count;
-            } else {
-                i += 1;
-            }
-        }
+        try gsub_contextual.applyFormat3(allocator, face, lookup_list, subtable, glyphs, depth, applySubstitutionRecords);
     }
 
     pub fn apply(allocator: std.mem.Allocator, face: font_parser.Face, glyphs: *std.ArrayList(ShapedGlyph), options: ShapeOptions) LayoutError!void {
@@ -317,11 +123,11 @@ pub const Gsub = struct {
             const subtable_data = try ot_layout.sliceFrom(lookup_data, subtable_off);
 
             if (lookup_type == @intFromEnum(GsubLookupType.single_substitution)) {
-                try applySingleSubstitution(subtable_data, glyphs);
+                try gsub_single.apply(subtable_data, glyphs);
             } else if (lookup_type == @intFromEnum(GsubLookupType.alternate_substitution)) {
-                try applyAlternateSubstitution(subtable_data, glyphs);
+                try gsub_alternate.apply(subtable_data, glyphs);
             } else if (lookup_type == @intFromEnum(GsubLookupType.ligature_substitution)) {
-                try applyLigatureSubstitution(subtable_data, glyphs);
+                try gsub_ligature.apply(subtable_data, glyphs);
             } else if (lookup_type == @intFromEnum(GsubLookupType.contextual_substitution)) {
                 try applyContextualSubstitution(allocator, face, lookup_list, subtable_data, glyphs, depth);
             } else if (lookup_type == @intFromEnum(GsubLookupType.chained_contextual_substitution)) {
@@ -344,99 +150,16 @@ pub const Gsub = struct {
         for (0..subtable_count) |i| {
             const subtable_off = try readU16(lookup_data, ot_layout.OtLayout.lookup_subtable_offsets_offset + i * 2);
             const subtable_data = try ot_layout.sliceFrom(lookup_data, subtable_off);
-            try applySingleSubstitutionForJoiningForm(subtable_data, glyphs, forms, target_form);
+            try gsub_single.applyForJoiningForm(subtable_data, glyphs, forms, target_form);
         }
     }
 
     pub fn applyLigatureSubstitution(subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph)) font_parser.ParserError!void {
-        const coverage_off = try readU16(subtable, lig_coverage_offset);
-        const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
-        const ligature_set_count = try readU16(subtable, lig_set_count_offset);
-
-        var i: usize = 0;
-        while (i < glyphs.items.len) {
-            const index = try ot_layout.Coverage.getIndex(coverage_data, glyphs.items[i].glyph_id) orelse {
-                i += 1;
-                continue;
-            };
-
-            if (index >= ligature_set_count) return font_parser.ParserError.InvalidTable;
-            const ligature_set_off = try readU16(subtable, lig_set_offsets_offset + @as(usize, index) * 2);
-            const ligature_set_data = try ot_layout.sliceFrom(subtable, ligature_set_off);
-            const ligature_count = try readU16(ligature_set_data, lig_set_ligature_count_offset);
-
-            var matched = false;
-            for (0..ligature_count) |j| {
-                const ligature_off = try readU16(ligature_set_data, lig_set_lig_offsets_offset + j * 2);
-                const ligature_data = try ot_layout.sliceFrom(ligature_set_data, ligature_off);
-                const lig_glyph = try readU16(ligature_data, lig_glyph_offset);
-                const comp_count = try readU16(ligature_data, lig_comp_count_offset);
-
-                if (i + comp_count <= glyphs.items.len) {
-                    var match = true;
-                    for (1..comp_count) |k| {
-                        const comp_glyph = try readU16(ligature_data, lig_comp_ids_offset + (k - 1) * 2);
-                        if (glyphs.items[i + k].glyph_id != comp_glyph) {
-                            match = false;
-                            break;
-                        }
-                    }
-
-                    if (match) {
-                        const first = glyphs.items[i];
-                        glyphs.items[i] = .{
-                            .codepoint = 0,
-                            .glyph_id = lig_glyph,
-                            .cluster = first.cluster,
-                            .x_offset = 0,
-                            .y_offset = 0,
-                            .x_advance = 0,
-                            .y_advance = 0,
-                            .advance_width = 0,
-                            .lsb = 0,
-                            .kern_adjustment = 0,
-                        };
-
-                        for (1..comp_count) |_| {
-                            _ = glyphs.orderedRemove(i + 1);
-                        }
-                        matched = true;
-                        break;
-                    }
-                }
-            }
-
-            if (!matched) {
-                i += 1;
-            }
-        }
+        try gsub_ligature.apply(subtable, glyphs);
     }
 
     pub fn applySingleSubstitution(subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph)) font_parser.ParserError!void {
-        try applySingleSubstitutionForJoiningForm(subtable, glyphs, null, .none);
-    }
-
-    fn applySingleSubstitutionForJoiningForm(subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph), forms: ?[]const shaper_arabic.JoiningForm, target_form: shaper_arabic.JoiningForm) font_parser.ParserError!void {
-        const format = try readU16(subtable, single_format_offset);
-        const coverage_off = try readU16(subtable, single_coverage_offset);
-        const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
-
-        for (glyphs.items, 0..) |*glyph, index| {
-            if (forms) |joining_forms| {
-                if (index >= joining_forms.len) return font_parser.ParserError.InvalidTable;
-                if (joining_forms[index] != target_form) continue;
-            }
-            if (try ot_layout.Coverage.getIndex(coverage_data, glyph.glyph_id)) |coverage_index| {
-                if (format == 1) {
-                    const delta = try readI16(subtable, single_f1_delta_offset);
-                    glyph.glyph_id = @intCast(@mod(@as(i32, glyph.glyph_id) + delta, 65536));
-                } else if (format == 2) {
-                    const count = try readU16(subtable, single_f2_count_offset);
-                    if (coverage_index >= count) return font_parser.ParserError.InvalidTable;
-                    glyph.glyph_id = try readU16(subtable, single_f2_substitutes_offset + @as(usize, coverage_index) * 2);
-                }
-            }
-        }
+        try gsub_single.apply(subtable, glyphs);
     }
 
     fn applySubstitutionRecords(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, subst_records: []const u8, subst_count: u16, glyphs: *std.ArrayList(ShapedGlyph), start: usize, depth: usize) LayoutError!void {
