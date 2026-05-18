@@ -13,11 +13,11 @@ The current increment implements horizontal text shaping using data exposed by U
 5. Emit `ShapedGlyph` records with cluster indexes and horizontal metrics.
 6. Apply supported GSUB substitutions and GPOS positioning.
 7. Apply supported legacy pair kerning from the `kern` table when GPOS did not position the glyphs.
-8. Recompute horizontal offsets and total advance in raw FUnits.
-9. For RTL-only input or explicit RTL direction, mirror glyph offsets and reverse the shaped glyph sequence for visual output.
+8. Reorder common Indic pre-base matras before the preceding consonant base and recompute horizontal offsets.
+9. Recompute total advance in raw FUnits.
+10. For RTL-only input or explicit RTL direction, mirror glyph offsets and reverse the shaped glyph sequence for visual output, preserving numeric run order.
 
 ## Deferred Logic
 
-- Full mixed-direction Unicode Bidi handling.
-- Complex script reordering.
-- Vertical writing mode.
+- Full mixed-direction Unicode Bidi handling beyond the current heuristic.
+- Full Indic syllable shaping/reordering beyond pre-base matra visual movement.

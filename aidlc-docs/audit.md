@@ -1064,3 +1064,19 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-rtl-digits.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Bidi handling increment. RTL digit-run preservation is complete at the tested scope; full Unicode Bidi algorithm coverage, Indic syllable reordering, CFF2 non-default variation interpolation, and remaining full typography coverage remain pending.
+
+---
+
+## Code Generation - Indic Pre-Base Matra Reordering
+**Timestamp**: 2026-05-18T12:07:00+09:00
+**User Input**: "AIDLCにもとづき、次の作業をすすめて。なるべく大きな単位で実装して。"
+**AI Response**: "Implemented a Unit 2 Indic shaping increment. Added `shaper_indic.zig` to move common Indic pre-base matras before the preceding consonant base in visual glyph order, while preserving placement deltas and recomputing horizontal offsets. Integrated the pass after GSUB/GPOS/kern positioning and verified with Devanagari text."
+**Verification**:
+- `zig fmt src/shaper_indic.zig src/shaper.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf --text कि --quiet`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf --text कि --output /tmp/zig-font-renderer-devanagari-prebase.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-devanagari-prebase.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Complex script shaping increment. Indic pre-base matra visual reordering is complete at the tested scope; full Indic syllable shaping/reordering, full Unicode Bidi algorithm coverage, CFF2 non-default variation interpolation, and remaining full typography coverage remain pending.

@@ -64,6 +64,13 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Reuse the same grouping for RTL-only and mixed-direction visual ordering.
   - Verify with unit tests and a real Arabic text plus digits SVG smoke test.
 
+- [x] Step 10: Add Indic pre-base matra visual reordering
+  - Detect common Indic pre-base matra codepoints.
+  - Move pre-base matras before the preceding consonant base in visual glyph order.
+  - Recompute horizontal offsets after reordering while preserving per-glyph placement deltas.
+  - Keep post-base matras in logical/visual order.
+  - Verify with unit tests and a real Devanagari font SVG smoke test.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
@@ -75,4 +82,5 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - [x] Legacy `kern` table still works as a fallback if GPOS is missing or produces no adjustment.
 - [x] Arabic positional GSUB features are gated by computed joining form.
 - [x] RTL numeric runs preserve their internal LTR order in visual output.
+- [x] Indic pre-base matras can render before their base consonants at the tested scope.
 - [x] Existing parser and SVG rendering tests pass.

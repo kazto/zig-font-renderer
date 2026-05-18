@@ -7,6 +7,7 @@ const gpos = @import("gpos.zig");
 const kern = @import("kern.zig");
 const shaper_direction = @import("shaper_direction.zig");
 const shaper_features = @import("shaper_features.zig");
+const shaper_indic = @import("shaper_indic.zig");
 const test_utils = @import("shaper_test_utils.zig");
 
 pub const ShapeError = types.ShapeError;
@@ -93,6 +94,8 @@ pub const ShapeEngine = struct {
                 pen_x += glyph.x_advance;
             }
         }
+
+        try shaper_indic.applyIndicReordering(allocator, glyphs.items);
 
         const resolved_direction = shaper_direction.resolveDirection(options.direction, glyphs.items);
         const horizontal_total_advance = shaper_direction.computeTotalAdvance(glyphs.items, .ltr);
