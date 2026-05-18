@@ -16,6 +16,7 @@ pub const RenderOptions = struct {
     background: ?[]const u8 = null,
     shape: shaper.ShapeOptions = .{},
     variation_coords: []const font_parser.VariationCoord = &.{},
+    variation_instance_index: ?u16 = null,
     cff2_variation_coords: []const f64 = &.{},
 };
 
@@ -56,6 +57,8 @@ pub const SvgRenderer = struct {
         if (options.background) |background| try svg_color.validate(background);
         const normalized_variation_coords = if (options.variation_coords.len > 0)
             try face.normalizedVariationCoords(allocator, options.variation_coords)
+        else if (options.variation_instance_index) |instance_index|
+            try face.normalizedVariationInstanceCoords(allocator, instance_index)
         else
             null;
         defer if (normalized_variation_coords) |coords| allocator.free(coords);

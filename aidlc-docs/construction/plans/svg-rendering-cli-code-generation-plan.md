@@ -142,16 +142,20 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Compute region weights from caller-provided normalized coordinates.
   - Apply weighted deltas for Type 2 `blend` operands before drawing commands consume them.
   - Expose normalized CFF2 variation coordinates through `RenderOptions` for high-level SVG rendering.
-  - Keep named instance selection deferred.
 
 - [x] Step 23: Add fvar/avar variation coordinate normalization
   - Parse `fvar` variation axes with min/default/max design-space values.
   - Normalize caller-provided design-space coordinates by axis tag.
   - Apply optional `avar` segment-map interpolation after default `fvar` normalization.
   - Expose design-space variation coordinates through `Face.normalizedVariationCoords` and `RenderOptions.variation_coords`.
-  - Keep named instance selection deferred.
 
-- [x] Step 24: Add explicit TTC face index selection
+- [x] Step 24: Add fvar named instance selection
+  - Read the `fvar` named instance count and instance record sizes.
+  - Normalize named instance coordinates by index through the same `fvar`/`avar` path as design-space coordinates.
+  - Expose `Face.variationInstanceCount`, `Face.normalizedVariationInstanceCoords`, and `RenderOptions.variation_instance_index`.
+  - Reject out-of-range instance indexes with a parser error.
+
+- [x] Step 25: Add explicit TTC face index selection
   - Preserve `Face.init` default first-face behavior for existing callers.
   - Add explicit parser API for selecting a TTC face by zero-based index.
   - Add CLI and high-level SVG rendering options for selecting non-first TTC faces.
@@ -175,10 +179,11 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] CFF2 `blend` charstrings can render at the default instance by ignoring variation deltas.
 - [x] CFF2 `blend` charstrings can apply weighted non-default deltas when normalized variation coordinates are provided.
 - [x] Design-space variation coordinates can be normalized through `fvar` and optional `avar` data for CFF2 rendering callers.
+- [x] fvar named instance coordinates can be selected by index and normalized for CFF2 rendering callers.
 - [x] Non-first TTC faces can be selected explicitly for parser and SVG rendering paths.
 - [x] Common CFF Type 2 curve operators and hint masks are handled.
 - [x] Type 2 flex operators are emitted as cubic SVG paths.
 - [x] Type 2 calculation and stack operators can feed subsequent drawing operands.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
-- [x] CFF2 named instance selection and full typography remain explicitly deferred.
+- [x] Full typography remains explicitly deferred.

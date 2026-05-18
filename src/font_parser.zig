@@ -218,6 +218,16 @@ pub const Face = struct {
         return font_variations.normalizeCoords(allocator, fvar, self.getTable(TableTags.avar), coords);
     }
 
+    pub fn normalizedVariationInstanceCoords(self: Face, allocator: std.mem.Allocator, instance_index: u16) (ParserError || std.mem.Allocator.Error)![]f64 {
+        const fvar = try self.requireTable(TableTags.fvar);
+        return font_variations.normalizeInstanceCoords(allocator, fvar, self.getTable(TableTags.avar), instance_index);
+    }
+
+    pub fn variationInstanceCount(self: Face) ParserError!u16 {
+        const fvar = try self.requireTable(TableTags.fvar);
+        return font_variations.instanceCount(fvar);
+    }
+
     pub fn getGlyphId(self: Face, codepoint: u32) ParserError!u16 {
         const cmap = self.cmap orelse return ParserError.MissingMandatoryTable;
         const cmap_table = try self.requireTable(TableTags.cmap);

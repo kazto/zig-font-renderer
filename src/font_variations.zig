@@ -19,11 +19,14 @@ const Fvar = struct {
     const axes_array_offset_offset = 4;
     const axis_count_offset = 8;
     const axis_size_offset = 10;
+    const instance_count_offset = 12;
+    const instance_size_offset = 14;
     const axis_record_min_size = 20;
     const axis_tag_offset = 0;
     const axis_min_value_offset = 4;
     const axis_default_value_offset = 8;
     const axis_max_value_offset = 12;
+    const instance_header_size = 4;
 };
 
 const Avar = struct {
@@ -46,23 +49,14 @@ const min_normalized_coord = -1.0;
 const max_normalized_coord = 1.0;
 
 pub fn normalizeCoords(allocator: std.mem.Allocator, fvar: []const u8, avar: ?[]const u8, coords: []const VariationCoord) VariationError![]f64 {
-    if (fvar.len < Fvar.min_size) return ParserError.InvalidTable;
-    if (try readU16(fvar, Fvar.major_version_offset) != Fvar.expected_major_version) return ParserError.InvalidTable;
-    if (try readU16(fvar, Fvar.minor_version_offset) != Fvar.expected_minor_version) return ParserError.InvalidTable;
+    const header = try readFvarHeader(fvar);
 
-    const axes_offset = try readU16(fvar, Fvar.axes_array_offset_offset);
-    const axis_count = try readU16(fvar, Fvar.axis_count_offset);
-    const axis_size = try readU16(fvar, Fvar.axis_size_offset);
-    if (axis_size < Fvar.axis_record_min_size) return ParserError.InvalidTable;
-    const axes_end = @as(usize, axes_offset) + @as(usize, axis_count) * @as(usize, axis_size);
-    if (axes_end > fvar.len) return ParserError.InvalidTable;
-
-    const normalized = try allocator.alloc(f64, axis_count);
+    const normalized = try allocator.alloc(f64, header.axis_count);
     errdefer allocator.free(normalized);
 
     var axis_index: usize = 0;
-    while (axis_index < axis_count) : (axis_index += 1) {
-        const axis_offset = @as(usize, axes_offset) + axis_index * @as(usize, axis_size);
+    while (axis_index < header.axis_count) : (axis_index += 1) {
+        const axis_offset = axisRecordOffset(header, axis_index);
         const tag = fvar[axis_offset + Fvar.axis_tag_offset ..][0..4].*;
         const min_value = try readFixed16Dot16(fvar, axis_offset + Fvar.axis_min_value_offset);
         const default_value = try readFixed16Dot16(fvar, axis_offset + Fvar.axis_default_value_offset);
@@ -73,6 +67,73 @@ pub fn normalizeCoords(allocator: std.mem.Allocator, fvar: []const u8, avar: ?[]
 
     if (avar) |avar_table| try applyAvar(avar_table, normalized);
     return normalized;
+}
+
+pub fn normalizeInstanceCoords(allocator: std.mem.Allocator, fvar: []const u8, avar: ?[]const u8, instance_index: u16) VariationError![]f64 {
+    const header = try readFvarHeader(fvar);
+    if (instance_index >= header.instance_count) return ParserError.InvalidVariationInstanceIndex;
+    const min_instance_size = Fvar.instance_header_size + @as(usize, header.axis_count) * @sizeOf(i32);
+    if (header.instance_size < min_instance_size) return ParserError.InvalidTable;
+    const instance_offset = header.instances_offset + @as(usize, instance_index) * header.instance_size;
+    if (instance_offset + header.instance_size > fvar.len) return ParserError.InvalidTable;
+
+    const normalized = try allocator.alloc(f64, header.axis_count);
+    errdefer allocator.free(normalized);
+    var axis_index: usize = 0;
+    while (axis_index < header.axis_count) : (axis_index += 1) {
+        const axis_offset = axisRecordOffset(header, axis_index);
+        const min_value = try readFixed16Dot16(fvar, axis_offset + Fvar.axis_min_value_offset);
+        const default_value = try readFixed16Dot16(fvar, axis_offset + Fvar.axis_default_value_offset);
+        const max_value = try readFixed16Dot16(fvar, axis_offset + Fvar.axis_max_value_offset);
+        const coord_offset = instance_offset + Fvar.instance_header_size + axis_index * @sizeOf(i32);
+        const value = try readFixed16Dot16(fvar, coord_offset);
+        normalized[axis_index] = normalizeAxisValue(value, min_value, default_value, max_value);
+    }
+
+    if (avar) |avar_table| try applyAvar(avar_table, normalized);
+    return normalized;
+}
+
+pub fn instanceCount(fvar: []const u8) ParserError!u16 {
+    return (try readFvarHeader(fvar)).instance_count;
+}
+
+const FvarHeader = struct {
+    axes_offset: usize,
+    axis_count: u16,
+    axis_size: usize,
+    instance_count: u16,
+    instance_size: usize,
+    instances_offset: usize,
+};
+
+fn readFvarHeader(fvar: []const u8) ParserError!FvarHeader {
+    if (fvar.len < Fvar.min_size) return ParserError.InvalidTable;
+    if (try readU16(fvar, Fvar.major_version_offset) != Fvar.expected_major_version) return ParserError.InvalidTable;
+    if (try readU16(fvar, Fvar.minor_version_offset) != Fvar.expected_minor_version) return ParserError.InvalidTable;
+
+    const axes_offset = @as(usize, try readU16(fvar, Fvar.axes_array_offset_offset));
+    const axis_count = try readU16(fvar, Fvar.axis_count_offset);
+    const axis_size = @as(usize, try readU16(fvar, Fvar.axis_size_offset));
+    const instance_count_value = try readU16(fvar, Fvar.instance_count_offset);
+    const instance_size = @as(usize, try readU16(fvar, Fvar.instance_size_offset));
+    if (axis_size < Fvar.axis_record_min_size) return ParserError.InvalidTable;
+    const axes_end = axes_offset + @as(usize, axis_count) * axis_size;
+    if (axes_end > fvar.len) return ParserError.InvalidTable;
+    const instances_end = axes_end + @as(usize, instance_count_value) * instance_size;
+    if (instances_end > fvar.len) return ParserError.InvalidTable;
+    return .{
+        .axes_offset = axes_offset,
+        .axis_count = axis_count,
+        .axis_size = axis_size,
+        .instance_count = instance_count_value,
+        .instance_size = instance_size,
+        .instances_offset = axes_end,
+    };
+}
+
+fn axisRecordOffset(header: FvarHeader, axis_index: usize) usize {
+    return header.axes_offset + axis_index * header.axis_size;
 }
 
 fn designCoordForAxis(coords: []const VariationCoord, tag: [4]u8) ?f64 {
@@ -203,4 +264,32 @@ test "avar maps normalized coordinates with interpolation" {
     defer std.testing.allocator.free(normalized);
 
     try std.testing.expectApproxEqAbs(@as(f64, 0.25), normalized[0], 0.0001);
+}
+
+test "fvar named instance coordinates normalize by instance index" {
+    var fvar = [_]u8{0} ** 64;
+    writeU16(&fvar, Fvar.major_version_offset, Fvar.expected_major_version);
+    writeU16(&fvar, Fvar.minor_version_offset, Fvar.expected_minor_version);
+    writeU16(&fvar, Fvar.axes_array_offset_offset, 16);
+    writeU16(&fvar, Fvar.axis_count_offset, 1);
+    writeU16(&fvar, Fvar.axis_size_offset, Fvar.axis_record_min_size);
+    writeU16(&fvar, Fvar.instance_count_offset, 2);
+    writeU16(&fvar, Fvar.instance_size_offset, 8);
+    @memcpy(fvar[16..20], "wght");
+    writeI32(&fvar, 20, 100 << 16);
+    writeI32(&fvar, 24, 400 << 16);
+    writeI32(&fvar, 28, 900 << 16);
+    writeU16(&fvar, 36, 256);
+    writeU16(&fvar, 38, 0);
+    writeI32(&fvar, 40, 400 << 16);
+    writeU16(&fvar, 44, 257);
+    writeU16(&fvar, 46, 0);
+    writeI32(&fvar, 48, 900 << 16);
+
+    const normalized = try normalizeInstanceCoords(std.testing.allocator, &fvar, null, 1);
+    defer std.testing.allocator.free(normalized);
+
+    try std.testing.expectEqual(@as(u16, 2), try instanceCount(&fvar));
+    try std.testing.expectApproxEqAbs(@as(f64, 1.0), normalized[0], 0.0001);
+    try std.testing.expectError(ParserError.InvalidVariationInstanceIndex, normalizeInstanceCoords(std.testing.allocator, &fvar, null, 2));
 }

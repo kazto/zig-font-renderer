@@ -173,6 +173,14 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed with a real variable TrueType font.
 - Command: `wc -c /tmp/zig-font-renderer-fvar-smoke.svg`
 - Result: `861 /tmp/zig-font-renderer-fvar-smoke.svg`
+- Command: `zig build test`
+- Result: Passed after adding fvar named instance coordinate normalization by index.
+- Command: `zig build`
+- Result: Passed after adding `RenderOptions.variation_instance_index`.
+- Command: `zig build run -- --font '/usr/share/fonts/truetype/ubuntu/UbuntuSans[wdth,wght].ttf' --text A --output /tmp/zig-font-renderer-fvar-instance-smoke.svg --font-size 96`
+- Result: Passed with a real variable TrueType font.
+- Command: `wc -c /tmp/zig-font-renderer-fvar-instance-smoke.svg`
+- Result: `861 /tmp/zig-font-renderer-fvar-instance-smoke.svg`
 - Command: `git diff --check`
 - Result: Passed
 
@@ -180,5 +188,5 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 
 - Point-matched composite glyphs are implemented for tested TrueType component point alignment cases.
 - Some uncommon Type 2 operators beyond compact curves, flex operators, stem3 hint groups, `setcurrentpoint`, `closepath`, and `callothersubr`/`pop` are not implemented.
-- CFF2 non-default `blend` interpolation is implemented for caller-provided normalized coordinates and `fvar`/`avar`-normalized design-space coordinates; named instance selection is not implemented.
+- CFF2 non-default `blend` interpolation is implemented for caller-provided normalized coordinates, `fvar`/`avar`-normalized design-space coordinates, and fvar named instance coordinates.
 - Complex shaping remains incomplete.

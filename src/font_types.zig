@@ -8,6 +8,7 @@ pub const ParserError = error{
     InvalidTable,
     UnsupportedCmapFormat,
     InvalidGlyphId,
+    InvalidVariationInstanceIndex,
 };
 
 pub const TableMetadata = struct {
