@@ -1096,3 +1096,19 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-gsub-split-arabic.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Source organization refactoring. Public `src/gsub.zig` remains the GSUB facade while individual GSUB lookup families now live in focused modules.
+
+---
+
+## Code Generation - Devanagari Repha Reordering
+**Timestamp**: 2026-05-18T14:09:32+09:00
+**User Input**: "ロードマップにしたがって、次の作業をおねがい"
+**AI Response**: "Implemented the next Unit 2 complex-script shaping increment. Extended `shaper_indic.zig` so leading Devanagari ra + virama sequences that remain decomposed after GSUB/GPOS move after the following consonant base in visual order, preserving placement deltas and recomputing horizontal offsets. Added tests for plain repha movement and interaction with pre-base matra reordering."
+**Verification**:
+- `zig fmt src/shaper_indic.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf --text र्क --quiet`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf --text र्क --output /tmp/zig-font-renderer-devanagari-repha.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-devanagari-repha.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Complex script shaping increment. Devanagari repha-sequence visual fallback reordering is complete at the tested scope; full Indic syllable shaping/reordering, full Unicode Bidi algorithm coverage, CFF2 non-default variation interpolation, and remaining full typography coverage remain pending.

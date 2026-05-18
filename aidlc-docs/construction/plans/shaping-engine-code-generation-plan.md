@@ -9,6 +9,7 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - **Dependencies**: Unit 1 `Face`
 - **Application code paths**:
   - `src/shaper.zig`
+  - `src/shaper_indic.zig`
 
 ## Execution Checklist
 
@@ -71,6 +72,12 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Keep post-base matras in logical/visual order.
   - Verify with unit tests and a real Devanagari font SVG smoke test.
 
+- [x] Step 11: Add Devanagari initial repha-sequence visual reordering
+  - Detect leading Devanagari ra + virama glyph sequences that remain after GSUB/GPOS.
+  - Move the sequence after the following consonant base in visual glyph order.
+  - Preserve placement deltas and recompute horizontal offsets after reordering.
+  - Verify with unit tests covering plain repha movement and interaction with pre-base matras.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
@@ -83,4 +90,5 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - [x] Arabic positional GSUB features are gated by computed joining form.
 - [x] RTL numeric runs preserve their internal LTR order in visual output.
 - [x] Indic pre-base matras can render before their base consonants at the tested scope.
+- [x] Leading Devanagari ra + virama sequences can move after the consonant base at the tested scope.
 - [x] Existing parser and SVG rendering tests pass.

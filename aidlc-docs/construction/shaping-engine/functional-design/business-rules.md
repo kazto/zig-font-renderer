@@ -24,11 +24,12 @@
 - When direction is automatic and the input contains only strong RTL codepoints plus neutral and weak numeric characters, shaped glyphs are mirrored into RTL visual order after positioning while preserving the internal order of ASCII and Arabic-Indic digit runs.
 - Mixed strong LTR/RTL text reverses RTL runs inside predominantly LTR text and preserves internal numeric run order inside those RTL runs.
 - Common Indic pre-base matras move before the preceding consonant base in visual order after GSUB/GPOS positioning; post-base matras remain in place.
+- Leading Devanagari ra + virama sequences that remain decomposed after GSUB/GPOS move after the following consonant base in visual order.
 - When direction is explicitly top-to-bottom, shaped glyphs stack on the vertical axis while preserving cross-axis positioning from GPOS.
 - Legacy `kern` remains a fallback when GPOS is absent or does not apply an adjustment.
 - Cluster indexes follow input codepoint order.
 
 ## Deferred Rules
 
-- Full Indic syllable reordering beyond pre-base matra visual movement is not applied.
+- Full Indic syllable reordering beyond pre-base matra and Devanagari repha-sequence visual movement is not applied.
 - Full mixed-direction Unicode Bidi beyond the current run-level heuristic is not applied.

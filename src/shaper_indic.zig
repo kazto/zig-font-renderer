@@ -31,6 +31,10 @@ pub fn applyIndicReordering(allocator: std.mem.Allocator, glyphs: []ShapedGlyph)
         try visual_deltas.append(allocator, delta);
     }
 
+    if (moveInitialDevanagariRephaSequence(visual.items, visual_deltas.items)) {
+        did_reorder = true;
+    }
+
     if (!did_reorder) return;
 
     for (visual.items, 0..) |item, index| {
@@ -67,6 +71,39 @@ fn findPreviousIndicBase(glyphs: []const ShapedGlyph) ?usize {
         if (isIndicConsonant(codepoint)) return index;
     }
     return null;
+}
+
+fn moveInitialDevanagariRephaSequence(glyphs: []ShapedGlyph, placement_deltas: []i32) bool {
+    if (glyphs.len < 3) return false;
+    if (!isDevanagariRa(glyphs[0].codepoint) or !isDevanagariVirama(glyphs[1].codepoint)) return false;
+
+    var base_index: ?usize = null;
+    var index: usize = 2;
+    while (index < glyphs.len) : (index += 1) {
+        const codepoint = glyphs[index].codepoint;
+        if (isIndicMark(codepoint) or isIndicVirama(codepoint)) continue;
+        if (isIndicConsonant(codepoint)) {
+            base_index = index;
+            break;
+        }
+    }
+
+    const base = base_index orelse return false;
+    const ra = glyphs[0];
+    const virama = glyphs[1];
+    const ra_delta = placement_deltas[0];
+    const virama_delta = placement_deltas[1];
+
+    index = 2;
+    while (index <= base) : (index += 1) {
+        glyphs[index - 2] = glyphs[index];
+        placement_deltas[index - 2] = placement_deltas[index];
+    }
+    glyphs[base - 1] = ra;
+    placement_deltas[base - 1] = ra_delta;
+    glyphs[base] = virama;
+    placement_deltas[base] = virama_delta;
+    return true;
 }
 
 fn isIndicPreBaseMatra(codepoint: u21) bool {
@@ -110,6 +147,14 @@ fn isIndicVirama(codepoint: u21) bool {
     return codepoint == 0x094D or codepoint == 0x09CD or codepoint == 0x0A4D or
         codepoint == 0x0ACD or codepoint == 0x0B4D or codepoint == 0x0BCD or
         codepoint == 0x0C4D or codepoint == 0x0CCD or codepoint == 0x0D4D;
+}
+
+fn isDevanagariRa(codepoint: u21) bool {
+    return codepoint == 0x0930;
+}
+
+fn isDevanagariVirama(codepoint: u21) bool {
+    return codepoint == 0x094D;
 }
 
 fn isInRange(codepoint: u21, start: u21, end: u21) bool {
@@ -157,4 +202,48 @@ test "Indic reordering keeps post-base matras in place" {
 
     try std.testing.expectEqual(@as(u16, 10), glyphs[0].glyph_id);
     try std.testing.expectEqual(@as(u16, 11), glyphs[1].glyph_id);
+}
+
+test "Indic reordering moves initial Devanagari repha sequence after base" {
+    var glyphs = [_]ShapedGlyph{
+        glyph(0x0930, 10, 0, 0, 300),
+        glyph(0x094D, 11, 1, 300, 0),
+        glyph(0x0915, 12, 2, 300, 600),
+    };
+
+    try applyIndicReordering(std.testing.allocator, &glyphs);
+
+    try std.testing.expectEqual(@as(u16, 12), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(usize, 2), glyphs[0].cluster);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u16, 10), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(usize, 0), glyphs[1].cluster);
+    try std.testing.expectEqual(@as(i32, 600), glyphs[1].x_offset);
+    try std.testing.expectEqual(@as(u16, 11), glyphs[2].glyph_id);
+    try std.testing.expectEqual(@as(usize, 1), glyphs[2].cluster);
+    try std.testing.expectEqual(@as(i32, 900), glyphs[2].x_offset);
+}
+
+test "Indic reordering combines pre-base matra and initial Devanagari repha sequence" {
+    var glyphs = [_]ShapedGlyph{
+        glyph(0x0930, 10, 0, 0, 300),
+        glyph(0x094D, 11, 1, 300, 0),
+        glyph(0x0915, 12, 2, 300, 600),
+        glyph(0x093F, 13, 3, 900, 200),
+    };
+
+    try applyIndicReordering(std.testing.allocator, &glyphs);
+
+    try std.testing.expectEqual(@as(u16, 13), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(usize, 3), glyphs[0].cluster);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u16, 12), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(usize, 2), glyphs[1].cluster);
+    try std.testing.expectEqual(@as(i32, 200), glyphs[1].x_offset);
+    try std.testing.expectEqual(@as(u16, 10), glyphs[2].glyph_id);
+    try std.testing.expectEqual(@as(usize, 0), glyphs[2].cluster);
+    try std.testing.expectEqual(@as(i32, 800), glyphs[2].x_offset);
+    try std.testing.expectEqual(@as(u16, 11), glyphs[3].glyph_id);
+    try std.testing.expectEqual(@as(usize, 1), glyphs[3].cluster);
+    try std.testing.expectEqual(@as(i32, 1100), glyphs[3].x_offset);
 }
