@@ -178,6 +178,7 @@ pub fn appendGlyphPath(
     glyph_id: u16,
     transform: Transform,
     depth: u8,
+    cff2_variation_coords: []const f64,
 ) SvgGlyphError!void {
     if (depth > max_composite_depth) return SvgGlyphError.UnsupportedCompositeGlyph;
 
@@ -193,14 +194,14 @@ pub fn appendGlyphPath(
             });
         }
         if (face.getTable(TableTags.cff2)) |cff2| {
-            return cff_outline.appendCff2GlyphPath(writer, cff2, glyph_id, .{
+            return cff_outline.appendCff2GlyphPathWithVariationCoords(allocator, writer, cff2, glyph_id, .{
                 .xx = transform.xx,
                 .yx = transform.yx,
                 .xy = transform.xy,
                 .yy = transform.yy,
                 .dx = transform.dx,
                 .dy = transform.dy,
-            });
+            }, cff2_variation_coords);
         }
     }
 
@@ -214,7 +215,7 @@ pub fn appendGlyphPath(
     const number_of_contours = try readI16(glyph, Glyf.number_of_contours_offset);
     if (number_of_contours == Glyf.empty_contour_count) return;
     if (number_of_contours <= Glyf.composite_contour_marker_max) {
-        return appendCompositeGlyphPaths(allocator, writer, face, glyph, transform, depth + 1);
+        return appendCompositeGlyphPaths(allocator, writer, face, glyph, transform, depth + 1, cff2_variation_coords);
     }
 
     const outline = try readSimpleGlyphOutline(allocator, glyph, number_of_contours);
@@ -301,6 +302,7 @@ fn appendCompositeGlyphPaths(
     glyph: []const u8,
     transform: Transform,
     depth: u8,
+    cff2_variation_coords: []const f64,
 ) SvgGlyphError!void {
     var parent_points = std.ArrayList(TransformedPoint).empty;
     defer parent_points.deinit(allocator);
@@ -373,6 +375,7 @@ fn appendCompositeGlyphPaths(
             component_glyph_id,
             transform.compose(component_transform),
             depth,
+            cff2_variation_coords,
         );
 
         try appendGlyphTransformedPoints(
@@ -694,7 +697,7 @@ test "CFF2 outline path emits through charstring renderer" {
         .cmap = null,
     };
 
-    try appendGlyphPath(std.testing.allocator, writer, face, 0, Transform{}, 0);
+    try appendGlyphPath(std.testing.allocator, writer, face, 0, Transform{}, 0, &.{});
     try std.testing.expectEqualStrings("    <path d=\"M 0.00 0.00 L 50.00 0.00 Z \"/>\n", output.items);
 }
 
@@ -711,7 +714,7 @@ test "composite glyph parser rejects point-matched first component" {
 
     try std.testing.expectError(
         font_parser.ParserError.InvalidTable,
-        appendCompositeGlyphPaths(allocator, writer, face, &glyph, Transform{}, 0),
+        appendCompositeGlyphPaths(allocator, writer, face, &glyph, Transform{}, 0, &.{}),
     );
 }
 
@@ -770,6 +773,6 @@ test "composite glyph parser aligns point-matched components" {
         0,    0,
     };
 
-    try appendCompositeGlyphPaths(allocator, writer, face, &glyph, Transform{}, 0);
+    try appendCompositeGlyphPaths(allocator, writer, face, &glyph, Transform{}, 0, &.{});
     try std.testing.expectEqual(@as(usize, test_composite_point_match_count), std.mem.count(u8, output.items, "M 20.00 30.00"));
 }

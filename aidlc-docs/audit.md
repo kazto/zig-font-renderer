@@ -1112,3 +1112,16 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-devanagari-repha.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Complex script shaping increment. Devanagari repha-sequence visual fallback reordering is complete at the tested scope; full Indic syllable shaping/reordering, full Unicode Bidi algorithm coverage, CFF2 non-default variation interpolation, and remaining full typography coverage remain pending.
+
+---
+
+## Code Generation - CFF2 Variation Blend Interpolation Core
+**Timestamp**: 2026-05-18T14:17:12+09:00
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented the next Unit 3 CFF2 variation increment. Added Variation Region List F2DOT14 scalar calculation, optional normalized CFF2 variation coordinates on `RenderOptions`, and weighted Type 2 `blend` interpolation so non-default deltas can affect CFF2 outline path operands when callers provide normalized coordinates."
+**Verification**:
+- `zig fmt src/cff_types.zig src/cff_context.zig src/type2_charstring.zig src/cff_outline.zig src/svg_renderer.zig src/svg_glyph.zig`
+- `zig build test`
+- `zig build`
+- `git diff --check`
+**Context**: Construction Phase - Unit 3 - CFF2 variation coverage. Non-default CFF2 `blend` interpolation is complete at the tested core/API scope with caller-provided normalized coordinates; `fvar`/`avar` normalization, named instance selection, full Unicode Bidi, and full Indic syllable shaping remain pending.

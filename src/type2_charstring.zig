@@ -37,6 +37,8 @@ const subr_bias_medium_count_threshold = 33900;
 const subr_bias_low = 107;
 const subr_bias_medium = 1131;
 const subr_bias_high = 32768;
+const type2_i32_min = @as(f64, @floatFromInt(std.math.minInt(i32)));
+const type2_i32_max = @as(f64, @floatFromInt(std.math.maxInt(i32)));
 
 pub fn appendType2CharStringPath(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext) CffError!void {
     try appendType2CharStringPathWithSubrs(writer, charstring, transform, context, context.local_subrs);
@@ -276,6 +278,21 @@ fn executeCff2Blend(state: *Type2State, context: CffContext) CffError!void {
     if (operand_count > state.stack_len) return font_parser.ParserError.InvalidTable;
 
     const base = state.stack_len - operand_count;
+    if (context.cff2_blend_region_weights) |weights| {
+        if (weights.len < region_count) return font_parser.ParserError.InvalidTable;
+        var value_index: usize = 0;
+        while (value_index < blend_count) : (value_index += 1) {
+            var blended = @as(f64, @floatFromInt(state.stack[base + value_index]));
+            var region_index: usize = 0;
+            while (region_index < region_count) : (region_index += 1) {
+                const delta_index = base + blend_count + value_index * @as(usize, region_count) + region_index;
+                blended += @as(f64, @floatFromInt(state.stack[delta_index])) * weights[region_index];
+            }
+            const rounded = @round(blended);
+            if (rounded < type2_i32_min or rounded > type2_i32_max) return font_parser.ParserError.InvalidTable;
+            state.stack[base + value_index] = @intFromFloat(rounded);
+        }
+    }
     state.stack_len = base + blend_count;
 }
 
@@ -303,6 +320,7 @@ const readCffTopDictInfo = cff_context.readCffTopDictInfo;
 const readCff2TopDictInfo = cff_context.readCff2TopDictInfo;
 const readCffFdSelect = cff_context.readCffFdSelect;
 const readCff2VariationRegionCount = cff_context.readCff2VariationRegionCount;
+const readCff2VariationRegionWeights = cff_context.readCff2VariationRegionWeights;
 
 test "CFF INDEX reads object slices" {
     const data = [_]u8{
@@ -380,6 +398,30 @@ test "CFF2 variation store exposes region count" {
         0x40, 0x00,
     };
     try std.testing.expectEqual(@as(u16, 2), try readCff2VariationRegionCount(&variation_store));
+}
+
+test "CFF2 variation store computes region weights from normalized coordinates" {
+    const variation_store = [_]u8{
+        0x00, 0x01,
+        0x00, 0x00,
+        0x00, 0x08,
+        0x00, 0x00,
+        0x00, 0x01,
+        0x00, 0x02,
+        0xc0, 0x00,
+        0x00, 0x00,
+        0x40, 0x00,
+        0x00, 0x00,
+        0x40, 0x00,
+        0x40, 0x00,
+    };
+
+    const weights = try readCff2VariationRegionWeights(std.testing.allocator, &variation_store, &.{0.5});
+    defer std.testing.allocator.free(weights);
+
+    try std.testing.expectEqual(@as(usize, 2), weights.len);
+    try std.testing.expectApproxEqAbs(@as(f64, 0.5), weights[0], 0.0001);
+    try std.testing.expectApproxEqAbs(@as(f64, 0.5), weights[1], 0.0001);
 }
 
 test "CFF FDSelect format 0 maps glyph IDs" {
@@ -567,6 +609,32 @@ test "CFF2 blend keeps default operands for default instance" {
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
     try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 Z ", output.items);
+}
+
+test "CFF2 blend applies non-default region weights" {
+    var output = std.ArrayList(u8).empty;
+    defer output.deinit(std.testing.allocator);
+    const writer = output.writer(std.testing.allocator);
+    const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
+    const weights = [_]f64{ 0.5, 1.0 };
+    const context = CffContext{
+        .cff = &[_]u8{},
+        .charstrings = empty_index,
+        .global_subrs = empty_index,
+        .local_subrs = null,
+        .cff2_blend_region_count = 2,
+        .cff2_blend_region_weights = &weights,
+        .is_cff2 = true,
+    };
+    const charstring = [_]u8{
+        139, 139,         Type2.rmoveto,
+        189, 139,         149,
+        159, 143,         133,
+        141, Type2.blend, Type2.rlineto,
+    };
+
+    try appendType2CharStringPath(writer, &charstring, Transform{}, context);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 75.00 -4.00 Z ", output.items);
 }
 
 test "Type2 escaped storage and conditional operators feed drawing operands" {

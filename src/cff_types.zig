@@ -143,7 +143,9 @@ pub const CffContext = struct {
     local_subrs: ?CffIndex = null,
     fd_array_offset: ?usize = null,
     fd_select_offset: ?usize = null,
+    cff2_variation_store_offset: ?usize = null,
     cff2_blend_region_count: ?u16 = null,
+    cff2_blend_region_weights: ?[]const f64 = null,
     is_cff2: bool = false,
 };
 

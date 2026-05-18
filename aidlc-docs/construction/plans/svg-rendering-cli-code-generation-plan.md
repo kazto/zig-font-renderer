@@ -137,7 +137,14 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Keep non-default variation interpolation deferred.
   - Verify existing CFF1 SVG output still succeeds.
 
-- [x] Step 22: Add explicit TTC face index selection
+- [x] Step 22: Add CFF2 variation blend interpolation core
+  - Parse Variation Region List F2DOT14 start/peak/end coordinates.
+  - Compute region weights from caller-provided normalized coordinates.
+  - Apply weighted deltas for Type 2 `blend` operands before drawing commands consume them.
+  - Expose normalized CFF2 variation coordinates through `RenderOptions` for high-level SVG rendering.
+  - Keep `fvar`/`avar` axis normalization and named instance selection deferred.
+
+- [x] Step 23: Add explicit TTC face index selection
   - Preserve `Face.init` default first-face behavior for existing callers.
   - Add explicit parser API for selecting a TTC face by zero-based index.
   - Add CLI and high-level SVG rendering options for selecting non-first TTC faces.
@@ -159,10 +166,11 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] CID-keyed CFF glyphs can select glyph-specific local subroutines via FDSelect.
 - [x] Non-variation CFF2 charstrings can be reached and converted through the SVG outline path.
 - [x] CFF2 `blend` charstrings can render at the default instance by ignoring variation deltas.
+- [x] CFF2 `blend` charstrings can apply weighted non-default deltas when normalized variation coordinates are provided.
 - [x] Non-first TTC faces can be selected explicitly for parser and SVG rendering paths.
 - [x] Common CFF Type 2 curve operators and hint masks are handled.
 - [x] Type 2 flex operators are emitted as cubic SVG paths.
 - [x] Type 2 calculation and stack operators can feed subsequent drawing operands.
 - [x] Generated SVG contains path elements.
 - [x] Existing parser and shaper tests still pass.
-- [x] CFF2 non-default variation interpolation and full typography remain explicitly deferred.
+- [x] CFF2 `fvar`/`avar` axis normalization, named instance selection, and full typography remain explicitly deferred.

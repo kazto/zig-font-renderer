@@ -15,6 +15,7 @@ pub const RenderOptions = struct {
     fill: []const u8 = "black",
     background: ?[]const u8 = null,
     shape: shaper.ShapeOptions = .{},
+    cff2_variation_coords: []const f64 = &.{},
 };
 
 pub const SvgRenderer = struct {
@@ -84,7 +85,7 @@ pub const SvgRenderer = struct {
 
         for (shaped.glyphs) |glyph| {
             const transform = try svg_glyph.glyphTransform(face, glyph, options.shape.direction);
-            try svg_glyph.appendGlyphPath(allocator, writer, face, glyph.glyph_id, transform, 0);
+            try svg_glyph.appendGlyphPath(allocator, writer, face, glyph.glyph_id, transform, 0, options.cff2_variation_coords);
         }
 
         try writer.print(

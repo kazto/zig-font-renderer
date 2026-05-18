@@ -39,8 +39,10 @@
 - Common Type 2 compact curve operators `hhcurveto`, `vvcurveto`, `hvcurveto`, `vhcurveto`, `rcurveline`, and `rlinecurve` emit SVG path commands.
 - Type 2 escaped flex operators `hflex`, `flex`, `hflex1`, and `flex1` emit two SVG cubic path commands.
 - Type 2 escaped calculation and stack operators update the operand stack for subsequent path commands.
+- CFF2 `blend` keeps default operands when no normalized variation coordinates are provided.
+- CFF2 `blend` applies weighted region deltas when callers provide normalized CFF2 variation coordinates.
 - Unsupported Type 2 operators return `UnsupportedCffOperator`.
 
 ## Deferred Rules
 
-- CFF2 outlines are not rendered.
+- CFF2 `fvar`/`avar` axis normalization and named instance selection are not applied.

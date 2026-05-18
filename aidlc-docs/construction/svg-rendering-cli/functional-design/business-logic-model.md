@@ -2,20 +2,21 @@
 
 ## Scope
 
-The current increment renders shaped text as SVG paths for TrueType `glyf` outlines and CFF Type 2 outlines at the tested scope.
+The current increment renders shaped text as SVG paths for TrueType `glyf` outlines, CFF Type 2 outlines, and CFF2 Type 2 outlines at the tested scope.
 
 ## Flow
 
 1. Parse a font with `Face`.
 2. Shape UTF-8 text with `ShapeEngine`.
 3. Resolve each glyph ID to a `glyf` byte range through `loca`.
-4. Decode simple glyph contours or supported CFF Type 2 charstrings.
+4. Decode simple glyph contours or supported CFF/CFF2 Type 2 charstrings.
 5. Convert contour points to SVG path commands.
 6. Place each glyph at the shaped glyph `x_offset` and `y_offset`.
 7. For supported composite glyphs, recursively render component glyphs with XY offsets, affine transforms, or point-matched placement.
-8. Combine glyph header bounds into shaped text bounds.
-9. Scale raw FUnit path coordinates into a pixel-sized SVG group transform.
-10. Write a complete SVG document.
+8. For CFF2 `blend`, compute Variation Store region weights from normalized coordinates when callers provide them.
+9. Combine glyph header bounds into shaped text bounds.
+10. Scale raw FUnit path coordinates into a pixel-sized SVG group transform.
+11. Write a complete SVG document.
 
 ## High-Level API Flow
 
@@ -27,7 +28,7 @@ The current increment renders shaped text as SVG paths for TrueType `glyf` outli
 ## Deferred Logic
 
 - Uncommon CFF Type 2 operators.
-- CFF2 outline rendering.
+- CFF2 `fvar`/`avar` axis normalization and named instance selection.
 - Complex script reordering.
 - Bidirectional text handling.
 - Vertical layout.

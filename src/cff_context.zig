@@ -1,3 +1,4 @@
+const std = @import("std");
 const font_parser = @import("font_parser.zig");
 const binary_reader = @import("binary_reader.zig");
 const cff_index = @import("cff_index.zig");
@@ -10,6 +11,7 @@ pub const CffIndex = types.CffIndex;
 const TopDictInfo = types.TopDictInfo;
 const CffError = types.CffError;
 const readU16 = binary_reader.readU16;
+const readI16 = binary_reader.readI16;
 const readU32 = binary_reader.readU32;
 const readCffIndex = cff_index.readCffIndex;
 const readCff2Index = cff_index.readCff2Index;
@@ -38,6 +40,12 @@ const variation_region_list_axis_count_offset = 0;
 const variation_region_list_region_count_offset = 2;
 const variation_region_list_header_size = 4;
 const variation_region_axis_region_size = 6;
+const variation_region_start_offset = 0;
+const variation_region_peak_offset = 2;
+const variation_region_end_offset = 4;
+const f2dot14_denominator = 16384.0;
+const default_region_scalar = 1.0;
+const zero_region_scalar = 0.0;
 
 pub fn parseCffContext(cff: []const u8) CffError!CffContext {
     if (cff.len < Cff.header_min_size) return font_parser.ParserError.InvalidTable;
@@ -106,6 +114,7 @@ pub fn parseCff2Context(cff2: []const u8) CffError!CffContext {
         .local_subrs = null,
         .fd_array_offset = top_dict_info.fd_array_offset,
         .fd_select_offset = top_dict_info.fd_select_offset,
+        .cff2_variation_store_offset = top_dict_info.variation_store_offset,
         .cff2_blend_region_count = cff2_blend_region_count,
         .is_cff2 = true,
     };
@@ -227,6 +236,57 @@ pub fn readCff2VariationRegionCount(data: []const u8) CffError!u16 {
     const region_data_len = @as(usize, axis_count) * @as(usize, region_count) * variation_region_axis_region_size;
     if (variation_region_list_header_size + region_data_len > region_list.len) return font_parser.ParserError.InvalidTable;
     return region_count;
+}
+
+pub fn readCff2VariationRegionWeights(allocator: std.mem.Allocator, data: []const u8, normalized_coords: []const f64) CffError![]f64 {
+    if (data.len < variation_store_min_size) return font_parser.ParserError.InvalidTable;
+    const region_list_offset = try readU32(data, variation_store_region_list_offset);
+    const item_data_count = try readU16(data, variation_store_item_data_count_offset);
+    const item_data_offsets_end = variation_store_min_size + @as(usize, item_data_count) * variation_store_item_data_offset_size;
+    if (item_data_offsets_end > data.len or region_list_offset > data.len) return font_parser.ParserError.InvalidTable;
+
+    const region_list = data[region_list_offset..];
+    if (region_list.len < variation_region_list_header_size) return font_parser.ParserError.InvalidTable;
+    const axis_count = try readU16(region_list, variation_region_list_axis_count_offset);
+    const region_count = try readU16(region_list, variation_region_list_region_count_offset);
+    if (normalized_coords.len < axis_count) return font_parser.ParserError.InvalidTable;
+    const region_data_len = @as(usize, axis_count) * @as(usize, region_count) * variation_region_axis_region_size;
+    if (variation_region_list_header_size + region_data_len > region_list.len) return font_parser.ParserError.InvalidTable;
+
+    const weights = try allocator.alloc(f64, region_count);
+    errdefer allocator.free(weights);
+    var region_index: usize = 0;
+    while (region_index < region_count) : (region_index += 1) {
+        var weight: f64 = default_region_scalar;
+        var axis_index: usize = 0;
+        while (axis_index < axis_count) : (axis_index += 1) {
+            const axis_offset = variation_region_list_header_size +
+                (region_index * @as(usize, axis_count) + axis_index) * variation_region_axis_region_size;
+            const start = try readF2Dot14(region_list, axis_offset + variation_region_start_offset);
+            const peak = try readF2Dot14(region_list, axis_offset + variation_region_peak_offset);
+            const end = try readF2Dot14(region_list, axis_offset + variation_region_end_offset);
+            weight *= variationAxisScalar(normalized_coords[axis_index], start, peak, end);
+        }
+        weights[region_index] = weight;
+    }
+    return weights;
+}
+
+fn readF2Dot14(data: []const u8, offset: usize) CffError!f64 {
+    return @as(f64, @floatFromInt(try readI16(data, offset))) / f2dot14_denominator;
+}
+
+fn variationAxisScalar(coord: f64, start: f64, peak: f64, end: f64) f64 {
+    if (!std.math.isFinite(coord)) return zero_region_scalar;
+    if (peak == zero_region_scalar and start == zero_region_scalar and end == zero_region_scalar) return default_region_scalar;
+    if (coord == peak) return default_region_scalar;
+    if (coord <= start or coord >= end) return zero_region_scalar;
+    if (coord < peak) {
+        if (peak == start) return zero_region_scalar;
+        return (coord - start) / (peak - start);
+    }
+    if (end == peak) return zero_region_scalar;
+    return (end - coord) / (end - peak);
 }
 
 pub fn readCffPrivateSubrsOffset(dict: []const u8) CffError!?usize {

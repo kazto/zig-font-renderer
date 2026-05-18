@@ -161,6 +161,10 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 - Result: Passed; generated SVG through the new vertical shaping direction path.
 - Command: `wc -c /tmp/zig-font-renderer-vertical-origin.svg`
 - Result: `2189 /tmp/zig-font-renderer-vertical-origin.svg`
+- Command: `zig build test`
+- Result: Passed after adding CFF2 variation region scalar calculation and weighted Type 2 `blend` interpolation.
+- Command: `zig build`
+- Result: Passed after adding `RenderOptions.cff2_variation_coords`.
 - Command: `git diff --check`
 - Result: Passed
 
@@ -168,5 +172,5 @@ Implemented visible SVG rendering increments for TrueType outlines, including hi
 
 - Point-matched composite glyphs are implemented for tested TrueType component point alignment cases.
 - Some uncommon Type 2 operators beyond compact curves, flex operators, stem3 hint groups, `setcurrentpoint`, `closepath`, and `callothersubr`/`pop` are not implemented.
-- CFF2 non-default variation interpolation is not implemented.
+- CFF2 non-default `blend` interpolation is implemented for caller-provided normalized coordinates; `fvar`/`avar` axis normalization and named instance selection are not implemented.
 - Complex shaping remains incomplete.
