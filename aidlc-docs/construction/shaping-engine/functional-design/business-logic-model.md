@@ -14,7 +14,7 @@ The current increment implements horizontal text shaping using data exposed by U
 6. Apply supported GSUB substitutions and GPOS positioning.
 7. Apply supported legacy pair kerning from the `kern` table when GPOS did not position the glyphs.
 8. Reorder common Indic pre-base matras before the preceding consonant base.
-9. Reorder leading decomposed Devanagari ra + virama sequences after the following consonant base.
+9. Reorder leading decomposed same-script Brahmic ra + virama sequences after the following consonant base.
 10. Recompute horizontal offsets after Indic visual reordering.
 11. Recompute total advance in raw FUnits.
 12. For RTL-only input, explicit RTL direction, or mixed RTL runs, resolve ASCII, common, and extended paired brackets to mirrored glyph IDs when the font provides the mirrored codepoint.

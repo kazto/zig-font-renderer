@@ -26,7 +26,7 @@
 - Numeric separators, signs, and percent marks remain weak LTR only when attached to neighboring digits; standalone neutral punctuation remains part of the RTL run.
 - ASCII, common, and extended paired brackets inside RTL visual runs are mirrored by resolving the mirrored codepoint through the font cmap; if the mirrored codepoint maps to glyph ID 0, the original glyph is preserved.
 - Common Indic pre-base matras move before the preceding consonant base in visual order after GSUB/GPOS positioning; post-base matras remain in place.
-- Leading Devanagari ra + virama sequences that remain decomposed after GSUB/GPOS move after the following consonant base in visual order.
+- Leading same-script Brahmic ra + virama sequences that remain decomposed after GSUB/GPOS move after the following consonant base in visual order.
 - When direction is explicitly top-to-bottom, shaped glyphs stack on the vertical axis while preserving cross-axis positioning from GPOS.
 - Legacy `kern` remains a fallback when GPOS is absent or does not apply an adjustment.
 - Cluster indexes follow input codepoint order.

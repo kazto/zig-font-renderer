@@ -198,6 +198,22 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 
 ---
 
+## Code Generation - Broad Indic Fallback Reordering
+**Timestamp**: 2026-05-19T05:47:14Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented the next larger Unit 2 Indic increment. Generalized initial ra + virama fallback repha movement from Devanagari to same-script Brahmic sequences, guarded it against cross-script movement, and expanded pre-base matra coverage for Telugu, Kannada, and Malayalam."
+**Verification**:
+- `zig fmt src/shaper_indic.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansBengali-Regular.ttf --text 'র্কি' --output /tmp/zig-font-renderer-bengali-repha-prebase.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-bengali-repha-prebase.svg`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansTelugu-Regular.ttf --text 'కె' --output /tmp/zig-font-renderer-telugu-prebase.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-telugu-prebase.svg`
+**Context**: Construction Phase - Unit 2 - Indic shaping increment. Broad Indic fallback reordering is complete at the tested scope; full Indic syllable shaping remains pending.
+
+---
+
 ## Code Generation Planning - Start
 **Timestamp**: 2026-05-08T13:57:44Z
 **User Input**: "作業を進めて"

@@ -95,6 +95,12 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Keep standalone neutral punctuation with surrounding RTL run content.
   - Verify with focused unit tests and a real Hebrew font SVG smoke test.
 
+- [x] Step 15: Broaden Indic fallback reordering coverage
+  - Generalize initial ra + virama repha fallback movement across supported Brahmic scripts instead of Devanagari only.
+  - Keep repha movement script-aware so cross-script glyph streams are not reordered accidentally.
+  - Expand pre-base matra detection for Telugu, Kannada, and Malayalam vowel signs.
+  - Verify with focused unit tests and real Bengali/Telugu font SVG smoke tests.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
@@ -112,4 +118,5 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - [x] Missing mirrored glyphs fall back to the original glyph instead of failing shaping.
 - [x] Indic pre-base matras can render before their base consonants at the tested scope.
 - [x] Leading Devanagari ra + virama sequences can move after the consonant base at the tested scope.
+- [x] Leading ra + virama repha fallback movement is script-aware across supported Brahmic scripts at the tested scope.
 - [x] Existing parser and SVG rendering tests pass.

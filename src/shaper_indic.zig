@@ -31,7 +31,7 @@ pub fn applyIndicReordering(allocator: std.mem.Allocator, glyphs: []ShapedGlyph)
         try visual_deltas.append(allocator, delta);
     }
 
-    if (moveInitialDevanagariRephaSequence(visual.items, visual_deltas.items)) {
+    if (moveInitialRephaSequence(visual.items, visual_deltas.items)) {
         did_reorder = true;
     }
 
@@ -73,16 +73,27 @@ fn findPreviousIndicBase(glyphs: []const ShapedGlyph) ?usize {
     return null;
 }
 
-fn moveInitialDevanagariRephaSequence(glyphs: []ShapedGlyph, placement_deltas: []i32) bool {
+const IndicScript = enum {
+    devanagari,
+    bengali,
+    gurmukhi,
+    gujarati,
+    oriya,
+    telugu,
+    kannada,
+    malayalam,
+};
+
+fn moveInitialRephaSequence(glyphs: []ShapedGlyph, placement_deltas: []i32) bool {
     if (glyphs.len < 3) return false;
-    if (!isDevanagariRa(glyphs[0].codepoint) or !isDevanagariVirama(glyphs[1].codepoint)) return false;
+    const script = initialRephaScript(glyphs[0].codepoint, glyphs[1].codepoint) orelse return false;
 
     var base_index: ?usize = null;
     var index: usize = 2;
     while (index < glyphs.len) : (index += 1) {
         const codepoint = glyphs[index].codepoint;
         if (isIndicMark(codepoint) or isIndicVirama(codepoint)) continue;
-        if (isIndicConsonant(codepoint)) {
+        if (isIndicConsonantForScript(codepoint, script)) {
             base_index = index;
             break;
         }
@@ -111,7 +122,9 @@ fn isIndicPreBaseMatra(codepoint: u21) bool {
         codepoint == 0x09BF or codepoint == 0x09C7 or codepoint == 0x09C8 or
         codepoint == 0x0A3F or codepoint == 0x0ABF or codepoint == 0x0B3F or
         isInRange(codepoint, 0x0BC6, 0x0BC8) or
-        codepoint == 0x0CC6 or codepoint == 0x0D46 or codepoint == 0x0D47 or
+        isInRange(codepoint, 0x0C46, 0x0C48) or
+        isInRange(codepoint, 0x0CC6, 0x0CC8) or
+        isInRange(codepoint, 0x0D46, 0x0D48) or
         isInRange(codepoint, 0x0E40, 0x0E44);
 }
 
@@ -126,6 +139,19 @@ fn isIndicConsonant(codepoint: u21) bool {
         isInRange(codepoint, 0x0C15, 0x0C39) or
         isInRange(codepoint, 0x0C95, 0x0CB9) or
         isInRange(codepoint, 0x0D15, 0x0D39);
+}
+
+fn isIndicConsonantForScript(codepoint: u21, script: IndicScript) bool {
+    return switch (script) {
+        .devanagari => isInRange(codepoint, 0x0915, 0x0939) or isInRange(codepoint, 0x0958, 0x095F),
+        .bengali => isInRange(codepoint, 0x0995, 0x09B9),
+        .gurmukhi => isInRange(codepoint, 0x0A15, 0x0A39),
+        .gujarati => isInRange(codepoint, 0x0A95, 0x0AB9),
+        .oriya => isInRange(codepoint, 0x0B15, 0x0B39),
+        .telugu => isInRange(codepoint, 0x0C15, 0x0C39),
+        .kannada => isInRange(codepoint, 0x0C95, 0x0CB9),
+        .malayalam => isInRange(codepoint, 0x0D15, 0x0D39),
+    };
 }
 
 fn isIndicMark(codepoint: u21) bool {
@@ -149,12 +175,16 @@ fn isIndicVirama(codepoint: u21) bool {
         codepoint == 0x0C4D or codepoint == 0x0CCD or codepoint == 0x0D4D;
 }
 
-fn isDevanagariRa(codepoint: u21) bool {
-    return codepoint == 0x0930;
-}
-
-fn isDevanagariVirama(codepoint: u21) bool {
-    return codepoint == 0x094D;
+fn initialRephaScript(ra: u21, virama: u21) ?IndicScript {
+    if (ra == 0x0930 and virama == 0x094D) return .devanagari;
+    if (ra == 0x09B0 and virama == 0x09CD) return .bengali;
+    if (ra == 0x0A30 and virama == 0x0A4D) return .gurmukhi;
+    if (ra == 0x0AB0 and virama == 0x0ACD) return .gujarati;
+    if (ra == 0x0B30 and virama == 0x0B4D) return .oriya;
+    if (ra == 0x0C30 and virama == 0x0C4D) return .telugu;
+    if (ra == 0x0CB0 and virama == 0x0CCD) return .kannada;
+    if (ra == 0x0D30 and virama == 0x0D4D) return .malayalam;
+    return null;
 }
 
 fn isInRange(codepoint: u21, start: u21, end: u21) bool {
@@ -222,6 +252,56 @@ test "Indic reordering moves initial Devanagari repha sequence after base" {
     try std.testing.expectEqual(@as(u16, 11), glyphs[2].glyph_id);
     try std.testing.expectEqual(@as(usize, 1), glyphs[2].cluster);
     try std.testing.expectEqual(@as(i32, 900), glyphs[2].x_offset);
+}
+
+test "Indic reordering moves initial Bengali repha sequence after base" {
+    var glyphs = [_]ShapedGlyph{
+        glyph(0x09B0, 10, 0, 0, 300),
+        glyph(0x09CD, 11, 1, 300, 0),
+        glyph(0x0995, 12, 2, 300, 600),
+    };
+
+    try applyIndicReordering(std.testing.allocator, &glyphs);
+
+    try std.testing.expectEqual(@as(u16, 12), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(usize, 2), glyphs[0].cluster);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u16, 10), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(usize, 0), glyphs[1].cluster);
+    try std.testing.expectEqual(@as(i32, 600), glyphs[1].x_offset);
+    try std.testing.expectEqual(@as(u16, 11), glyphs[2].glyph_id);
+    try std.testing.expectEqual(@as(usize, 1), glyphs[2].cluster);
+    try std.testing.expectEqual(@as(i32, 900), glyphs[2].x_offset);
+}
+
+test "Indic reordering keeps initial repha sequence within matching script" {
+    var glyphs = [_]ShapedGlyph{
+        glyph(0x09B0, 10, 0, 0, 300),
+        glyph(0x09CD, 11, 1, 300, 0),
+        glyph(0x0915, 12, 2, 300, 600),
+    };
+
+    try applyIndicReordering(std.testing.allocator, &glyphs);
+
+    try std.testing.expectEqual(@as(u16, 10), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(u16, 11), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(u16, 12), glyphs[2].glyph_id);
+}
+
+test "Indic reordering moves Telugu pre-base matra before base" {
+    var glyphs = [_]ShapedGlyph{
+        glyph(0x0C15, 10, 0, 0, 600),
+        glyph(0x0C46, 11, 1, 600, 200),
+    };
+
+    try applyIndicReordering(std.testing.allocator, &glyphs);
+
+    try std.testing.expectEqual(@as(u16, 11), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(usize, 1), glyphs[0].cluster);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u16, 10), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(usize, 0), glyphs[1].cluster);
+    try std.testing.expectEqual(@as(i32, 200), glyphs[1].x_offset);
 }
 
 test "Indic reordering combines pre-base matra and initial Devanagari repha sequence" {
