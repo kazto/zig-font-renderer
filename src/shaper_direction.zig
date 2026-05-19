@@ -336,17 +336,26 @@ fn collectDirectionalGroups(
 
     var index: usize = 0;
     while (index < run.len) {
-        const direction: RunDirection = if (isWeakLtrCodepoint(run[index].codepoint)) .weak_ltr else .rtl;
+        const direction = runDirectionAt(run, index);
         const start = index;
         index += 1;
         while (index < run.len) : (index += 1) {
-            const next_direction: RunDirection = if (isWeakLtrCodepoint(run[index].codepoint)) .weak_ltr else .rtl;
+            const next_direction = runDirectionAt(run, index);
             if (next_direction != direction) break;
         }
         try groups.append(allocator, .{ .start = start, .end = index, .direction = direction });
     }
 
     return groups;
+}
+
+fn runDirectionAt(run: []const ShapedGlyph, index: usize) RunDirection {
+    const codepoint = run[index].codepoint;
+    if (isWeakLtrCodepoint(codepoint)) return .weak_ltr;
+    if (isNumericSeparatorCodepoint(codepoint) and hasNumericBefore(run, index) and hasNumericAfter(run, index)) return .weak_ltr;
+    if (isNumericPrefixCodepoint(codepoint) and hasNumericAfter(run, index)) return .weak_ltr;
+    if (isNumericSuffixCodepoint(codepoint) and hasNumericBefore(run, index)) return .weak_ltr;
+    return .rtl;
 }
 
 fn runEnd(run: []const ShapedGlyph) i32 {
@@ -420,6 +429,27 @@ fn isWeakLtrCodepoint(codepoint: u21) bool {
         isInRange(codepoint, UnicodeRange.eastern_arabic_indic_digit_start, UnicodeRange.eastern_arabic_indic_digit_end);
 }
 
+fn isNumericSeparatorCodepoint(codepoint: u21) bool {
+    return codepoint == '.' or codepoint == ',' or codepoint == ':' or codepoint == '/' or
+        codepoint == '-' or codepoint == 0x066B or codepoint == 0x066C;
+}
+
+fn isNumericPrefixCodepoint(codepoint: u21) bool {
+    return codepoint == '+' or codepoint == '-' or codepoint == 0x2212;
+}
+
+fn isNumericSuffixCodepoint(codepoint: u21) bool {
+    return codepoint == '%' or codepoint == 0x066A;
+}
+
+fn hasNumericBefore(run: []const ShapedGlyph, index: usize) bool {
+    return index > 0 and isWeakLtrCodepoint(run[index - 1].codepoint);
+}
+
+fn hasNumericAfter(run: []const ShapedGlyph, index: usize) bool {
+    return index + 1 < run.len and isWeakLtrCodepoint(run[index + 1].codepoint);
+}
+
 fn isInRange(codepoint: u21, start: u21, end: u21) bool {
     return codepoint >= start and codepoint <= end;
 }
@@ -475,6 +505,54 @@ test "RTL visual order preserves numeric run order" {
     try std.testing.expectEqual(@as(i32, 170), glyphs[3].x_offset);
     try std.testing.expectEqual(@as(u16, 1), glyphs[4].glyph_id);
     try std.testing.expectEqual(@as(i32, 240), glyphs[4].x_offset);
+}
+
+test "RTL visual order preserves numeric separators inside numeric runs" {
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = '1', .glyph_id = 2, .cluster = 1, .x_offset = 70, .y_offset = 0, .x_advance = 50, .y_advance = 0, .advance_width = 50, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = ',', .glyph_id = 3, .cluster = 2, .x_offset = 120, .y_offset = 0, .x_advance = 20, .y_advance = 0, .advance_width = 20, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = '2', .glyph_id = 4, .cluster = 3, .x_offset = 140, .y_offset = 0, .x_advance = 50, .y_advance = 0, .advance_width = 50, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = '.', .glyph_id = 5, .cluster = 4, .x_offset = 190, .y_offset = 0, .x_advance = 20, .y_advance = 0, .advance_width = 20, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = '3', .glyph_id = 6, .cluster = 5, .x_offset = 210, .y_offset = 0, .x_advance = 50, .y_advance = 0, .advance_width = 50, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 0x05D1, .glyph_id = 7, .cluster = 6, .x_offset = 260, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    const face: font_parser.Face = undefined;
+    try applyRtlVisualOrder(std.testing.allocator, face, &glyphs, 330);
+
+    try std.testing.expectEqual(@as(u16, 7), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u16, 2), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(i32, 70), glyphs[1].x_offset);
+    try std.testing.expectEqual(@as(u16, 3), glyphs[2].glyph_id);
+    try std.testing.expectEqual(@as(i32, 120), glyphs[2].x_offset);
+    try std.testing.expectEqual(@as(u16, 4), glyphs[3].glyph_id);
+    try std.testing.expectEqual(@as(i32, 140), glyphs[3].x_offset);
+    try std.testing.expectEqual(@as(u16, 5), glyphs[4].glyph_id);
+    try std.testing.expectEqual(@as(i32, 190), glyphs[4].x_offset);
+    try std.testing.expectEqual(@as(u16, 6), glyphs[5].glyph_id);
+    try std.testing.expectEqual(@as(i32, 210), glyphs[5].x_offset);
+    try std.testing.expectEqual(@as(u16, 1), glyphs[6].glyph_id);
+    try std.testing.expectEqual(@as(i32, 260), glyphs[6].x_offset);
+}
+
+test "RTL visual order treats standalone neutral punctuation as RTL run content" {
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = '.', .glyph_id = 2, .cluster = 1, .x_offset = 70, .y_offset = 0, .x_advance = 20, .y_advance = 0, .advance_width = 20, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 0x05D1, .glyph_id = 3, .cluster = 2, .x_offset = 90, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    const face: font_parser.Face = undefined;
+    try applyRtlVisualOrder(std.testing.allocator, face, &glyphs, 160);
+
+    try std.testing.expectEqual(@as(u16, 3), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u16, 2), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(i32, 70), glyphs[1].x_offset);
+    try std.testing.expectEqual(@as(u16, 1), glyphs[2].glyph_id);
+    try std.testing.expectEqual(@as(i32, 90), glyphs[2].x_offset);
 }
 
 test "RTL visual order mirrors paired punctuation glyphs" {

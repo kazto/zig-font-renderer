@@ -18,7 +18,7 @@ The current increment implements horizontal text shaping using data exposed by U
 10. Recompute horizontal offsets after Indic visual reordering.
 11. Recompute total advance in raw FUnits.
 12. For RTL-only input, explicit RTL direction, or mixed RTL runs, resolve ASCII, common, and extended paired brackets to mirrored glyph IDs when the font provides the mirrored codepoint.
-13. For RTL-only input or explicit RTL direction, mirror glyph offsets and reverse the shaped glyph sequence for visual output, preserving numeric run order.
+13. For RTL-only input or explicit RTL direction, mirror glyph offsets and reverse the shaped glyph sequence for visual output, preserving formatted numeric run order.
 
 ## Deferred Logic
 

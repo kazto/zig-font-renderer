@@ -184,6 +184,20 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 
 ---
 
+## Code Generation - RTL Numeric Separator Preservation
+**Timestamp**: 2026-05-19T05:33:14Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented the next larger Unit 2 Bidi increment. RTL visual ordering now keeps formatted numeric runs together when digits are connected by decimal, grouping, date/time, sign, or percent separators, while standalone neutral punctuation remains part of the RTL run."
+**Verification**:
+- `zig fmt src/shaper_direction.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf --text 'אב1,234.56ג' --output /tmp/zig-font-renderer-rtl-number-separators.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-rtl-number-separators.svg`
+**Context**: Construction Phase - Unit 2 - Bidi handling increment. Formatted numeric run preservation is complete at the tested scope; full Unicode Bidi algorithm coverage and full Indic syllable shaping remain pending.
+
+---
+
 ## Code Generation Planning - Start
 **Timestamp**: 2026-05-08T13:57:44Z
 **User Input**: "作業を進めて"

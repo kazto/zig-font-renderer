@@ -89,6 +89,12 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Keep original glyphs when the font cmap does not contain the mirrored codepoint.
   - Verify with focused unit tests and real-font smoke tests for ASCII and extended bracket input.
 
+- [x] Step 14: Preserve numeric separators inside RTL numeric runs
+  - Treat decimal, grouping, date/time, sign, and percent separators as weak LTR when attached to digits.
+  - Keep formatted numeric strings in logical reading order inside RTL visual runs.
+  - Keep standalone neutral punctuation with surrounding RTL run content.
+  - Verify with focused unit tests and a real Hebrew font SVG smoke test.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
@@ -100,6 +106,7 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - [x] Legacy `kern` table still works as a fallback if GPOS is missing or produces no adjustment.
 - [x] Arabic positional GSUB features are gated by computed joining form.
 - [x] RTL numeric runs preserve their internal LTR order in visual output.
+- [x] RTL numeric runs preserve attached numeric separators and signs in visual output.
 - [x] Common paired punctuation glyphs mirror inside RTL visual runs at the tested scope.
 - [x] Extended Unicode paired brackets mirror inside RTL visual runs when the font provides mirrored glyphs.
 - [x] Missing mirrored glyphs fall back to the original glyph instead of failing shaping.
