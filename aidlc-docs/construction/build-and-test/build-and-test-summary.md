@@ -41,7 +41,7 @@
 ## Overall Status
 
 - **Build**: Success
-- **All Tests**: Pass for implemented build, unit, and integration checks
+- **All Tests**: Pass for implemented build, unit, integration, and optional local performance smoke checks
 - **Ready for Operations**: No; Operations is a placeholder and this project still has future implementation units.
 
 ## Generated Instruction Files

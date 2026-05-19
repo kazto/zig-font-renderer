@@ -142,6 +142,21 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_mod_tests.step);
     test_step.dependOn(&run_exe_tests.step);
 
+    const perf_exe = b.addExecutable(.{
+        .name = "zig_font_renderer_perf_smoke",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/perf_smoke.zig"),
+            .target = target,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "zig_font_renderer", .module = mod },
+            },
+        }),
+    });
+    const run_perf = b.addRunArtifact(perf_exe);
+    const perf_step = b.step("perf", "Run optional performance smoke tests");
+    perf_step.dependOn(&run_perf.step);
+
     // Just like flags, top level steps are also listed in the `--help` menu.
     //
     // The Zig build system is entirely implemented in userland, which means

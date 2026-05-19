@@ -2,23 +2,29 @@
 
 ## Purpose
 
-Validate parser performance characteristics when representative font fixtures are available.
+Validate parser, shaping, and SVG rendering performance characteristics when representative font fixtures are available.
 
 ## Performance Requirements
 
 - **Initialization**: Validate table directory and scalar headers without eager glyph parsing.
 - **Memory**: Keep font table access zero-copy; only table metadata is allocated during `Face.init`.
 - **Lookup**: Use deterministic table lookup and `cmap` glyph lookup without internal caching.
+- **Shaping/SVG**: Exercise representative Latin, Arabic, Indic, and CFF text paths when matching system fonts are present.
 
 ## Current Status
 
-Automated performance tests are not implemented in Unit 1 because no representative font fixture corpus is committed yet. The current build verifies correctness-focused unit tests only.
+`zig build perf` runs optional performance smoke tests. The step looks for representative system fonts and skips missing fonts without failing the build, so the repository still does not require committed font fixtures.
 
-## Recommended Future Test
+## Run
 
-Add a benchmark or timed test that:
+```bash
+zig build perf
+```
 
-1. Loads representative TrueType and OpenType font buffers.
-2. Measures `Face.init`.
+## Coverage
+
+1. Loads representative TrueType and OpenType/CFF font buffers when present.
+2. Measures repeated `Face.init`.
 3. Measures repeated `getGlyphId` and `getHMetric` calls for common codepoints.
-4. Confirms allocations remain limited to table metadata.
+4. Measures repeated shaping of representative text.
+5. Measures repeated SVG rendering of representative text.

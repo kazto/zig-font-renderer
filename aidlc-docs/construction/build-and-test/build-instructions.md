@@ -29,6 +29,15 @@ zig build
 - **Build Artifacts**: Installed executable under `zig-out/bin/zig_font_renderer`.
 - **Common Warnings**: No warnings are expected for the current Unit 1 scope.
 
+### 5. Optional Performance Smoke
+
+```bash
+zig build perf
+```
+
+- **Expected Output**: Prints per-iteration timings for representative fonts found on the local system.
+- **Missing Fonts**: Missing representative fonts are reported as skipped and do not fail the command.
+
 ## Troubleshooting
 
 ### Build Fails with Dependency Errors

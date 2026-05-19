@@ -214,6 +214,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 
 ---
 
+## Build and Test - Optional Performance Smoke
+**Timestamp**: 2026-05-19T06:13:08Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented an optional performance smoke step. Added `src/perf_smoke.zig` and a `zig build perf` target that measures repeated `Face.init`, glyph lookup/metric access, shaping, and SVG rendering for representative local fonts, skipping missing fonts without failing the build."
+**Verification**:
+- `zig fmt build.zig src/perf_smoke.zig`
+- `zig build test`
+- `zig build perf`
+**Context**: Construction Phase - Build and Test increment. Optional local performance smoke coverage is now available; full Unicode Bidi, full Indic syllable shaping, and remaining full typography coverage remain pending.
+
+---
+
 ## Code Generation Planning - Start
 **Timestamp**: 2026-05-08T13:57:44Z
 **User Input**: "作業を進めて"
