@@ -23,6 +23,7 @@
 - When no feature tags are provided, the shaping engine applies a conservative default feature policy for common shaping features, with Arabic and Indic-specific additions.
 - When direction is automatic and the input contains only strong RTL codepoints plus neutral and weak numeric characters, shaped glyphs are mirrored into RTL visual order after positioning while preserving the internal order of ASCII and Arabic-Indic digit runs.
 - Mixed strong LTR/RTL text reverses RTL runs inside predominantly LTR text and preserves internal numeric run order inside those RTL runs.
+- ASCII, common, and extended paired brackets inside RTL visual runs are mirrored by resolving the mirrored codepoint through the font cmap; if the mirrored codepoint maps to glyph ID 0, the original glyph is preserved.
 - Common Indic pre-base matras move before the preceding consonant base in visual order after GSUB/GPOS positioning; post-base matras remain in place.
 - Leading Devanagari ra + virama sequences that remain decomposed after GSUB/GPOS move after the following consonant base in visual order.
 - When direction is explicitly top-to-bottom, shaped glyphs stack on the vertical axis while preserving cross-axis positioning from GPOS.

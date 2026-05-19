@@ -78,6 +78,17 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Preserve placement deltas and recompute horizontal offsets after reordering.
   - Verify with unit tests covering plain repha movement and interaction with pre-base matras.
 
+- [x] Step 12: Add RTL paired punctuation mirroring
+  - Mirror common paired punctuation codepoints inside RTL visual runs.
+  - Resolve mirrored codepoints through cmap so rendered glyph IDs change, not only metadata.
+  - Apply mirroring before RTL visual reordering for RTL-only and mixed-direction RTL runs.
+  - Verify with focused unit tests and a real Hebrew SVG smoke test.
+
+- [x] Step 13: Broaden RTL paired-bracket mirroring coverage
+  - Expand mirroring from ASCII/common punctuation to a broader Unicode paired-bracket set.
+  - Keep original glyphs when the font cmap does not contain the mirrored codepoint.
+  - Verify with focused unit tests and real-font smoke tests for ASCII and extended bracket input.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
@@ -89,6 +100,9 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - [x] Legacy `kern` table still works as a fallback if GPOS is missing or produces no adjustment.
 - [x] Arabic positional GSUB features are gated by computed joining form.
 - [x] RTL numeric runs preserve their internal LTR order in visual output.
+- [x] Common paired punctuation glyphs mirror inside RTL visual runs at the tested scope.
+- [x] Extended Unicode paired brackets mirror inside RTL visual runs when the font provides mirrored glyphs.
+- [x] Missing mirrored glyphs fall back to the original glyph instead of failing shaping.
 - [x] Indic pre-base matras can render before their base consonants at the tested scope.
 - [x] Leading Devanagari ra + virama sequences can move after the consonant base at the tested scope.
 - [x] Existing parser and SVG rendering tests pass.

@@ -161,6 +161,29 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 
 ---
 
+## Session Continuity - Resume Request
+**Timestamp**: 2026-05-19T05:16:20Z
+**User Input**: "AIDLCにもとづき、次の作業をおねがい"
+**AI Response**: "Loaded AI-DLC core workflow, common rules, session continuity state, extension opt-in prompts, and resumed Unit 2 shaping work from existing session-continuity answer."
+**Context**: Continue CONSTRUCTION phase from existing AI-DLC state.
+
+---
+
+## Code Generation - Broad RTL Paired-Bracket Mirroring
+**Timestamp**: 2026-05-19T05:18:13Z
+**User Input**: "実装はあまり小さな単位にしすぎず、大きめの単位でスピードよく進めたい"
+**AI Response**: "Implemented a larger Unit 2 Bidi mirroring increment. Expanded RTL paired-bracket mirroring from ASCII/common punctuation to a broader Unicode paired-bracket set, and preserved original glyphs when the font cmap lacks the mirrored glyph."
+**Verification**:
+- `zig fmt src/shaper_direction.zig`
+- `zig build test`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf --text 'אב(12)' --output /tmp/zig-font-renderer-bidi-mirror.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-bidi-mirror.svg`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf --text 'אב⟨12⟩' --output /tmp/zig-font-renderer-bidi-extended-mirror.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-bidi-extended-mirror.svg`
+**Context**: Construction Phase - Unit 2 - Bidi handling increment. Broad paired-bracket mirroring is complete at the tested scope; full Unicode Bidi algorithm coverage and full Indic syllable shaping remain pending.
+
+---
+
 ## Code Generation Planning - Start
 **Timestamp**: 2026-05-08T13:57:44Z
 **User Input**: "作業を進めて"
@@ -1155,3 +1178,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-fvar-instance-smoke.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 1/3 - Variation named instance selection. fvar named instance coordinate normalization is complete at the tested API scope; full Unicode Bidi, full Indic syllable shaping, and remaining full typography coverage remain pending.
+
+---
+
+## Code Generation - RTL Paired Punctuation Mirroring
+**Timestamp**: 2026-05-18T15:27:23+09:00
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented the next Unit 2 Bidi increment. RTL visual ordering now mirrors common paired punctuation inside RTL runs by resolving the mirrored codepoint through the font cmap, so rendered glyph IDs change before RTL-only or mixed-direction RTL run visual reordering."
+**Verification**:
+- `zig fmt src/shaper_direction.zig src/shaper.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf --text 'אב(12)' --output /tmp/zig-font-renderer-bidi-mirror.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-bidi-mirror.svg`
+- `git diff --check`
+**Context**: Construction Phase - Unit 2 - Bidi handling increment. Paired punctuation mirroring is complete at the tested scope; full Unicode Bidi, full Indic syllable shaping, and remaining full typography coverage remain pending.

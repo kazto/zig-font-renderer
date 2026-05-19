@@ -1,4 +1,6 @@
 const std = @import("std");
+const font_cmap = @import("font_cmap.zig");
+const font_parser = @import("font_parser.zig");
 const types = @import("shaper_types.zig");
 
 const ShapeDirection = types.ShapeDirection;
@@ -55,9 +57,12 @@ pub fn resolveDirection(direction: ShapeDirection, glyphs: []const ShapedGlyph) 
 
 pub fn applyRtlVisualOrder(
     allocator: std.mem.Allocator,
+    face: font_parser.Face,
     glyphs: []ShapedGlyph,
     total_advance: i32,
 ) !void {
+    try applyRtlMirroring(face, glyphs);
+
     var visual_glyphs = std.ArrayList(ShapedGlyph).empty;
     defer visual_glyphs.deinit(allocator);
 
@@ -81,8 +86,11 @@ pub fn applyVerticalLayout(glyphs: []ShapedGlyph) void {
 
 pub fn applyMixedDirectionVisualOrder(
     allocator: std.mem.Allocator,
+    face: font_parser.Face,
     glyphs: []ShapedGlyph,
 ) !void {
+    try applyMixedRtlMirroring(face, glyphs);
+
     var visual_glyphs = std.ArrayList(ShapedGlyph).empty;
     defer visual_glyphs.deinit(allocator);
 
@@ -108,6 +116,151 @@ pub fn applyMixedDirectionVisualOrder(
     for (visual_glyphs.items, 0..) |glyph, out_index| {
         glyphs[out_index] = glyph;
     }
+}
+
+fn applyMixedRtlMirroring(face: font_parser.Face, glyphs: []ShapedGlyph) font_parser.ParserError!void {
+    var run_start: usize = 0;
+    var run_direction: ShapeDirection = .ltr;
+    var index: usize = 0;
+    while (index < glyphs.len) : (index += 1) {
+        if (strongDirectionForCodepoint(glyphs[index].codepoint)) |direction| {
+            if (index == run_start) {
+                run_direction = direction;
+                continue;
+            }
+            if (direction != run_direction) {
+                if (run_direction == .rtl) try applyRtlMirroring(face, glyphs[run_start..index]);
+                run_start = index;
+                run_direction = direction;
+            }
+        }
+    }
+
+    if (run_direction == .rtl) try applyRtlMirroring(face, glyphs[run_start..]);
+}
+
+fn applyRtlMirroring(face: font_parser.Face, glyphs: []ShapedGlyph) font_parser.ParserError!void {
+    for (glyphs) |*glyph| {
+        const mirrored = mirroredCodepoint(glyph.codepoint) orelse continue;
+        const info = try face.getGlyphInfo(mirrored);
+        if (info.id == 0) continue;
+        glyph.codepoint = mirrored;
+        glyph.glyph_id = info.id;
+    }
+}
+
+fn mirroredCodepoint(codepoint: u21) ?u21 {
+    return switch (codepoint) {
+        '(' => ')',
+        ')' => '(',
+        '[' => ']',
+        ']' => '[',
+        '{' => '}',
+        '}' => '{',
+        '<' => '>',
+        '>' => '<',
+        0x00AB => 0x00BB,
+        0x00BB => 0x00AB,
+        0x0F3A => 0x0F3B,
+        0x0F3B => 0x0F3A,
+        0x0F3C => 0x0F3D,
+        0x0F3D => 0x0F3C,
+        0x169B => 0x169C,
+        0x169C => 0x169B,
+        0x2045 => 0x2046,
+        0x2046 => 0x2045,
+        0x207D => 0x207E,
+        0x207E => 0x207D,
+        0x208D => 0x208E,
+        0x208E => 0x208D,
+        0x2308 => 0x2309,
+        0x2309 => 0x2308,
+        0x230A => 0x230B,
+        0x230B => 0x230A,
+        0x2329 => 0x232A,
+        0x232A => 0x2329,
+        0x2768 => 0x2769,
+        0x2769 => 0x2768,
+        0x276A => 0x276B,
+        0x276B => 0x276A,
+        0x276C => 0x276D,
+        0x276D => 0x276C,
+        0x276E => 0x276F,
+        0x276F => 0x276E,
+        0x2770 => 0x2771,
+        0x2771 => 0x2770,
+        0x2772 => 0x2773,
+        0x2773 => 0x2772,
+        0x2774 => 0x2775,
+        0x2775 => 0x2774,
+        0x27C5 => 0x27C6,
+        0x27C6 => 0x27C5,
+        0x27E6 => 0x27E7,
+        0x27E7 => 0x27E6,
+        0x27E8 => 0x27E9,
+        0x27E9 => 0x27E8,
+        0x27EA => 0x27EB,
+        0x27EB => 0x27EA,
+        0x27EC => 0x27ED,
+        0x27ED => 0x27EC,
+        0x27EE => 0x27EF,
+        0x27EF => 0x27EE,
+        0x2983 => 0x2984,
+        0x2984 => 0x2983,
+        0x2985 => 0x2986,
+        0x2986 => 0x2985,
+        0x2987 => 0x2988,
+        0x2988 => 0x2987,
+        0x2989 => 0x298A,
+        0x298A => 0x2989,
+        0x298B => 0x298C,
+        0x298C => 0x298B,
+        0x298D => 0x2990,
+        0x298E => 0x298F,
+        0x298F => 0x298E,
+        0x2990 => 0x298D,
+        0x2991 => 0x2992,
+        0x2992 => 0x2991,
+        0x2993 => 0x2994,
+        0x2994 => 0x2993,
+        0x2995 => 0x2996,
+        0x2996 => 0x2995,
+        0x2997 => 0x2998,
+        0x2998 => 0x2997,
+        0x29D8 => 0x29D9,
+        0x29D9 => 0x29D8,
+        0x29DA => 0x29DB,
+        0x29DB => 0x29DA,
+        0x29FC => 0x29FD,
+        0x29FD => 0x29FC,
+        0x2E22 => 0x2E23,
+        0x2E23 => 0x2E22,
+        0x2E24 => 0x2E25,
+        0x2E25 => 0x2E24,
+        0x2E26 => 0x2E27,
+        0x2E27 => 0x2E26,
+        0x2E28 => 0x2E29,
+        0x2E29 => 0x2E28,
+        0x3008 => 0x3009,
+        0x3009 => 0x3008,
+        0x300A => 0x300B,
+        0x300B => 0x300A,
+        0x300C => 0x300D,
+        0x300D => 0x300C,
+        0x300E => 0x300F,
+        0x300F => 0x300E,
+        0x3010 => 0x3011,
+        0x3011 => 0x3010,
+        0x3014 => 0x3015,
+        0x3015 => 0x3014,
+        0x3016 => 0x3017,
+        0x3017 => 0x3016,
+        0x3018 => 0x3019,
+        0x3019 => 0x3018,
+        0x301A => 0x301B,
+        0x301B => 0x301A,
+        else => null,
+    };
 }
 
 fn appendVisualRun(
@@ -291,7 +444,8 @@ test "RTL visual order mirrors horizontal positions" {
         .{ .codepoint = 0x05D1, .glyph_id = 2, .cluster = 1, .x_offset = 100, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
     };
 
-    try applyRtlVisualOrder(std.testing.allocator, &glyphs, 180);
+    const face: font_parser.Face = undefined;
+    try applyRtlVisualOrder(std.testing.allocator, face, &glyphs, 180);
 
     try std.testing.expectEqual(@as(u16, 2), glyphs[0].glyph_id);
     try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
@@ -308,7 +462,8 @@ test "RTL visual order preserves numeric run order" {
         .{ .codepoint = 0x05D2, .glyph_id = 5, .cluster = 4, .x_offset = 240, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
     };
 
-    try applyRtlVisualOrder(std.testing.allocator, &glyphs, 310);
+    const face: font_parser.Face = undefined;
+    try applyRtlVisualOrder(std.testing.allocator, face, &glyphs, 310);
 
     try std.testing.expectEqual(@as(u16, 5), glyphs[0].glyph_id);
     try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
@@ -322,6 +477,115 @@ test "RTL visual order preserves numeric run order" {
     try std.testing.expectEqual(@as(i32, 240), glyphs[4].x_offset);
 }
 
+test "RTL visual order mirrors paired punctuation glyphs" {
+    var data = [_]u8{0} ** 92;
+    writeU16(&data, 0, 0);
+    writeU16(&data, 2, 1);
+    writeU16(&data, 4, 3);
+    writeU16(&data, 6, 10);
+    writeU32(&data, 8, 12);
+    writeU16(&data, 12, 12);
+    writeU16(&data, 14, 0);
+    writeU32(&data, 16, 28);
+    writeU32(&data, 20, 0);
+    writeU32(&data, 24, 1);
+    writeU32(&data, 28, '(');
+    writeU32(&data, 32, ')');
+    writeU32(&data, 36, 10);
+    const hmtx_offset = 44;
+    var metric_index: usize = 0;
+    while (metric_index < 12) : (metric_index += 1) {
+        writeU16(&data, hmtx_offset + metric_index * 4, 40);
+        writeI16(&data, hmtx_offset + metric_index * 4 + 2, 0);
+    }
+    const tables = [_]font_parser.TableMetadata{
+        .{ .tag = "cmap".*, .offset = 0, .length = 44 },
+        .{ .tag = "hmtx".*, .offset = hmtx_offset, .length = 48 },
+    };
+    const face = font_parser.Face{
+        .data = &data,
+        .units_per_em = 1000,
+        .num_glyphs = 12,
+        .tables = &tables,
+        .number_of_h_metrics = 12,
+        .number_of_v_metrics = null,
+        .vorg_default_vert_origin_y = null,
+        .vorg = null,
+        .cmap = font_cmap.Selection{ .offset = 12, .format = 12 },
+    };
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = '(', .glyph_id = 10, .cluster = 1, .x_offset = 70, .y_offset = 0, .x_advance = 40, .y_advance = 0, .advance_width = 40, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    try applyRtlVisualOrder(std.testing.allocator, face, &glyphs, 110);
+
+    try std.testing.expectEqual(@as(u21, ')'), glyphs[0].codepoint);
+    try std.testing.expectEqual(@as(u16, 11), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u21, 0x05D0), glyphs[1].codepoint);
+    try std.testing.expectEqual(@as(i32, 40), glyphs[1].x_offset);
+}
+
+test "RTL mirroring covers extended Unicode paired brackets" {
+    try std.testing.expectEqual(@as(?u21, 0x27E9), mirroredCodepoint(0x27E8));
+    try std.testing.expectEqual(@as(?u21, 0x27E8), mirroredCodepoint(0x27E9));
+    try std.testing.expectEqual(@as(?u21, 0x3009), mirroredCodepoint(0x3008));
+    try std.testing.expectEqual(@as(?u21, 0x3008), mirroredCodepoint(0x3009));
+    try std.testing.expectEqual(@as(?u21, 0x2984), mirroredCodepoint(0x2983));
+    try std.testing.expectEqual(@as(?u21, null), mirroredCodepoint('A'));
+}
+
+test "RTL visual order keeps punctuation when mirrored glyph is missing" {
+    var data = [_]u8{0} ** 88;
+    writeU16(&data, 0, 0);
+    writeU16(&data, 2, 1);
+    writeU16(&data, 4, 3);
+    writeU16(&data, 6, 10);
+    writeU32(&data, 8, 12);
+    writeU16(&data, 12, 12);
+    writeU16(&data, 14, 0);
+    writeU32(&data, 16, 28);
+    writeU32(&data, 20, 0);
+    writeU32(&data, 24, 1);
+    writeU32(&data, 28, '(');
+    writeU32(&data, 32, '(');
+    writeU32(&data, 36, 10);
+    const hmtx_offset = 44;
+    var metric_index: usize = 0;
+    while (metric_index < 11) : (metric_index += 1) {
+        writeU16(&data, hmtx_offset + metric_index * 4, 40);
+        writeI16(&data, hmtx_offset + metric_index * 4 + 2, 0);
+    }
+    const tables = [_]font_parser.TableMetadata{
+        .{ .tag = "cmap".*, .offset = 0, .length = 44 },
+        .{ .tag = "hmtx".*, .offset = hmtx_offset, .length = 44 },
+    };
+    const face = font_parser.Face{
+        .data = &data,
+        .units_per_em = 1000,
+        .num_glyphs = 11,
+        .tables = &tables,
+        .number_of_h_metrics = 11,
+        .number_of_v_metrics = null,
+        .vorg_default_vert_origin_y = null,
+        .vorg = null,
+        .cmap = font_cmap.Selection{ .offset = 12, .format = 12 },
+    };
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = '(', .glyph_id = 10, .cluster = 1, .x_offset = 70, .y_offset = 0, .x_advance = 40, .y_advance = 0, .advance_width = 40, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    try applyRtlVisualOrder(std.testing.allocator, face, &glyphs, 110);
+
+    try std.testing.expectEqual(@as(u21, '('), glyphs[0].codepoint);
+    try std.testing.expectEqual(@as(u16, 10), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u21, 0x05D0), glyphs[1].codepoint);
+    try std.testing.expectEqual(@as(i32, 40), glyphs[1].x_offset);
+}
+
 test "mixed direction visual order reverses RTL runs inside LTR text" {
     var glyphs = [_]ShapedGlyph{
         .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
@@ -330,7 +594,8 @@ test "mixed direction visual order reverses RTL runs inside LTR text" {
         .{ .codepoint = 'B', .glyph_id = 4, .cluster = 3, .x_offset = 240, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
     };
 
-    try applyMixedDirectionVisualOrder(std.testing.allocator, &glyphs);
+    const face: font_parser.Face = undefined;
+    try applyMixedDirectionVisualOrder(std.testing.allocator, face, &glyphs);
 
     try std.testing.expectEqual(@as(u16, 1), glyphs[0].glyph_id);
     try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
@@ -340,6 +605,18 @@ test "mixed direction visual order reverses RTL runs inside LTR text" {
     try std.testing.expectEqual(@as(i32, 170), glyphs[2].x_offset);
     try std.testing.expectEqual(@as(u16, 4), glyphs[3].glyph_id);
     try std.testing.expectEqual(@as(i32, 240), glyphs[3].x_offset);
+}
+
+fn writeU16(data: []u8, offset: usize, value: u16) void {
+    std.mem.writeInt(u16, data[offset..][0..2], value, .big);
+}
+
+fn writeI16(data: []u8, offset: usize, value: i16) void {
+    std.mem.writeInt(i16, data[offset..][0..2], value, .big);
+}
+
+fn writeU32(data: []u8, offset: usize, value: u32) void {
+    std.mem.writeInt(u32, data[offset..][0..4], value, .big);
 }
 
 test "vertical layout stacks glyphs downward" {
