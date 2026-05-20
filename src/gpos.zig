@@ -15,9 +15,11 @@ const ShapedGlyph = types.ShapedGlyph;
 const GposLookupType = enum(u16) {
     single_adjustment = 1,
     pair_adjustment = 2,
+    cursive_attachment = 3,
     mark_to_base_attachment = 4,
     mark_to_ligature_attachment = 5,
     mark_to_mark_attachment = 6,
+    chained_contextual_positioning = 8,
     extension_positioning = 9,
 };
 
@@ -138,14 +140,12 @@ pub const Gpos = struct {
         var lookup_indices = try ot_layout.OtLayout.collectLookupIndices(allocator, data, options);
         defer lookup_indices.deinit(allocator);
         for (lookup_indices.items) |lookup_index| {
-            try applyLookup(allocator, face, lookup_list_data, lookup_index, glyphs, 0);
+            try applyLookup(allocator, face, lookup_list_data, lookup_index, glyphs, 0, options);
         }
     }
 
-    pub fn applyLookup(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, index: u16, glyphs: []ShapedGlyph, depth: usize) font_parser.ParserError!void {
+    pub fn applyLookup(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, index: u16, glyphs: []ShapedGlyph, depth: usize, options: ShapeOptions) font_parser.ParserError!void {
         if (depth >= max_recursion_depth) return font_parser.ParserError.InvalidTable;
-        _ = allocator;
-        _ = face;
         const lookup_off = try ot_layout.OtLayout.getLookupOffset(lookup_list, index);
         const lookup_data = try ot_layout.sliceFrom(lookup_list, lookup_off);
         const lookup_type = try readU16(lookup_data, ot_layout.OtLayout.lookup_type_offset);
@@ -154,25 +154,29 @@ pub const Gpos = struct {
         for (0..subtable_count) |i| {
             const subtable_off = try readU16(lookup_data, ot_layout.OtLayout.lookup_subtable_offsets_offset + i * 2);
             const subtable_data = try ot_layout.sliceFrom(lookup_data, subtable_off);
-            try applyLookupSubtable(lookup_type, subtable_data, glyphs, depth);
+            try applyLookupSubtable(allocator, face, lookup_type, subtable_data, glyphs, depth, options);
         }
     }
 
-    fn applyLookupSubtable(lookup_type: u16, subtable_data: []const u8, glyphs: []ShapedGlyph, depth: usize) font_parser.ParserError!void {
+    fn applyLookupSubtable(allocator: std.mem.Allocator, face: font_parser.Face, lookup_type: u16, subtable_data: []const u8, glyphs: []ShapedGlyph, depth: usize, options: ShapeOptions) font_parser.ParserError!void {
         if (depth >= max_recursion_depth) return font_parser.ParserError.InvalidTable;
         if (lookup_type == @intFromEnum(GposLookupType.extension_positioning)) {
             const extension = try extensionSubtable(subtable_data);
-            try applyLookupSubtable(extension.lookup_type, extension.subtable, glyphs, depth + 1);
+            try applyLookupSubtable(allocator, face, extension.lookup_type, extension.subtable, glyphs, depth + 1, options);
         } else if (lookup_type == @intFromEnum(GposLookupType.single_adjustment)) {
             try applySingleAdjustment(subtable_data, glyphs);
         } else if (lookup_type == @intFromEnum(GposLookupType.pair_adjustment)) {
             try applyPairAdjustment(subtable_data, glyphs);
+        } else if (lookup_type == @intFromEnum(GposLookupType.cursive_attachment)) {
+            try applyCursiveAttachment(subtable_data, glyphs, options);
         } else if (lookup_type == @intFromEnum(GposLookupType.mark_to_base_attachment)) {
             try applyMarkToBase(subtable_data, glyphs);
         } else if (lookup_type == @intFromEnum(GposLookupType.mark_to_ligature_attachment)) {
             try applyMarkToLigature(subtable_data, glyphs);
         } else if (lookup_type == @intFromEnum(GposLookupType.mark_to_mark_attachment)) {
             try applyMarkToMark(subtable_data, glyphs);
+        } else if (lookup_type == @intFromEnum(GposLookupType.chained_contextual_positioning)) {
+            try applyChainedContextualPositioning(allocator, face, subtable_data, glyphs, depth, options);
         }
     }
 
@@ -497,6 +501,432 @@ pub const Gpos = struct {
             .y = try readI16(data, anchor_y_offset),
         };
     }
+
+    pub fn applyCursiveAttachment(subtable: []const u8, glyphs: []ShapedGlyph, options: ShapeOptions) font_parser.ParserError!void {
+        if (subtable.len < 6) return font_parser.ParserError.InvalidTable;
+        const format = try readU16(subtable, 0);
+        if (format != 1) return font_parser.ParserError.InvalidTable;
+
+        const coverage_off = try readU16(subtable, 2);
+        const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
+
+        const count = try readU16(subtable, 4);
+        const record_size: usize = 4;
+        if (subtable.len < 6 + @as(usize, count) * record_size) return font_parser.ParserError.InvalidTable;
+
+        const direction = options.direction;
+
+        var i: usize = 1;
+        while (i < glyphs.len) : (i += 1) {
+            const prev_idx = try ot_layout.Coverage.getIndex(coverage_data, glyphs[i - 1].glyph_id) orelse continue;
+            const curr_idx = try ot_layout.Coverage.getIndex(coverage_data, glyphs[i].glyph_id) orelse continue;
+
+            if (prev_idx >= count or curr_idx >= count) return font_parser.ParserError.InvalidTable;
+
+            const prev_record_off = 6 + @as(usize, prev_idx) * record_size;
+            const curr_record_off = 6 + @as(usize, curr_idx) * record_size;
+
+            const prev_exit_off = try readU16(subtable, prev_record_off + 2);
+            const curr_entry_off = try readU16(subtable, curr_record_off);
+
+            if (prev_exit_off == 0 or curr_entry_off == 0) continue;
+
+            const prev_exit_data = try ot_layout.sliceFrom(subtable, prev_exit_off);
+            const curr_entry_data = try ot_layout.sliceFrom(subtable, curr_entry_off);
+
+            const exit_anchor = try readAnchor(prev_exit_data);
+            const entry_anchor = try readAnchor(curr_entry_data);
+
+            const exit_x = @as(i32, exit_anchor.x);
+            const exit_y = @as(i32, exit_anchor.y);
+            const entry_x = @as(i32, entry_anchor.x);
+            const entry_y = @as(i32, entry_anchor.y);
+
+            if (direction == .rtl) {
+                const d = exit_x + glyphs[i - 1].x_offset;
+                glyphs[i - 1].x_advance -= d;
+                glyphs[i - 1].x_offset -= d;
+
+                glyphs[i].x_advance = entry_x + glyphs[i].x_offset;
+            } else {
+                glyphs[i - 1].x_advance = exit_x + glyphs[i - 1].x_offset;
+
+                const d = entry_x + glyphs[i].x_offset;
+                glyphs[i].x_advance -= d;
+                glyphs[i].x_offset -= d;
+            }
+
+            if (direction == .rtl) {
+                glyphs[i - 1].y_offset = glyphs[i].y_offset + entry_y - exit_y;
+            } else {
+                glyphs[i].y_offset = glyphs[i - 1].y_offset + exit_y - entry_y;
+            }
+        }
+    }
+
+    const chained_f1_coverage_offset = 2;
+    const chained_f1_rule_set_count_offset = 4;
+    const chained_f1_rule_set_offsets_offset = 6;
+    const chain_rule_set_count_offset = 0;
+    const chain_rule_set_offsets_offset = 2;
+    const chain_rule_backtrack_count_offset = 0;
+
+    const chained_f2_coverage_offset = 2;
+    const chained_f2_backtrack_class_def_offset = 4;
+    const chained_f2_input_class_def_offset = 6;
+    const chained_f2_lookahead_class_def_offset = 8;
+    const chained_f2_class_set_count_offset = 10;
+    const chained_f2_class_set_offsets_offset = 12;
+    const chain_class_set_count_offset = 0;
+    const chain_class_set_offsets_offset = 2;
+    const chain_class_rule_backtrack_count_offset = 0;
+
+    pub fn applyChainedContextualPositioning(
+        allocator: std.mem.Allocator,
+        face: font_parser.Face,
+        subtable: []const u8,
+        glyphs: []ShapedGlyph,
+        depth: usize,
+        options: ShapeOptions,
+    ) font_parser.ParserError!void {
+        if (depth >= max_recursion_depth) return font_parser.ParserError.InvalidTable;
+        if (subtable.len < 2) return font_parser.ParserError.InvalidTable;
+        const format = try readU16(subtable, 0);
+        if (format == 1) {
+            try applyChainedFormat1(allocator, face, subtable, glyphs, depth, options);
+        } else if (format == 2) {
+            try applyChainedFormat2(allocator, face, subtable, glyphs, depth, options);
+        } else if (format == 3) {
+            try applyChainedFormat3(allocator, face, subtable, glyphs, depth, options);
+        } else {
+            return font_parser.ParserError.InvalidTable;
+        }
+    }
+
+    fn applyChainedFormat1(
+        allocator: std.mem.Allocator,
+        face: font_parser.Face,
+        subtable: []const u8,
+        glyphs: []ShapedGlyph,
+        depth: usize,
+        options: ShapeOptions,
+    ) font_parser.ParserError!void {
+        if (subtable.len < 6) return font_parser.ParserError.InvalidTable;
+        const coverage_off = try readU16(subtable, chained_f1_coverage_offset);
+        const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
+        const rule_set_count = try readU16(subtable, chained_f1_rule_set_count_offset);
+
+        var i: usize = 0;
+        while (i < glyphs.len) {
+            const coverage_index = try ot_layout.Coverage.getIndex(coverage_data, glyphs[i].glyph_id) orelse {
+                i += 1;
+                continue;
+            };
+            if (coverage_index >= rule_set_count) return font_parser.ParserError.InvalidTable;
+
+            const rule_set_off = try readU16(subtable, chained_f1_rule_set_offsets_offset + @as(usize, coverage_index) * 2);
+            if (rule_set_off == 0) {
+                i += 1;
+                continue;
+            }
+
+            const rule_set = try ot_layout.sliceFrom(subtable, rule_set_off);
+            if (rule_set.len < 2) return font_parser.ParserError.InvalidTable;
+            const rule_count = try readU16(rule_set, chain_rule_set_count_offset);
+            var matched_len: ?u16 = null;
+
+            for (0..rule_count) |rule_idx| {
+                const rule_off = try readU16(rule_set, chain_rule_set_offsets_offset + rule_idx * 2);
+                const rule = try ot_layout.sliceFrom(rule_set, rule_off);
+                if (rule.len < 2) return font_parser.ParserError.InvalidTable;
+                const backtrack_count = try readU16(rule, chain_rule_backtrack_count_offset);
+                var offset: usize = chain_rule_backtrack_count_offset + 2;
+
+                if (i < backtrack_count) continue;
+                var matches = true;
+                if (rule.len < offset + @as(usize, backtrack_count) * 2) return font_parser.ParserError.InvalidTable;
+                for (0..backtrack_count) |j| {
+                    const expected_gid = try readU16(rule, offset + j * 2);
+                    if (glyphs[i - 1 - j].glyph_id != expected_gid) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, backtrack_count) * 2;
+
+                if (rule.len < offset + 2) return font_parser.ParserError.InvalidTable;
+                const input_count = try readU16(rule, offset);
+                offset += 2;
+                if (input_count == 0 or i + input_count > glyphs.len) continue;
+                if (rule.len < offset + @as(usize, input_count - 1) * 2) return font_parser.ParserError.InvalidTable;
+                for (1..input_count) |input_idx| {
+                    const expected_gid = try readU16(rule, offset + (input_idx - 1) * 2);
+                    if (glyphs[i + input_idx].glyph_id != expected_gid) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, input_count - 1) * 2;
+
+                if (rule.len < offset + 2) return font_parser.ParserError.InvalidTable;
+                const lookahead_count = try readU16(rule, offset);
+                offset += 2;
+                if (i + input_count + lookahead_count > glyphs.len) continue;
+                if (rule.len < offset + @as(usize, lookahead_count) * 2) return font_parser.ParserError.InvalidTable;
+                for (0..lookahead_count) |lookahead_idx| {
+                    const expected_gid = try readU16(rule, offset + lookahead_idx * 2);
+                    if (glyphs[i + input_count + lookahead_idx].glyph_id != expected_gid) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, lookahead_count) * 2;
+
+                if (rule.len < offset + 2) return font_parser.ParserError.InvalidTable;
+                const pos_count = try readU16(rule, offset);
+                offset += 2;
+                if (rule.len < offset + @as(usize, pos_count) * 4) return font_parser.ParserError.InvalidTable;
+                const pos_records = rule[offset .. offset + @as(usize, pos_count) * 4];
+
+                try applyPositioningRecords(allocator, face, pos_records, pos_count, glyphs, i, depth, options);
+                matched_len = input_count;
+                break;
+            }
+
+            if (matched_len) |len| {
+                i += len;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    fn applyChainedFormat2(
+        allocator: std.mem.Allocator,
+        face: font_parser.Face,
+        subtable: []const u8,
+        glyphs: []ShapedGlyph,
+        depth: usize,
+        options: ShapeOptions,
+    ) font_parser.ParserError!void {
+        if (subtable.len < 12) return font_parser.ParserError.InvalidTable;
+        const coverage_off = try readU16(subtable, chained_f2_coverage_offset);
+        const backtrack_class_def_off = try readU16(subtable, chained_f2_backtrack_class_def_offset);
+        const input_class_def_off = try readU16(subtable, chained_f2_input_class_def_offset);
+        const lookahead_class_def_off = try readU16(subtable, chained_f2_lookahead_class_def_offset);
+        const class_set_count = try readU16(subtable, chained_f2_class_set_count_offset);
+        const coverage_data = try ot_layout.sliceFrom(subtable, coverage_off);
+        const backtrack_class_def = try ot_layout.sliceFrom(subtable, backtrack_class_def_off);
+        const input_class_def = try ot_layout.sliceFrom(subtable, input_class_def_off);
+        const lookahead_class_def = try ot_layout.sliceFrom(subtable, lookahead_class_def_off);
+
+        var i: usize = 0;
+        while (i < glyphs.len) {
+            if (try ot_layout.Coverage.getIndex(coverage_data, glyphs[i].glyph_id) == null) {
+                i += 1;
+                continue;
+            }
+
+            const first_class = try ot_layout.ClassDef.getClass(input_class_def, glyphs[i].glyph_id);
+            if (first_class >= class_set_count) return font_parser.ParserError.InvalidTable;
+
+            const class_set_off = try readU16(subtable, chained_f2_class_set_offsets_offset + @as(usize, first_class) * 2);
+            if (class_set_off == 0) {
+                i += 1;
+                continue;
+            }
+
+            const class_set = try ot_layout.sliceFrom(subtable, class_set_off);
+            if (class_set.len < 2) return font_parser.ParserError.InvalidTable;
+            const class_rule_count = try readU16(class_set, chain_class_set_count_offset);
+            var matched_len: ?u16 = null;
+
+            for (0..class_rule_count) |rule_idx| {
+                const class_rule_off = try readU16(class_set, chain_class_set_offsets_offset + rule_idx * 2);
+                const class_rule = try ot_layout.sliceFrom(class_set, class_rule_off);
+                if (class_rule.len < 2) return font_parser.ParserError.InvalidTable;
+                const backtrack_count = try readU16(class_rule, chain_class_rule_backtrack_count_offset);
+                var offset: usize = chain_class_rule_backtrack_count_offset + 2;
+
+                if (i < backtrack_count) continue;
+                var matches = true;
+                if (class_rule.len < offset + @as(usize, backtrack_count) * 2) return font_parser.ParserError.InvalidTable;
+                for (0..backtrack_count) |j| {
+                    const expected_class = try readU16(class_rule, offset + j * 2);
+                    const actual_class = try ot_layout.ClassDef.getClass(backtrack_class_def, glyphs[i - 1 - j].glyph_id);
+                    if (actual_class != expected_class) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, backtrack_count) * 2;
+
+                if (class_rule.len < offset + 2) return font_parser.ParserError.InvalidTable;
+                const input_count = try readU16(class_rule, offset);
+                offset += 2;
+                if (input_count == 0 or i + input_count > glyphs.len) continue;
+                if (class_rule.len < offset + @as(usize, input_count - 1) * 2) return font_parser.ParserError.InvalidTable;
+                for (1..input_count) |input_idx| {
+                    const expected_class = try readU16(class_rule, offset + (input_idx - 1) * 2);
+                    const actual_class = try ot_layout.ClassDef.getClass(input_class_def, glyphs[i + input_idx].glyph_id);
+                    if (actual_class != expected_class) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, input_count - 1) * 2;
+
+                if (class_rule.len < offset + 2) return font_parser.ParserError.InvalidTable;
+                const lookahead_count = try readU16(class_rule, offset);
+                offset += 2;
+                if (i + input_count + lookahead_count > glyphs.len) continue;
+                if (class_rule.len < offset + @as(usize, lookahead_count) * 2) return font_parser.ParserError.InvalidTable;
+                for (0..lookahead_count) |lookahead_idx| {
+                    const expected_class = try readU16(class_rule, offset + lookahead_idx * 2);
+                    const actual_class = try ot_layout.ClassDef.getClass(lookahead_class_def, glyphs[i + input_count + lookahead_idx].glyph_id);
+                    if (actual_class != expected_class) {
+                        matches = false;
+                        break;
+                    }
+                }
+                if (!matches) continue;
+                offset += @as(usize, lookahead_count) * 2;
+
+                if (class_rule.len < offset + 2) return font_parser.ParserError.InvalidTable;
+                const pos_count = try readU16(class_rule, offset);
+                offset += 2;
+                if (class_rule.len < offset + @as(usize, pos_count) * 4) return font_parser.ParserError.InvalidTable;
+                const pos_records = class_rule[offset .. offset + @as(usize, pos_count) * 4];
+
+                try applyPositioningRecords(allocator, face, pos_records, pos_count, glyphs, i, depth, options);
+                matched_len = input_count;
+                break;
+            }
+
+            if (matched_len) |len| {
+                i += len;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    fn applyChainedFormat3(
+        allocator: std.mem.Allocator,
+        face: font_parser.Face,
+        subtable: []const u8,
+        glyphs: []ShapedGlyph,
+        depth: usize,
+        options: ShapeOptions,
+    ) font_parser.ParserError!void {
+        if (subtable.len < 10) return font_parser.ParserError.InvalidTable;
+        var offset: usize = 2;
+
+        const backtrack_count = try readU16(subtable, offset);
+        offset += 2;
+        if (subtable.len < offset + @as(usize, backtrack_count) * 2) return font_parser.ParserError.InvalidTable;
+        const backtrack_coverages = subtable[offset .. offset + @as(usize, backtrack_count) * 2];
+        offset += @as(usize, backtrack_count) * 2;
+
+        if (subtable.len < offset + 2) return font_parser.ParserError.InvalidTable;
+        const input_count = try readU16(subtable, offset);
+        offset += 2;
+        if (subtable.len < offset + @as(usize, input_count) * 2) return font_parser.ParserError.InvalidTable;
+        const input_coverages = subtable[offset .. offset + @as(usize, input_count) * 2];
+        offset += @as(usize, input_count) * 2;
+
+        if (subtable.len < offset + 2) return font_parser.ParserError.InvalidTable;
+        const lookahead_count = try readU16(subtable, offset);
+        offset += 2;
+        if (subtable.len < offset + @as(usize, lookahead_count) * 2) return font_parser.ParserError.InvalidTable;
+        const lookahead_coverages = subtable[offset .. offset + @as(usize, lookahead_count) * 2];
+        offset += @as(usize, lookahead_count) * 2;
+
+        if (subtable.len < offset + 2) return font_parser.ParserError.InvalidTable;
+        const pos_count = try readU16(subtable, offset);
+        offset += 2;
+        if (subtable.len < offset + @as(usize, pos_count) * 4) return font_parser.ParserError.InvalidTable;
+        const pos_records = subtable[offset .. offset + @as(usize, pos_count) * 4];
+
+        var i: usize = 0;
+        while (i < glyphs.len) {
+            if (try matchChainedFormat3(subtable, backtrack_coverages, input_coverages, lookahead_coverages, glyphs, i)) {
+                try applyPositioningRecords(allocator, face, pos_records, pos_count, glyphs, i, depth, options);
+                i += input_count;
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    fn matchChainedFormat3(
+        subtable: []const u8,
+        backtrack: []const u8,
+        input: []const u8,
+        lookahead: []const u8,
+        glyphs: []const ShapedGlyph,
+        pos: usize,
+    ) font_parser.ParserError!bool {
+        const backtrack_count = @as(u16, @intCast(backtrack.len / 2));
+        const input_count = @as(u16, @intCast(input.len / 2));
+        const lookahead_count = @as(u16, @intCast(lookahead.len / 2));
+
+        if (pos + input_count > glyphs.len) return false;
+        for (0..input_count) |j| {
+            const coverage_off = try readU16(input, j * 2);
+            const coverage = try ot_layout.sliceFrom(subtable, coverage_off);
+            if (try ot_layout.Coverage.getIndex(coverage, glyphs[pos + j].glyph_id) == null) return false;
+        }
+
+        if (pos < backtrack_count) return false;
+        for (0..backtrack_count) |j| {
+            const coverage_off = try readU16(backtrack, j * 2);
+            const coverage = try ot_layout.sliceFrom(subtable, coverage_off);
+            if (try ot_layout.Coverage.getIndex(coverage, glyphs[pos - 1 - j].glyph_id) == null) return false;
+        }
+
+        if (pos + input_count + lookahead_count > glyphs.len) return false;
+        for (0..lookahead_count) |j| {
+            const coverage_off = try readU16(lookahead, j * 2);
+            const coverage = try ot_layout.sliceFrom(subtable, coverage_off);
+            if (try ot_layout.Coverage.getIndex(coverage, glyphs[pos + input_count + j].glyph_id) == null) return false;
+        }
+
+        return true;
+    }
+
+    fn applyPositioningRecords(
+        allocator: std.mem.Allocator,
+        face: font_parser.Face,
+        pos_records: []const u8,
+        pos_count: u16,
+        glyphs: []ShapedGlyph,
+        start: usize,
+        depth: usize,
+        options: ShapeOptions,
+    ) font_parser.ParserError!void {
+        if (depth >= max_recursion_depth) return font_parser.ParserError.InvalidTable;
+
+        const data = face.getTable(ot_layout.TableTags.gpos) orelse return;
+        if (data.len < ot_layout.OtLayout.header_min_size) return font_parser.ParserError.InvalidTable;
+        const lookup_list_off = try readU16(data, ot_layout.OtLayout.lookup_list_offset);
+        const lookup_list_data = try ot_layout.sliceFrom(data, lookup_list_off);
+
+        for (0..pos_count) |i| {
+            const sequence_index = try readU16(pos_records, i * 4);
+            const lookup_list_index = try readU16(pos_records, i * 4 + 2);
+
+            const target_idx = start + sequence_index;
+            if (target_idx >= glyphs.len) continue;
+
+            try applyLookup(allocator, face, lookup_list_data, lookup_list_index, glyphs[target_idx..], depth + 1, options);
+        }
+    }
 };
 
 test "gpos mark to base attachment" {
@@ -596,7 +1026,7 @@ test "gpos extension positioning delegates to nested single adjustment" {
     };
 
     const face: font_parser.Face = undefined;
-    try Gpos.applyLookup(std.testing.allocator, face, &lookup_list, 0, &glyphs, 0);
+    try Gpos.applyLookup(std.testing.allocator, face, &lookup_list, 0, &glyphs, 0, .{});
 
     try std.testing.expectEqual(@as(i32, 125), glyphs[0].x_advance);
 }
@@ -620,7 +1050,7 @@ test "gpos extension positioning rejects nested extension positioning" {
     };
 
     const face: font_parser.Face = undefined;
-    try std.testing.expectError(font_parser.ParserError.InvalidTable, Gpos.applyLookup(std.testing.allocator, face, &lookup_list, 0, &glyphs, 0));
+    try std.testing.expectError(font_parser.ParserError.InvalidTable, Gpos.applyLookup(std.testing.allocator, face, &lookup_list, 0, &glyphs, 0, .{}));
 }
 
 test "gpos mark to mark attachment" {
@@ -756,3 +1186,166 @@ test "gpos mark to ligature uses cluster to select component" {
     try std.testing.expectEqual(@as(i32, 90), glyphs[1].y_offset);
     try std.testing.expectEqual(@as(i32, 0), glyphs[1].x_advance);
 }
+
+test "gpos cursive attachment LTR" {
+    var subtable = [_]u8{0} ** 34;
+    test_utils.writeU16(&subtable, 0, 1); // posFormat
+    test_utils.writeU16(&subtable, 2, 14); // coverageOffset
+    test_utils.writeU16(&subtable, 4, 2); // entryExitCount
+    // glyph 2 exit anchor at 22
+    test_utils.writeU16(&subtable, 6, 0); // entryAnchorOffset
+    test_utils.writeU16(&subtable, 8, 22); // exitAnchorOffset
+    // glyph 3 entry anchor at 28
+    test_utils.writeU16(&subtable, 10, 28); // entryAnchorOffset
+    test_utils.writeU16(&subtable, 12, 0); // exitAnchorOffset
+
+    // Coverage (offset 14)
+    test_utils.writeU16(&subtable, 14, 1); // format
+    test_utils.writeU16(&subtable, 16, 2); // glyphCount
+    test_utils.writeU16(&subtable, 18, 2); // glyphs[0] = 2
+    test_utils.writeU16(&subtable, 20, 3); // glyphs[1] = 3
+
+    // exit anchor for glyph 2 (offset 22)
+    test_utils.writeU16(&subtable, 22, 1); // format
+    test_utils.writeI16(&subtable, 24, 80); // x
+    test_utils.writeI16(&subtable, 26, 40); // y
+
+    // entry anchor for glyph 3 (offset 28)
+    test_utils.writeU16(&subtable, 28, 1); // format
+    test_utils.writeI16(&subtable, 30, 10); // x
+    test_utils.writeI16(&subtable, 32, 30); // y
+
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 'A', .glyph_id = 2, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'B', .glyph_id = 3, .cluster = 1, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    try Gpos.applyCursiveAttachment(&subtable, &glyphs, .{ .direction = .ltr });
+
+    try std.testing.expectEqual(@as(i32, 80), glyphs[0].x_advance);
+    try std.testing.expectEqual(@as(i32, 90), glyphs[1].x_advance);
+    try std.testing.expectEqual(@as(i32, -10), glyphs[1].x_offset);
+    try std.testing.expectEqual(@as(i32, 10), glyphs[1].y_offset);
+}
+
+test "gpos cursive attachment RTL" {
+    var subtable = [_]u8{0} ** 34;
+    test_utils.writeU16(&subtable, 0, 1);
+    test_utils.writeU16(&subtable, 2, 14);
+    test_utils.writeU16(&subtable, 4, 2);
+    test_utils.writeU16(&subtable, 6, 0);
+    test_utils.writeU16(&subtable, 8, 22);
+    test_utils.writeU16(&subtable, 10, 28);
+    test_utils.writeU16(&subtable, 12, 0);
+
+    test_utils.writeU16(&subtable, 14, 1);
+    test_utils.writeU16(&subtable, 16, 2);
+    test_utils.writeU16(&subtable, 18, 2);
+    test_utils.writeU16(&subtable, 20, 3);
+
+    test_utils.writeU16(&subtable, 22, 1);
+    test_utils.writeI16(&subtable, 24, 80);
+    test_utils.writeI16(&subtable, 26, 40);
+
+    test_utils.writeU16(&subtable, 28, 1);
+    test_utils.writeI16(&subtable, 30, 10);
+    test_utils.writeI16(&subtable, 32, 30);
+
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 'A', .glyph_id = 2, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'B', .glyph_id = 3, .cluster = 1, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    try Gpos.applyCursiveAttachment(&subtable, &glyphs, .{ .direction = .rtl });
+
+    try std.testing.expectEqual(@as(i32, 20), glyphs[0].x_advance);
+    try std.testing.expectEqual(@as(i32, -80), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(i32, 10), glyphs[1].x_advance);
+    try std.testing.expectEqual(@as(i32, -10), glyphs[0].y_offset);
+}
+
+test "gpos chained contextual positioning Format 3" {
+    var gpos_data = [_]u8{0} ** 100;
+    test_utils.writeU16(&gpos_data, 0, 1);
+    test_utils.writeU16(&gpos_data, 2, 0);
+    test_utils.writeU16(&gpos_data, 4, 10);
+    test_utils.writeU16(&gpos_data, 6, 10);
+    test_utils.writeU16(&gpos_data, 8, 10);
+
+    test_utils.writeU16(&gpos_data, 10, 2);
+    test_utils.writeU16(&gpos_data, 12, 6);
+    test_utils.writeU16(&gpos_data, 14, 40);
+
+    test_utils.writeU16(&gpos_data, 16, @intFromEnum(GposLookupType.chained_contextual_positioning));
+    test_utils.writeU16(&gpos_data, 18, 0);
+    test_utils.writeU16(&gpos_data, 20, 1);
+    test_utils.writeU16(&gpos_data, 22, 8);
+
+    test_utils.writeU16(&gpos_data, 24, 3);
+    test_utils.writeU16(&gpos_data, 26, 1);
+    test_utils.writeU16(&gpos_data, 28, 52);
+    test_utils.writeU16(&gpos_data, 30, 1);
+    test_utils.writeU16(&gpos_data, 32, 58);
+    test_utils.writeU16(&gpos_data, 34, 1);
+    test_utils.writeU16(&gpos_data, 36, 64);
+    test_utils.writeU16(&gpos_data, 38, 1);
+    test_utils.writeU16(&gpos_data, 40, 0);
+    test_utils.writeU16(&gpos_data, 42, 1);
+
+    test_utils.writeU16(&gpos_data, 50, @intFromEnum(GposLookupType.single_adjustment));
+    test_utils.writeU16(&gpos_data, 52, 0);
+    test_utils.writeU16(&gpos_data, 54, 1);
+    test_utils.writeU16(&gpos_data, 56, 8);
+
+    test_utils.writeU16(&gpos_data, 58, 1);
+    test_utils.writeU16(&gpos_data, 60, 12);
+    test_utils.writeU16(&gpos_data, 62, 0x0004);
+    test_utils.writeI16(&gpos_data, 64, 150);
+
+    test_utils.writeU16(&gpos_data, 70, 1);
+    test_utils.writeU16(&gpos_data, 72, 1);
+    test_utils.writeU16(&gpos_data, 74, 20);
+
+    test_utils.writeU16(&gpos_data, 76, 1);
+    test_utils.writeU16(&gpos_data, 78, 1);
+    test_utils.writeU16(&gpos_data, 80, 10);
+
+    test_utils.writeU16(&gpos_data, 82, 1);
+    test_utils.writeU16(&gpos_data, 84, 1);
+    test_utils.writeU16(&gpos_data, 86, 20);
+
+    test_utils.writeU16(&gpos_data, 88, 1);
+    test_utils.writeU16(&gpos_data, 90, 1);
+    test_utils.writeU16(&gpos_data, 92, 30);
+
+    var tables = [_]font_parser.TableMetadata{
+        .{
+            .tag = ot_layout.TableTags.gpos,
+            .offset = 0,
+            .length = @intCast(gpos_data.len),
+        },
+    };
+    const face = font_parser.Face{
+        .data = &gpos_data,
+        .units_per_em = 1000,
+        .num_glyphs = 100,
+        .tables = &tables,
+        .number_of_h_metrics = 0,
+        .number_of_v_metrics = null,
+        .vorg_default_vert_origin_y = null,
+        .vorg = null,
+        .cmap = null,
+    };
+
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 'X', .glyph_id = 10, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'Y', .glyph_id = 20, .cluster = 1, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'Z', .glyph_id = 30, .cluster = 2, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    const lookup_list_data = gpos_data[10..];
+    try Gpos.applyLookup(std.testing.allocator, face, lookup_list_data, 0, &glyphs, 0, .{});
+
+    try std.testing.expectEqual(@as(i32, 250), glyphs[1].x_advance);
+}
+

@@ -1310,3 +1310,47 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-gpos-extension-regression.svg --font-size 96`
 - `wc -c /tmp/zig-font-renderer-gpos-extension-regression.svg`
 **Context**: Construction Phase - Unit 2 - GPOS lookup coverage increment. Extension positioning dispatch is complete at the tested scope; full Unicode Bidi algorithm coverage, full Indic syllable shaping, and remaining full typography coverage remain pending.
+
+---
+
+## Session Continuity & Welcome Back
+**Timestamp**: 2026-05-20T14:20:38+09:00
+**User Input**: "AIDLCにもとづき、次の作業を進めて"
+**AI Response**: "Resuming from the CONSTRUCTION phase. The last completed stage was 'Unit 2: Code Generation - GPOS Extension Positioning'. Based on your continuity selection (B: 'Extend Unit 2: Implement full GSUB/GPOS shaping support (Complex typography)'), we will create a Code Generation Plan for advanced complex typography features: GPOS Lookup Type 3 (Cursive Attachment) and GPOS Lookup Type 8 (Chained Contextual Positioning)."
+**Context**: Resuming session. Setting up next code generation plan for Unit 2 Extension: Complex Typography & Script Support.
+
+---
+
+## Code Generation - Complex Typography Planning
+**Timestamp**: 2026-05-20T14:25:00+09:00
+**User Input**: ""
+**AI Response**: "Proposed the Code Generation Plan for advanced complex typography features: GPOS Lookup Type 3 (Cursive Attachment) and GPOS Lookup Type 8 (Chained Contextual Positioning). Requesting user approval."
+**Context**: Construction Phase - Unit 2 Extension: Complex Typography - Planning.
+
+---
+
+## Code Generation - Complex Typography Japanese Translation Request
+**Timestamp**: 2026-05-20T14:25:30+09:00
+**User Input**: "計画ファイルは日本語で書いて"
+**AI Response**: "Rewrote the Code Generation Plan in Japanese at `aidlc-docs/construction/plans/complex-typography-code-generation-plan.md` as requested. Requesting user approval."
+**Context**: Construction Phase - Unit 2 Extension: Complex Typography - Planning.
+
+---
+
+## Code Generation - Complex Typography Plan Approved
+**Timestamp**: 2026-05-20T14:26:18+09:00
+**User Input**: "承認"
+**AI Response**: "Received explicit approval for the Complex Typography code generation plan. Commencing implementation of GPOS Lookup Type 3 Cursive Attachment and GPOS Lookup Type 8 Chained Contextual Positioning."
+**Context**: Construction Phase - Unit 2 Extension: Complex Typography - Implementation.
+
+---
+
+## Code Generation & Verification - Complex Typography
+**Timestamp**: 2026-05-20T14:35:00+09:00
+**User Input**: "承認"
+**AI Response**: "Successfully implemented advanced complex typography features: GPOS Lookup Type 3 (Cursive Attachment) and GPOS Lookup Type 8 (Chained Contextual Positioning) in `src/gpos.zig`. Resolved the compilation warning/error where local variable `face` was never mutated in GPOS unit tests. Removed temporary files and verified that all existing and new unit tests fully pass."
+**Verification**:
+- Fixed unused variable mutation `var face` warning to `const face` in `src/gpos.zig` at line 1328.
+- Ran `zig build test` (Passed)
+- Removed temporary file `temp_cursive.hh`
+**Context**: Construction Phase - Unit 2 Extension: Complex Typography - Implementation and Verification complete. GPOS Cursive Attachment (Type 3) and GPOS Chained Contextual Positioning (Type 8) match/apply logic are fully integrated and verified via comprehensive unit tests.
