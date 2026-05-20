@@ -4,4 +4,5 @@ pub const GsubLookupType = enum(u16) {
     ligature_substitution = 4,
     contextual_substitution = 5,
     chained_contextual_substitution = 6,
+    extension_substitution = 7,
 };

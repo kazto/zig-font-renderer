@@ -13,6 +13,7 @@ const types = @import("shaper_types.zig");
 const test_utils = @import("shaper_test_utils.zig");
 
 const readU16 = binary_reader.readU16;
+const readU32 = binary_reader.readU32;
 const LayoutError = types.LayoutError;
 const ShapeOptions = types.ShapeOptions;
 const ShapedGlyph = types.ShapedGlyph;
@@ -32,6 +33,12 @@ const arabic_positional_features = [_]ArabicFeature{
 
 pub const Gsub = struct {
     pub const max_recursion_depth = 16;
+
+    const extension_substitution_format = 1;
+    const extension_format_offset = 0;
+    const extension_lookup_type_offset = 2;
+    const extension_subtable_offset_offset = 4;
+    const extension_header_size = 8;
 
     const subst_record_size = 4;
     const subst_record_sequence_index_offset = 0;
@@ -121,18 +128,24 @@ pub const Gsub = struct {
         for (0..subtable_count) |i| {
             const subtable_off = try readU16(lookup_data, ot_layout.OtLayout.lookup_subtable_offsets_offset + i * 2);
             const subtable_data = try ot_layout.sliceFrom(lookup_data, subtable_off);
+            try applyLookupSubtable(allocator, face, lookup_list, lookup_type, subtable_data, glyphs, depth);
+        }
+    }
 
-            if (lookup_type == @intFromEnum(GsubLookupType.single_substitution)) {
-                try gsub_single.apply(subtable_data, glyphs);
-            } else if (lookup_type == @intFromEnum(GsubLookupType.alternate_substitution)) {
-                try gsub_alternate.apply(subtable_data, glyphs);
-            } else if (lookup_type == @intFromEnum(GsubLookupType.ligature_substitution)) {
-                try gsub_ligature.apply(subtable_data, glyphs);
-            } else if (lookup_type == @intFromEnum(GsubLookupType.contextual_substitution)) {
-                try applyContextualSubstitution(allocator, face, lookup_list, subtable_data, glyphs, depth);
-            } else if (lookup_type == @intFromEnum(GsubLookupType.chained_contextual_substitution)) {
-                try applyChainedContextualSubstitution(allocator, face, lookup_list, subtable_data, glyphs, depth);
-            }
+    fn applyLookupSubtable(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, lookup_type: u16, subtable_data: []const u8, glyphs: *std.ArrayList(ShapedGlyph), depth: usize) LayoutError!void {
+        if (lookup_type == @intFromEnum(GsubLookupType.extension_substitution)) {
+            const extension = try extensionSubtable(subtable_data);
+            try applyLookupSubtable(allocator, face, lookup_list, extension.lookup_type, extension.subtable, glyphs, depth + 1);
+        } else if (lookup_type == @intFromEnum(GsubLookupType.single_substitution)) {
+            try gsub_single.apply(subtable_data, glyphs);
+        } else if (lookup_type == @intFromEnum(GsubLookupType.alternate_substitution)) {
+            try gsub_alternate.apply(subtable_data, glyphs);
+        } else if (lookup_type == @intFromEnum(GsubLookupType.ligature_substitution)) {
+            try gsub_ligature.apply(subtable_data, glyphs);
+        } else if (lookup_type == @intFromEnum(GsubLookupType.contextual_substitution)) {
+            try applyContextualSubstitution(allocator, face, lookup_list, subtable_data, glyphs, depth);
+        } else if (lookup_type == @intFromEnum(GsubLookupType.chained_contextual_substitution)) {
+            try applyChainedContextualSubstitution(allocator, face, lookup_list, subtable_data, glyphs, depth);
         }
     }
 
@@ -144,14 +157,42 @@ pub const Gsub = struct {
         const lookup_off = try ot_layout.OtLayout.getLookupOffset(lookup_list, index);
         const lookup_data = try ot_layout.sliceFrom(lookup_list, lookup_off);
         const lookup_type = try readU16(lookup_data, ot_layout.OtLayout.lookup_type_offset);
-        if (lookup_type != @intFromEnum(GsubLookupType.single_substitution)) return;
 
         const subtable_count = try readU16(lookup_data, ot_layout.OtLayout.lookup_subtable_count_offset);
         for (0..subtable_count) |i| {
             const subtable_off = try readU16(lookup_data, ot_layout.OtLayout.lookup_subtable_offsets_offset + i * 2);
             const subtable_data = try ot_layout.sliceFrom(lookup_data, subtable_off);
+            try applySingleSubtableForJoiningForm(lookup_type, subtable_data, glyphs, forms, target_form, depth + 1);
+        }
+    }
+
+    fn applySingleSubtableForJoiningForm(lookup_type: u16, subtable_data: []const u8, glyphs: *std.ArrayList(ShapedGlyph), forms: []const shaper_arabic.JoiningForm, target_form: shaper_arabic.JoiningForm, depth: usize) LayoutError!void {
+        if (depth >= max_recursion_depth) return font_parser.ParserError.InvalidTable;
+        if (lookup_type == @intFromEnum(GsubLookupType.extension_substitution)) {
+            const extension = try extensionSubtable(subtable_data);
+            try applySingleSubtableForJoiningForm(extension.lookup_type, extension.subtable, glyphs, forms, target_form, depth + 1);
+        } else if (lookup_type == @intFromEnum(GsubLookupType.single_substitution)) {
             try gsub_single.applyForJoiningForm(subtable_data, glyphs, forms, target_form);
         }
+    }
+
+    const ExtensionSubtable = struct {
+        lookup_type: u16,
+        subtable: []const u8,
+    };
+
+    fn extensionSubtable(subtable_data: []const u8) font_parser.ParserError!ExtensionSubtable {
+        if (subtable_data.len < extension_header_size) return font_parser.ParserError.InvalidTable;
+        const format = try readU16(subtable_data, extension_format_offset);
+        if (format != extension_substitution_format) return font_parser.ParserError.InvalidTable;
+        const lookup_type = try readU16(subtable_data, extension_lookup_type_offset);
+        if (lookup_type == @intFromEnum(GsubLookupType.extension_substitution)) return font_parser.ParserError.InvalidTable;
+        const extension_offset = try readU32(subtable_data, extension_subtable_offset_offset);
+        if (extension_offset > std.math.maxInt(usize)) return font_parser.ParserError.InvalidTable;
+        return .{
+            .lookup_type = lookup_type,
+            .subtable = try ot_layout.sliceFrom(subtable_data, @intCast(extension_offset)),
+        };
     }
 
     pub fn applyLigatureSubstitution(subtable: []const u8, glyphs: *std.ArrayList(ShapedGlyph)) font_parser.ParserError!void {
@@ -251,6 +292,38 @@ test "gsub alternate substitution" {
 
     try Gsub.applyAlternateSubstitution(&subtable, &glyphs);
     try std.testing.expectEqual(@as(u16, 20), glyphs.items[0].glyph_id);
+}
+
+test "gsub extension substitution delegates to nested single substitution" {
+    var lookup_list = [_]u8{0} ** 34;
+    test_utils.writeU16(&lookup_list, 0, 1);
+    test_utils.writeU16(&lookup_list, 2, 4);
+
+    test_utils.writeU16(&lookup_list, 4, @intFromEnum(GsubLookupType.extension_substitution));
+    test_utils.writeU16(&lookup_list, 6, 0);
+    test_utils.writeU16(&lookup_list, 8, 1);
+    test_utils.writeU16(&lookup_list, 10, 8);
+
+    test_utils.writeU16(&lookup_list, 12, 1);
+    test_utils.writeU16(&lookup_list, 14, @intFromEnum(GsubLookupType.single_substitution));
+    test_utils.writeU32(&lookup_list, 16, 8);
+
+    test_utils.writeU16(&lookup_list, 20, 2);
+    test_utils.writeU16(&lookup_list, 22, 8);
+    test_utils.writeU16(&lookup_list, 24, 1);
+    test_utils.writeU16(&lookup_list, 26, 4);
+    test_utils.writeU16(&lookup_list, 28, 1);
+    test_utils.writeU16(&lookup_list, 30, 1);
+    test_utils.writeU16(&lookup_list, 32, 2);
+
+    var glyphs = std.ArrayList(ShapedGlyph).empty;
+    defer glyphs.deinit(std.testing.allocator);
+    try glyphs.append(std.testing.allocator, .{ .codepoint = 'B', .glyph_id = 2, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 });
+
+    const face: font_parser.Face = undefined;
+    try Gsub.applyLookup(std.testing.allocator, face, &lookup_list, 0, &glyphs, 0);
+
+    try std.testing.expectEqual(@as(u16, 4), glyphs.items[0].glyph_id);
 }
 
 test "Arabic positional features apply only to matching joining forms" {

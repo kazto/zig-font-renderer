@@ -1280,3 +1280,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build run -- --font '/usr/share/fonts/truetype/ubuntu/UbuntuSans[wdth,wght].ttf' --text A --output /tmp/zig-font-renderer-cli-variation-instance.svg --font-size 96 --variation-instance 0`
 - `wc -c /tmp/zig-font-renderer-cli-variation.svg /tmp/zig-font-renderer-cli-variation-instance.svg`
 **Context**: Construction Phase - Unit 3 - SVG Rendering & CLI variation increment. CLI variation selection is complete at the tested scope; full Unicode Bidi algorithm coverage, full Indic syllable shaping, and remaining full typography coverage remain pending.
+
+---
+
+## Code Generation - GSUB Extension Substitution
+**Timestamp**: 2026-05-20T04:22:53Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented the next Unit 2 GSUB lookup coverage increment. GSUB Lookup Type 7 Extension Substitution now decodes extension subtables, delegates to supported nested substitution lookup types, rejects nested Type 7 loops, and preserves Arabic joining-form gating for extension-wrapped single substitutions."
+**Verification**:
+- `zig fmt src/gsub.zig src/gsub_lookup.zig src/shaper_test_utils.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --output /tmp/zig-font-renderer-gsub-extension-regression.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-gsub-extension-regression.svg`
+**Context**: Construction Phase - Unit 2 - GSUB lookup coverage increment. Extension substitution dispatch is complete at the tested scope; full Unicode Bidi algorithm coverage, full Indic syllable shaping, and remaining full typography coverage remain pending.

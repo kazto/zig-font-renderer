@@ -113,11 +113,19 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Keep standalone neutral punctuation with surrounding RTL run content.
   - Verify with focused unit tests and a real Hebrew mixed-direction SVG smoke test.
 
+- [x] Step 18: Add GSUB Extension Substitution dispatch
+  - Decode GSUB Lookup Type 7 Extension Substitution subtables.
+  - Delegate extension subtables to supported nested GSUB lookup types.
+  - Reject nested extension substitution to preserve bounded recursion.
+  - Preserve Arabic joining-form gating when a single substitution lookup is extension-wrapped.
+  - Verify with focused synthetic GSUB data and real-font shaping smoke tests.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
 - [x] Single glyph substitutions (GSUB Type 1) are applied.
 - [x] Ligature substitutions (GSUB Type 4) are applied, correctly merging multiple glyphs.
+- [x] Extension substitutions (GSUB Type 7) dispatch to supported nested substitution lookup types.
 - [x] Single glyph adjustments (GPOS Type 1) are applied.
 - [x] Pair adjustments (GPOS Type 2) are applied, correctly adjusting advances between glyphs.
 - [x] `ShapedGlyph` records reflect substitutions and adjustments.

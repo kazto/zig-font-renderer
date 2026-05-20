@@ -11,7 +11,7 @@ The current increment implements horizontal text shaping using data exposed by U
 3. Iterate Unicode codepoints in input order.
 4. Resolve each codepoint to a glyph ID and horizontal metrics through `Face.getGlyphInfo`.
 5. Emit `ShapedGlyph` records with cluster indexes and horizontal metrics.
-6. Apply supported GSUB substitutions and GPOS positioning.
+6. Apply supported GSUB substitutions, including extension-wrapped supported substitution lookups, and GPOS positioning.
 7. Apply supported legacy pair kerning from the `kern` table when GPOS did not position the glyphs.
 8. Reorder common Indic pre-base matras before the preceding consonant base.
 9. Reorder leading decomposed same-script Brahmic ra + virama sequences after the following consonant base.

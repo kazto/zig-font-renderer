@@ -7,3 +7,7 @@ pub fn writeU16(data: []u8, offset: usize, value: u16) void {
 pub fn writeI16(data: []u8, offset: usize, value: i16) void {
     std.mem.writeInt(i16, data[offset..][0..2], value, .big);
 }
+
+pub fn writeU32(data: []u8, offset: usize, value: u32) void {
+    std.mem.writeInt(u32, data[offset..][0..4], value, .big);
+}

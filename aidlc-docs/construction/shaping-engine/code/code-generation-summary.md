@@ -6,7 +6,7 @@
 
 ## Scope
 
-Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, caller-provided OpenType Layout script/language/feature selection, coarse automatic script/language tag inference, conservative default feature policy, Arabic joining-form positional GSUB gating, first-strong Bidi paragraph direction, RTL visual ordering with preserved LTR word/phrase and formatted numeric run order, RTL paired-bracket mirroring, mixed RTL run reordering, Indic pre-base matra visual reordering, script-aware Brahmic initial repha-sequence visual reordering, explicit top-to-bottom vertical layout, optional vertical metric lookup, and optional vertical origin lookup.
+Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, GSUB/GPOS layout handling including GSUB Extension Substitution dispatch, caller-provided OpenType Layout script/language/feature selection, coarse automatic script/language tag inference, conservative default feature policy, Arabic joining-form positional GSUB gating, first-strong Bidi paragraph direction, RTL visual ordering with preserved LTR word/phrase and formatted numeric run order, RTL paired-bracket mirroring, mixed RTL run reordering, Indic pre-base matra visual reordering, script-aware Brahmic initial repha-sequence visual reordering, explicit top-to-bottom vertical layout, optional vertical metric lookup, and optional vertical origin lookup.
 
 ## Application Code
 
@@ -15,6 +15,7 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
   - Implements `shapeText` for UTF-8 validation, glyph lookup, horizontal positioning, and total advance accumulation.
   - Implements legacy `kern` table version 0 horizontal format 0 pair adjustment.
   - Implements initial GSUB Single Substitution and Ligature Substitution.
+  - Dispatches GSUB Extension Substitution (Type 7) subtables to supported nested GSUB lookup types.
   - Implements initial GPOS Single Adjustment and Pair Adjustment.
   - Adds `ShapeOptions` and `shapeTextWithOptions` for caller-selected script, language, and feature tags.
   - Infers a coarse OpenType script tag from input Unicode ranges when callers do not provide one, while preserving explicit caller tags.
@@ -121,6 +122,12 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
 - Result: Passed after preserving LTR phrase connectors inside RTL visual paragraphs.
 - Command: `wc -c /tmp/zig-font-renderer-bidi-ltr-connectors.svg`
 - Result: `2123 /tmp/zig-font-renderer-bidi-ltr-connectors.svg`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --quiet`
+- Result: Passed after adding GSUB Type 7 Extension Substitution dispatch.
+- Command: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --output /tmp/zig-font-renderer-gsub-extension-regression.svg --font-size 96`
+- Result: Passed after adding GSUB Type 7 Extension Substitution dispatch.
+- Command: `wc -c /tmp/zig-font-renderer-gsub-extension-regression.svg`
+- Result: `664 /tmp/zig-font-renderer-gsub-extension-regression.svg`
 
 ## Known Limitations
 
