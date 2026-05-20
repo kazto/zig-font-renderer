@@ -2,45 +2,51 @@
 
 ## Purpose
 
-Validate the current integration boundary between the library module and CLI executable.
+Validate the integration boundaries across all components (Parser, Shaper, SVG Renderer, and CLI executable), including advanced GPOS Complex Typography features.
 
 ## Test Scenarios
 
-### Scenario 1: Font Parser Module -> CLI Build Integration
+### Scenario 1: Full Layout and Rendering Pipeline (Parser -> Shaper -> Renderer -> CLI)
 
-- **Description**: Ensure the executable links against the `zig_font_renderer` module without import or symbol errors.
-- **Setup**: Zig 0.15.2 installed.
-- **Test Steps**: Run `zig build`.
-- **Expected Results**: The executable builds successfully at `zig-out/bin/zig_font_renderer`.
-- **Cleanup**: No cleanup required.
+- **Description**: Verify that the CLI successfully parses an OpenType font, applies GSUB/GPOS shaping features, translates coordinates into vector SVG paths, and exports the resulting markup.
+- **Setup**: Zig 0.15.2 installed, and system font files (e.g., DejaVuSans.ttf) available.
+- **Test Steps**:
+  1. Build the release binary: `zig build`
+  2. Run layout and render: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text "AV" --output /tmp/integration-test-gpos.svg --font-size 96`
+- **Expected Results**:
+  - The CLI command completes with exit code 0.
+  - The SVG file `/tmp/integration-test-gpos.svg` is generated and contains valid XML markup with `<path>` elements representing styled and spaced glyphs.
+- **Cleanup**: Delete `/tmp/integration-test-gpos.svg` after verification.
 
-### Scenario 2: Root Module -> Font Parser API Export Integration
+### Scenario 2: Public API Exports via Root Module
 
-- **Description**: Ensure `src/root.zig` exposes Unit 1 parser APIs through the package module.
+- **Description**: Ensure `src/root.zig` exposes full APIs (Face, ShapeEngine, SVG Renderer structures) properly to external packages.
 - **Setup**: Zig 0.15.2 installed.
 - **Test Steps**: Run `zig build test`.
-- **Expected Results**: Module and executable test steps pass.
+- **Expected Results**: All unit and module integration tests pass successfully without compiler package mapping issues.
 - **Cleanup**: No cleanup required.
 
 ## Setup Integration Test Environment
 
-No services or external endpoints are required.
+No external services or endpoints are required. The tests execute entirely locally using native filesystem assets and Zig compiler toolchain.
 
 ## Run Integration Tests
 
-### 1. Execute Integration Test Suite
+### 1. Execute Integration Script/Commands
 
 ```bash
 zig build
 zig build test
+zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text "fi" --output /tmp/integration-test-gsub.svg
 ```
 
-### 2. Verify Service Interactions
+### 2. Verify Output
 
-- **Test Scenarios**: Library export and executable link integration.
-- **Expected Results**: Both commands exit with status 0.
-- **Logs Location**: Console output only.
+- Ensure console output logs all processed glyph runs successfully.
+- Check generated SVG file sizes and ensure standard XML validation checks pass.
 
 ### 3. Cleanup
 
-No cleanup is required.
+```bash
+rm -f /tmp/integration-test-gsub.svg /tmp/integration-test-gpos.svg
+```
