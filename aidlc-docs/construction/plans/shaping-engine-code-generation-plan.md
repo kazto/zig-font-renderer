@@ -120,6 +120,12 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Preserve Arabic joining-form gating when a single substitution lookup is extension-wrapped.
   - Verify with focused synthetic GSUB data and real-font shaping smoke tests.
 
+- [x] Step 19: Add GPOS Extension Positioning dispatch
+  - Decode GPOS Lookup Type 9 Extension Positioning subtables.
+  - Delegate extension subtables to supported nested GPOS lookup types.
+  - Reject nested extension positioning to preserve bounded recursion.
+  - Verify with focused synthetic GPOS data and real-font shaping/SVG smoke tests.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
@@ -128,6 +134,7 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - [x] Extension substitutions (GSUB Type 7) dispatch to supported nested substitution lookup types.
 - [x] Single glyph adjustments (GPOS Type 1) are applied.
 - [x] Pair adjustments (GPOS Type 2) are applied, correctly adjusting advances between glyphs.
+- [x] Extension positioning (GPOS Type 9) dispatches to supported nested positioning lookup types.
 - [x] `ShapedGlyph` records reflect substitutions and adjustments.
 - [x] Legacy `kern` table still works as a fallback if GPOS is missing or produces no adjustment.
 - [x] Arabic positional GSUB features are gated by computed joining form.

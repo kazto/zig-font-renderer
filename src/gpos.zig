@@ -6,6 +6,7 @@ const types = @import("shaper_types.zig");
 const test_utils = @import("shaper_test_utils.zig");
 
 const readU16 = binary_reader.readU16;
+const readU32 = binary_reader.readU32;
 const readI16 = binary_reader.readI16;
 const LayoutError = types.LayoutError;
 const ShapeOptions = types.ShapeOptions;
@@ -17,6 +18,7 @@ const GposLookupType = enum(u16) {
     mark_to_base_attachment = 4,
     mark_to_ligature_attachment = 5,
     mark_to_mark_attachment = 6,
+    extension_positioning = 9,
 };
 
 const ValueFormat = struct {
@@ -57,6 +59,14 @@ const ValueFormat = struct {
 };
 
 pub const Gpos = struct {
+    pub const max_recursion_depth = 16;
+
+    const extension_positioning_format = 1;
+    const extension_format_offset = 0;
+    const extension_lookup_type_offset = 2;
+    const extension_subtable_offset_offset = 4;
+    const extension_header_size = 8;
+
     const single_format_offset = 0;
     const single_coverage_offset = 2;
     const single_f1_value_format_offset = 4;
@@ -128,11 +138,12 @@ pub const Gpos = struct {
         var lookup_indices = try ot_layout.OtLayout.collectLookupIndices(allocator, data, options);
         defer lookup_indices.deinit(allocator);
         for (lookup_indices.items) |lookup_index| {
-            try applyLookup(allocator, face, lookup_list_data, lookup_index, glyphs);
+            try applyLookup(allocator, face, lookup_list_data, lookup_index, glyphs, 0);
         }
     }
 
-    pub fn applyLookup(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, index: u16, glyphs: []ShapedGlyph) font_parser.ParserError!void {
+    pub fn applyLookup(allocator: std.mem.Allocator, face: font_parser.Face, lookup_list: []const u8, index: u16, glyphs: []ShapedGlyph, depth: usize) font_parser.ParserError!void {
+        if (depth >= max_recursion_depth) return font_parser.ParserError.InvalidTable;
         _ = allocator;
         _ = face;
         const lookup_off = try ot_layout.OtLayout.getLookupOffset(lookup_list, index);
@@ -143,19 +154,45 @@ pub const Gpos = struct {
         for (0..subtable_count) |i| {
             const subtable_off = try readU16(lookup_data, ot_layout.OtLayout.lookup_subtable_offsets_offset + i * 2);
             const subtable_data = try ot_layout.sliceFrom(lookup_data, subtable_off);
-
-            if (lookup_type == @intFromEnum(GposLookupType.single_adjustment)) {
-                try applySingleAdjustment(subtable_data, glyphs);
-            } else if (lookup_type == @intFromEnum(GposLookupType.pair_adjustment)) {
-                try applyPairAdjustment(subtable_data, glyphs);
-            } else if (lookup_type == @intFromEnum(GposLookupType.mark_to_base_attachment)) {
-                try applyMarkToBase(subtable_data, glyphs);
-            } else if (lookup_type == @intFromEnum(GposLookupType.mark_to_ligature_attachment)) {
-                try applyMarkToLigature(subtable_data, glyphs);
-            } else if (lookup_type == @intFromEnum(GposLookupType.mark_to_mark_attachment)) {
-                try applyMarkToMark(subtable_data, glyphs);
-            }
+            try applyLookupSubtable(lookup_type, subtable_data, glyphs, depth);
         }
+    }
+
+    fn applyLookupSubtable(lookup_type: u16, subtable_data: []const u8, glyphs: []ShapedGlyph, depth: usize) font_parser.ParserError!void {
+        if (depth >= max_recursion_depth) return font_parser.ParserError.InvalidTable;
+        if (lookup_type == @intFromEnum(GposLookupType.extension_positioning)) {
+            const extension = try extensionSubtable(subtable_data);
+            try applyLookupSubtable(extension.lookup_type, extension.subtable, glyphs, depth + 1);
+        } else if (lookup_type == @intFromEnum(GposLookupType.single_adjustment)) {
+            try applySingleAdjustment(subtable_data, glyphs);
+        } else if (lookup_type == @intFromEnum(GposLookupType.pair_adjustment)) {
+            try applyPairAdjustment(subtable_data, glyphs);
+        } else if (lookup_type == @intFromEnum(GposLookupType.mark_to_base_attachment)) {
+            try applyMarkToBase(subtable_data, glyphs);
+        } else if (lookup_type == @intFromEnum(GposLookupType.mark_to_ligature_attachment)) {
+            try applyMarkToLigature(subtable_data, glyphs);
+        } else if (lookup_type == @intFromEnum(GposLookupType.mark_to_mark_attachment)) {
+            try applyMarkToMark(subtable_data, glyphs);
+        }
+    }
+
+    const ExtensionSubtable = struct {
+        lookup_type: u16,
+        subtable: []const u8,
+    };
+
+    fn extensionSubtable(subtable_data: []const u8) font_parser.ParserError!ExtensionSubtable {
+        if (subtable_data.len < extension_header_size) return font_parser.ParserError.InvalidTable;
+        const format = try readU16(subtable_data, extension_format_offset);
+        if (format != extension_positioning_format) return font_parser.ParserError.InvalidTable;
+        const lookup_type = try readU16(subtable_data, extension_lookup_type_offset);
+        if (lookup_type == @intFromEnum(GposLookupType.extension_positioning)) return font_parser.ParserError.InvalidTable;
+        const extension_offset = try readU32(subtable_data, extension_subtable_offset_offset);
+        if (extension_offset > std.math.maxInt(usize)) return font_parser.ParserError.InvalidTable;
+        return .{
+            .lookup_type = lookup_type,
+            .subtable = try ot_layout.sliceFrom(subtable_data, @intCast(extension_offset)),
+        };
     }
 
     pub fn applySingleAdjustment(subtable: []const u8, glyphs: []ShapedGlyph) font_parser.ParserError!void {
@@ -530,6 +567,60 @@ test "gpos mark to base attachment" {
     try std.testing.expectEqual(@as(i32, -80), glyphs[1].x_offset);
     try std.testing.expectEqual(@as(i32, 50), glyphs[1].y_offset);
     try std.testing.expectEqual(@as(i32, 0), glyphs[1].x_advance);
+}
+
+test "gpos extension positioning delegates to nested single adjustment" {
+    var lookup_list = [_]u8{0} ** 34;
+    test_utils.writeU16(&lookup_list, 0, 1);
+    test_utils.writeU16(&lookup_list, 2, 4);
+
+    test_utils.writeU16(&lookup_list, 4, @intFromEnum(GposLookupType.extension_positioning));
+    test_utils.writeU16(&lookup_list, 6, 0);
+    test_utils.writeU16(&lookup_list, 8, 1);
+    test_utils.writeU16(&lookup_list, 10, 8);
+
+    test_utils.writeU16(&lookup_list, 12, 1);
+    test_utils.writeU16(&lookup_list, 14, @intFromEnum(GposLookupType.single_adjustment));
+    test_utils.writeU32(&lookup_list, 16, 8);
+
+    test_utils.writeU16(&lookup_list, 20, 1);
+    test_utils.writeU16(&lookup_list, 22, 8);
+    test_utils.writeU16(&lookup_list, 24, ValueFormat.x_advance);
+    test_utils.writeI16(&lookup_list, 26, 25);
+    test_utils.writeU16(&lookup_list, 28, 1);
+    test_utils.writeU16(&lookup_list, 30, 1);
+    test_utils.writeU16(&lookup_list, 32, 2);
+
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 'A', .glyph_id = 2, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    const face: font_parser.Face = undefined;
+    try Gpos.applyLookup(std.testing.allocator, face, &lookup_list, 0, &glyphs, 0);
+
+    try std.testing.expectEqual(@as(i32, 125), glyphs[0].x_advance);
+}
+
+test "gpos extension positioning rejects nested extension positioning" {
+    var lookup_list = [_]u8{0} ** 20;
+    test_utils.writeU16(&lookup_list, 0, 1);
+    test_utils.writeU16(&lookup_list, 2, 4);
+
+    test_utils.writeU16(&lookup_list, 4, @intFromEnum(GposLookupType.extension_positioning));
+    test_utils.writeU16(&lookup_list, 6, 0);
+    test_utils.writeU16(&lookup_list, 8, 1);
+    test_utils.writeU16(&lookup_list, 10, 8);
+
+    test_utils.writeU16(&lookup_list, 12, 1);
+    test_utils.writeU16(&lookup_list, 14, @intFromEnum(GposLookupType.extension_positioning));
+    test_utils.writeU32(&lookup_list, 16, 8);
+
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 'A', .glyph_id = 2, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    const face: font_parser.Face = undefined;
+    try std.testing.expectError(font_parser.ParserError.InvalidTable, Gpos.applyLookup(std.testing.allocator, face, &lookup_list, 0, &glyphs, 0));
 }
 
 test "gpos mark to mark attachment" {

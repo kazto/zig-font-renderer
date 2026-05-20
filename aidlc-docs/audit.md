@@ -1295,3 +1295,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text fi --output /tmp/zig-font-renderer-gsub-extension-regression.svg --font-size 96`
 - `wc -c /tmp/zig-font-renderer-gsub-extension-regression.svg`
 **Context**: Construction Phase - Unit 2 - GSUB lookup coverage increment. Extension substitution dispatch is complete at the tested scope; full Unicode Bidi algorithm coverage, full Indic syllable shaping, and remaining full typography coverage remain pending.
+
+---
+
+## Code Generation - GPOS Extension Positioning
+**Timestamp**: 2026-05-20T04:27:35Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented the next Unit 2 GPOS lookup coverage increment. GPOS Lookup Type 9 Extension Positioning now decodes extension subtables, delegates to supported nested positioning lookup types, rejects nested Type 9 loops, and preserves bounded recursion."
+**Verification**:
+- `zig fmt src/gpos.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --quiet`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --output /tmp/zig-font-renderer-gpos-extension-regression.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-gpos-extension-regression.svg`
+**Context**: Construction Phase - Unit 2 - GPOS lookup coverage increment. Extension positioning dispatch is complete at the tested scope; full Unicode Bidi algorithm coverage, full Indic syllable shaping, and remaining full typography coverage remain pending.

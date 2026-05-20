@@ -14,6 +14,7 @@
 - GPOS Mark-to-Base Attachment (Type 4) aligns mark anchors with base anchors and zeroes mark advances.
 - GPOS Mark-to-Ligature Attachment (Type 5) aligns mark anchors with ligature component anchors and zeroes mark advances.
 - GPOS Mark-to-Mark Attachment (Type 6) aligns stacked mark anchors and zeroes attaching mark advances.
+- GPOS Extension Positioning (Type 9) delegates to supported nested GPOS lookup types and rejects nested Type 9 extension loops.
 - GSUB Alternate Substitution (Type 3) replaces covered glyphs with the first alternate glyph.
 - GSUB Contextual Substitution (Type 5 Format 3) applies lookups to input sequences based on coverage context.
 - GSUB Chained Contextual Substitution (Type 6 Format 3) applies lookups to input sequences based on surrounding coverage-based backtrack and lookahead glyphs.
