@@ -226,6 +226,22 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 
 ---
 
+## Code Generation - First-Strong Bidi Paragraph Direction
+**Timestamp**: 2026-05-19T08:36:08Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented the next Unit 2 Bidi increment. Automatic direction now resolves from the first strong codepoint, and RTL visual ordering preserves strong LTR word order inside RTL paragraphs while retaining formatted numeric run preservation and paired-bracket mirroring."
+**Verification**:
+- `zig fmt src/shaper_direction.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf --text 'אב ABC ג' --output /tmp/zig-font-renderer-bidi-first-strong-rtl.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-bidi-first-strong-rtl.svg`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf --text 'ABC אב' --output /tmp/zig-font-renderer-bidi-first-strong-ltr.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-bidi-first-strong-ltr.svg`
+**Context**: Construction Phase - Unit 2 - Bidi handling increment. First-strong paragraph direction and LTR-run preservation are complete at the tested scope; full Unicode Bidi algorithm coverage remains pending.
+
+---
+
 ## Code Generation Planning - Start
 **Timestamp**: 2026-05-08T13:57:44Z
 **User Input**: "作業を進めて"

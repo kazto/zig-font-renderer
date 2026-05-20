@@ -17,10 +17,11 @@ The current increment implements horizontal text shaping using data exposed by U
 9. Reorder leading decomposed same-script Brahmic ra + virama sequences after the following consonant base.
 10. Recompute horizontal offsets after Indic visual reordering.
 11. Recompute total advance in raw FUnits.
-12. For RTL-only input, explicit RTL direction, or mixed RTL runs, resolve ASCII, common, and extended paired brackets to mirrored glyph IDs when the font provides the mirrored codepoint.
-13. For RTL-only input or explicit RTL direction, mirror glyph offsets and reverse the shaped glyph sequence for visual output, preserving formatted numeric run order.
+12. Resolve automatic paragraph direction from the first strong codepoint.
+13. For RTL-only input, explicit RTL direction, or mixed RTL runs, resolve ASCII, common, and extended paired brackets to mirrored glyph IDs when the font provides the mirrored codepoint.
+14. For RTL-only input or explicit RTL direction, mirror glyph offsets and reverse the shaped glyph sequence for visual output, preserving strong LTR word order and formatted numeric run order.
 
 ## Deferred Logic
 
-- Full mixed-direction Unicode Bidi handling beyond the current heuristic.
+- Full mixed-direction Unicode Bidi handling beyond the current first-strong/run-level heuristic.
 - Full Indic syllable shaping/reordering beyond pre-base matra and Devanagari repha-sequence visual movement.

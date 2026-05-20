@@ -6,7 +6,7 @@
 
 ## Scope
 
-Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, caller-provided OpenType Layout script/language/feature selection, coarse automatic script/language tag inference, conservative default feature policy, Arabic joining-form positional GSUB gating, RTL visual ordering with preserved formatted numeric run order, RTL paired-bracket mirroring, mixed RTL run reordering, Indic pre-base matra visual reordering, script-aware Brahmic initial repha-sequence visual reordering, explicit top-to-bottom vertical layout, optional vertical metric lookup, and optional vertical origin lookup.
+Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, initial GSUB/GPOS layout handling, caller-provided OpenType Layout script/language/feature selection, coarse automatic script/language tag inference, conservative default feature policy, Arabic joining-form positional GSUB gating, first-strong Bidi paragraph direction, RTL visual ordering with preserved LTR word and formatted numeric run order, RTL paired-bracket mirroring, mixed RTL run reordering, Indic pre-base matra visual reordering, script-aware Brahmic initial repha-sequence visual reordering, explicit top-to-bottom vertical layout, optional vertical metric lookup, and optional vertical origin lookup.
 
 ## Application Code
 
@@ -21,7 +21,7 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
   - Infers a coarse OpenType language tag for selected Unicode ranges when callers do not provide one, while preserving explicit caller tags.
   - Applies conservative default OpenType features when callers do not provide feature tags, while preserving explicit caller tags.
   - Classifies Arabic joining forms and applies `isol`/`init`/`medi`/`fina` GSUB single substitutions only to matching glyph positions.
-  - Adds `ShapeDirection`, automatic RTL visual ordering with ASCII and Arabic-Indic formatted numeric-run preservation, mixed RTL run reordering in predominantly LTR text, explicit top-to-bottom vertical layout, optional vertical metric lookup from `vhea`/`vmtx`, and optional vertical origin lookup from `VORG`.
+  - Adds `ShapeDirection`, first-strong automatic paragraph direction, automatic RTL visual ordering with strong LTR word preservation plus ASCII and Arabic-Indic formatted numeric-run preservation, mixed RTL run reordering in LTR paragraphs, explicit top-to-bottom vertical layout, optional vertical metric lookup from `vhea`/`vmtx`, and optional vertical origin lookup from `VORG`.
   - Mirrors ASCII, common, and extended Unicode paired brackets inside RTL visual runs by resolving mirrored codepoints through cmap, with original-glyph fallback when the font lacks the mirrored glyph.
   - Reorders common Indic pre-base matras before the preceding consonant base after GSUB/GPOS while preserving per-glyph placement deltas, including expanded Telugu/Kannada/Malayalam coverage.
   - Reorders leading same-script Brahmic ra + virama sequences after the following consonant base when GSUB leaves the sequence decomposed.
@@ -109,7 +109,15 @@ Implemented Unit 2 shaping increments for basic cmap shaping, legacy `kern`, ini
 - Result: Passed after broadening pre-base matra coverage.
 - Command: `wc -c /tmp/zig-font-renderer-telugu-prebase.svg`
 - Result: `2265 /tmp/zig-font-renderer-telugu-prebase.svg`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf --text 'אב ABC ג' --output /tmp/zig-font-renderer-bidi-first-strong-rtl.svg --font-size 96`
+- Result: Passed after adding first-strong RTL paragraph handling with LTR run preservation.
+- Command: `wc -c /tmp/zig-font-renderer-bidi-first-strong-rtl.svg`
+- Result: `2036 /tmp/zig-font-renderer-bidi-first-strong-rtl.svg`
+- Command: `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf --text 'ABC אב' --output /tmp/zig-font-renderer-bidi-first-strong-ltr.svg --font-size 96`
+- Result: Passed after keeping LTR-first mixed text in LTR paragraph handling.
+- Command: `wc -c /tmp/zig-font-renderer-bidi-first-strong-ltr.svg`
+- Result: `1597 /tmp/zig-font-renderer-bidi-first-strong-ltr.svg`
 
 ## Known Limitations
 
-- Full Unicode Bidi algorithm coverage beyond the current heuristic plus paired-bracket mirroring and full Indic syllable shaping/reordering beyond the implemented visual reorderings are not implemented.
+- Full Unicode Bidi algorithm coverage beyond the current first-strong/run-level heuristic plus paired-bracket mirroring and full Indic syllable shaping/reordering beyond the implemented visual reorderings are not implemented.

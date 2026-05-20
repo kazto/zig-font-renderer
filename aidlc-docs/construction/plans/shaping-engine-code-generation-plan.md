@@ -101,6 +101,12 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Expand pre-base matra detection for Telugu, Kannada, and Malayalam vowel signs.
   - Verify with focused unit tests and real Bengali/Telugu font SVG smoke tests.
 
+- [x] Step 16: Add first-strong Bidi paragraph direction and LTR run preservation
+  - Resolve automatic paragraph direction from the first strong codepoint.
+  - Preserve strong LTR word order inside RTL visual paragraphs.
+  - Keep existing numeric separator preservation and paired-bracket mirroring inside RTL runs.
+  - Verify with focused unit tests and real Hebrew mixed-direction SVG smoke tests.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
@@ -113,6 +119,8 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - [x] Arabic positional GSUB features are gated by computed joining form.
 - [x] RTL numeric runs preserve their internal LTR order in visual output.
 - [x] RTL numeric runs preserve attached numeric separators and signs in visual output.
+- [x] Automatic paragraph direction follows the first strong codepoint at the tested scope.
+- [x] Strong LTR words preserve internal order inside RTL visual paragraphs at the tested scope.
 - [x] Common paired punctuation glyphs mirror inside RTL visual runs at the tested scope.
 - [x] Extended Unicode paired brackets mirror inside RTL visual runs when the font provides mirrored glyphs.
 - [x] Missing mirrored glyphs fall back to the original glyph instead of failing shaping.

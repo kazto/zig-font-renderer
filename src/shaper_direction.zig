@@ -8,7 +8,7 @@ const ShapedGlyph = types.ShapedGlyph;
 
 const RunDirection = enum {
     rtl,
-    weak_ltr,
+    ltr,
 };
 
 const UnicodeRange = struct {
@@ -43,16 +43,11 @@ const UnicodeRange = struct {
 pub fn resolveDirection(direction: ShapeDirection, glyphs: []const ShapedGlyph) ShapeDirection {
     if (direction != .auto) return direction;
 
-    var saw_rtl = false;
     for (glyphs) |glyph| {
-        if (isStrongRtlCodepoint(glyph.codepoint)) {
-            saw_rtl = true;
-        } else if (isStrongLtrCodepoint(glyph.codepoint)) {
-            return .ltr;
-        }
+        if (strongDirectionForCodepoint(glyph.codepoint)) |strong_direction| return strong_direction;
     }
 
-    return if (saw_rtl) .rtl else .ltr;
+    return .ltr;
 }
 
 pub fn applyRtlVisualOrder(
@@ -301,7 +296,7 @@ fn appendRtlRunVisualGroups(
         const visual_group_start = run_start + (run_end_value - group_end_value);
 
         switch (group.direction) {
-            .weak_ltr => {
+            .ltr => {
                 for (run[group.start..group.end]) |glyph| {
                     var visual_glyph = glyph;
                     visual_glyph.x_offset = visual_group_start + (glyph.x_offset - group_start);
@@ -351,10 +346,11 @@ fn collectDirectionalGroups(
 
 fn runDirectionAt(run: []const ShapedGlyph, index: usize) RunDirection {
     const codepoint = run[index].codepoint;
-    if (isWeakLtrCodepoint(codepoint)) return .weak_ltr;
-    if (isNumericSeparatorCodepoint(codepoint) and hasNumericBefore(run, index) and hasNumericAfter(run, index)) return .weak_ltr;
-    if (isNumericPrefixCodepoint(codepoint) and hasNumericAfter(run, index)) return .weak_ltr;
-    if (isNumericSuffixCodepoint(codepoint) and hasNumericBefore(run, index)) return .weak_ltr;
+    if (isStrongLtrCodepoint(codepoint)) return .ltr;
+    if (isWeakLtrCodepoint(codepoint)) return .ltr;
+    if (isNumericSeparatorCodepoint(codepoint) and hasNumericBefore(run, index) and hasNumericAfter(run, index)) return .ltr;
+    if (isNumericPrefixCodepoint(codepoint) and hasNumericAfter(run, index)) return .ltr;
+    if (isNumericSuffixCodepoint(codepoint) and hasNumericBefore(run, index)) return .ltr;
     return .rtl;
 }
 
@@ -454,18 +450,23 @@ fn isInRange(codepoint: u21, start: u21, end: u21) bool {
     return codepoint >= start and codepoint <= end;
 }
 
-test "automatic direction uses RTL for RTL-only text" {
+test "automatic direction uses first strong direction" {
     const rtl = [_]ShapedGlyph{
         .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
         .{ .codepoint = 0x05D1, .glyph_id = 2, .cluster = 1, .x_offset = 100, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
     };
-    const mixed = [_]ShapedGlyph{
+    const rtl_first_mixed = [_]ShapedGlyph{
         .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
         .{ .codepoint = 'A', .glyph_id = 2, .cluster = 1, .x_offset = 100, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
     };
+    const ltr_first_mixed = [_]ShapedGlyph{
+        .{ .codepoint = 'A', .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 80, .y_advance = 0, .advance_width = 80, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 0x05D0, .glyph_id = 2, .cluster = 1, .x_offset = 80, .y_offset = 0, .x_advance = 100, .y_advance = 0, .advance_width = 100, .lsb = 0, .kern_adjustment = 0 },
+    };
 
     try std.testing.expectEqual(ShapeDirection.rtl, resolveDirection(.auto, &rtl));
-    try std.testing.expectEqual(ShapeDirection.ltr, resolveDirection(.auto, &mixed));
+    try std.testing.expectEqual(ShapeDirection.rtl, resolveDirection(.auto, &rtl_first_mixed));
+    try std.testing.expectEqual(ShapeDirection.ltr, resolveDirection(.auto, &ltr_first_mixed));
 }
 
 test "RTL visual order mirrors horizontal positions" {
@@ -535,6 +536,27 @@ test "RTL visual order preserves numeric separators inside numeric runs" {
     try std.testing.expectEqual(@as(i32, 210), glyphs[5].x_offset);
     try std.testing.expectEqual(@as(u16, 1), glyphs[6].glyph_id);
     try std.testing.expectEqual(@as(i32, 260), glyphs[6].x_offset);
+}
+
+test "RTL visual order preserves LTR word order inside RTL paragraph" {
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'A', .glyph_id = 2, .cluster = 1, .x_offset = 70, .y_offset = 0, .x_advance = 50, .y_advance = 0, .advance_width = 50, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'B', .glyph_id = 3, .cluster = 2, .x_offset = 120, .y_offset = 0, .x_advance = 50, .y_advance = 0, .advance_width = 50, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 0x05D1, .glyph_id = 4, .cluster = 3, .x_offset = 170, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    const face: font_parser.Face = undefined;
+    try applyRtlVisualOrder(std.testing.allocator, face, &glyphs, 240);
+
+    try std.testing.expectEqual(@as(u16, 4), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u16, 2), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(i32, 70), glyphs[1].x_offset);
+    try std.testing.expectEqual(@as(u16, 3), glyphs[2].glyph_id);
+    try std.testing.expectEqual(@as(i32, 120), glyphs[2].x_offset);
+    try std.testing.expectEqual(@as(u16, 1), glyphs[3].glyph_id);
+    try std.testing.expectEqual(@as(i32, 170), glyphs[3].x_offset);
 }
 
 test "RTL visual order treats standalone neutral punctuation as RTL run content" {
