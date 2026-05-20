@@ -1251,3 +1251,17 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `wc -c /tmp/zig-font-renderer-bidi-mirror.svg`
 - `git diff --check`
 **Context**: Construction Phase - Unit 2 - Bidi handling increment. Paired punctuation mirroring is complete at the tested scope; full Unicode Bidi, full Indic syllable shaping, and remaining full typography coverage remain pending.
+
+---
+
+## Code Generation - RTL LTR Phrase Connector Preservation
+**Timestamp**: 2026-05-20T01:01:19Z
+**User Input**: "AIDLCにもとづき、次の作業をおねがい"
+**AI Response**: "Implemented the next Unit 2 Bidi increment. RTL visual ordering now treats neutral phrase connectors as LTR only when bounded by LTR letters or digits, preserving phrases such as `A-B C` inside RTL paragraphs while leaving standalone neutral punctuation in the surrounding RTL run."
+**Verification**:
+- `zig fmt src/shaper_direction.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf --text 'אב A-B C ג' --output /tmp/zig-font-renderer-bidi-ltr-connectors.svg --font-size 96`
+- `wc -c /tmp/zig-font-renderer-bidi-ltr-connectors.svg`
+**Context**: Construction Phase - Unit 2 - Bidi handling increment. LTR phrase connector preservation is complete at the tested scope; full Unicode Bidi algorithm coverage, full Indic syllable shaping, and remaining full typography coverage remain pending.

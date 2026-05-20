@@ -19,7 +19,7 @@ The current increment implements horizontal text shaping using data exposed by U
 11. Recompute total advance in raw FUnits.
 12. Resolve automatic paragraph direction from the first strong codepoint.
 13. For RTL-only input, explicit RTL direction, or mixed RTL runs, resolve ASCII, common, and extended paired brackets to mirrored glyph IDs when the font provides the mirrored codepoint.
-14. For RTL-only input or explicit RTL direction, mirror glyph offsets and reverse the shaped glyph sequence for visual output, preserving strong LTR word order and formatted numeric run order.
+14. For RTL-only input or explicit RTL direction, mirror glyph offsets and reverse the shaped glyph sequence for visual output, preserving strong LTR word/phrase order and formatted numeric run order.
 
 ## Deferred Logic
 

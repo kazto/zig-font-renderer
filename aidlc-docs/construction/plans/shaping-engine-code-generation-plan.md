@@ -107,6 +107,12 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
   - Keep existing numeric separator preservation and paired-bracket mirroring inside RTL runs.
   - Verify with focused unit tests and real Hebrew mixed-direction SVG smoke tests.
 
+- [x] Step 17: Preserve LTR phrase connectors inside RTL paragraphs
+  - Treat neutral phrase connectors as LTR only when bounded by strong/weak LTR content.
+  - Preserve LTR phrases such as `A-B C` inside RTL visual paragraphs.
+  - Keep standalone neutral punctuation with surrounding RTL run content.
+  - Verify with focused unit tests and a real Hebrew mixed-direction SVG smoke test.
+
 ## Completion Criteria
 
 - [x] `GSUB` and `GPOS` tables are successfully detected and parsed.
@@ -121,6 +127,7 @@ This plan covers the implementation of OpenType Layout features (GSUB and GPOS) 
 - [x] RTL numeric runs preserve attached numeric separators and signs in visual output.
 - [x] Automatic paragraph direction follows the first strong codepoint at the tested scope.
 - [x] Strong LTR words preserve internal order inside RTL visual paragraphs at the tested scope.
+- [x] LTR phrase connectors preserve internal LTR phrase order inside RTL visual paragraphs at the tested scope.
 - [x] Common paired punctuation glyphs mirror inside RTL visual runs at the tested scope.
 - [x] Extended Unicode paired brackets mirror inside RTL visual runs when the font provides mirrored glyphs.
 - [x] Missing mirrored glyphs fall back to the original glyph instead of failing shaping.

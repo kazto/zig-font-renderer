@@ -22,9 +22,10 @@
 - When no language tag is provided, the shaping engine infers a coarse OpenType language tag for selected scripts/languages and falls back to the default LangSys if that language is absent from the font.
 - When no feature tags are provided, the shaping engine applies a conservative default feature policy for common shaping features, with Arabic and Indic-specific additions.
 - When direction is automatic, the first strong codepoint determines the paragraph direction.
-- RTL visual ordering preserves the internal order of strong LTR words plus ASCII and Arabic-Indic formatted numeric runs.
+- RTL visual ordering preserves the internal order of strong LTR words/phrases plus ASCII and Arabic-Indic formatted numeric runs.
 - Mixed strong LTR/RTL text with an LTR first strong codepoint reverses RTL runs inside the LTR paragraph and preserves internal formatted numeric run order inside those RTL runs.
 - Numeric separators, signs, and percent marks remain weak LTR only when attached to neighboring digits; standalone neutral punctuation remains part of the RTL run.
+- Neutral phrase connectors remain LTR only when bounded by LTR letters or digits; standalone neutral punctuation remains part of the RTL run.
 - ASCII, common, and extended paired brackets inside RTL visual runs are mirrored by resolving the mirrored codepoint through the font cmap; if the mirrored codepoint maps to glyph ID 0, the original glyph is preserved.
 - Common Indic pre-base matras move before the preceding consonant base in visual order after GSUB/GPOS positioning; post-base matras remain in place.
 - Leading same-script Brahmic ra + virama sequences that remain decomposed after GSUB/GPOS move after the following consonant base in visual order.

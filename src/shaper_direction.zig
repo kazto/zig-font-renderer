@@ -351,6 +351,7 @@ fn runDirectionAt(run: []const ShapedGlyph, index: usize) RunDirection {
     if (isNumericSeparatorCodepoint(codepoint) and hasNumericBefore(run, index) and hasNumericAfter(run, index)) return .ltr;
     if (isNumericPrefixCodepoint(codepoint) and hasNumericAfter(run, index)) return .ltr;
     if (isNumericSuffixCodepoint(codepoint) and hasNumericBefore(run, index)) return .ltr;
+    if (isLtrPhraseConnectorCodepoint(codepoint) and hasLtrBefore(run, index) and hasLtrAfter(run, index)) return .ltr;
     return .rtl;
 }
 
@@ -438,12 +439,39 @@ fn isNumericSuffixCodepoint(codepoint: u21) bool {
     return codepoint == '%' or codepoint == 0x066A;
 }
 
+fn isLtrPhraseConnectorCodepoint(codepoint: u21) bool {
+    return codepoint == ' ' or codepoint == 0x00A0 or codepoint == '-' or codepoint == '_' or
+        codepoint == '\'' or codepoint == 0x2019 or codepoint == '.' or codepoint == ',' or
+        codepoint == ':' or codepoint == '/' or codepoint == '&';
+}
+
 fn hasNumericBefore(run: []const ShapedGlyph, index: usize) bool {
     return index > 0 and isWeakLtrCodepoint(run[index - 1].codepoint);
 }
 
 fn hasNumericAfter(run: []const ShapedGlyph, index: usize) bool {
     return index + 1 < run.len and isWeakLtrCodepoint(run[index + 1].codepoint);
+}
+
+fn hasLtrBefore(run: []const ShapedGlyph, index: usize) bool {
+    var cursor = index;
+    while (cursor > 0) {
+        cursor -= 1;
+        const codepoint = run[cursor].codepoint;
+        if (isStrongLtrCodepoint(codepoint) or isWeakLtrCodepoint(codepoint)) return true;
+        if (!isLtrPhraseConnectorCodepoint(codepoint)) return false;
+    }
+    return false;
+}
+
+fn hasLtrAfter(run: []const ShapedGlyph, index: usize) bool {
+    var cursor = index + 1;
+    while (cursor < run.len) : (cursor += 1) {
+        const codepoint = run[cursor].codepoint;
+        if (isStrongLtrCodepoint(codepoint) or isWeakLtrCodepoint(codepoint)) return true;
+        if (!isLtrPhraseConnectorCodepoint(codepoint)) return false;
+    }
+    return false;
 }
 
 fn isInRange(codepoint: u21, start: u21, end: u21) bool {
@@ -557,6 +585,36 @@ test "RTL visual order preserves LTR word order inside RTL paragraph" {
     try std.testing.expectEqual(@as(i32, 120), glyphs[2].x_offset);
     try std.testing.expectEqual(@as(u16, 1), glyphs[3].glyph_id);
     try std.testing.expectEqual(@as(i32, 170), glyphs[3].x_offset);
+}
+
+test "RTL visual order preserves LTR phrase connectors inside RTL paragraph" {
+    var glyphs = [_]ShapedGlyph{
+        .{ .codepoint = 0x05D0, .glyph_id = 1, .cluster = 0, .x_offset = 0, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'A', .glyph_id = 2, .cluster = 1, .x_offset = 70, .y_offset = 0, .x_advance = 50, .y_advance = 0, .advance_width = 50, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = '-', .glyph_id = 3, .cluster = 2, .x_offset = 120, .y_offset = 0, .x_advance = 20, .y_advance = 0, .advance_width = 20, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'B', .glyph_id = 4, .cluster = 3, .x_offset = 140, .y_offset = 0, .x_advance = 50, .y_advance = 0, .advance_width = 50, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = ' ', .glyph_id = 5, .cluster = 4, .x_offset = 190, .y_offset = 0, .x_advance = 20, .y_advance = 0, .advance_width = 20, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 'C', .glyph_id = 6, .cluster = 5, .x_offset = 210, .y_offset = 0, .x_advance = 50, .y_advance = 0, .advance_width = 50, .lsb = 0, .kern_adjustment = 0 },
+        .{ .codepoint = 0x05D1, .glyph_id = 7, .cluster = 6, .x_offset = 260, .y_offset = 0, .x_advance = 70, .y_advance = 0, .advance_width = 70, .lsb = 0, .kern_adjustment = 0 },
+    };
+
+    const face: font_parser.Face = undefined;
+    try applyRtlVisualOrder(std.testing.allocator, face, &glyphs, 330);
+
+    try std.testing.expectEqual(@as(u16, 7), glyphs[0].glyph_id);
+    try std.testing.expectEqual(@as(i32, 0), glyphs[0].x_offset);
+    try std.testing.expectEqual(@as(u16, 2), glyphs[1].glyph_id);
+    try std.testing.expectEqual(@as(i32, 70), glyphs[1].x_offset);
+    try std.testing.expectEqual(@as(u16, 3), glyphs[2].glyph_id);
+    try std.testing.expectEqual(@as(i32, 120), glyphs[2].x_offset);
+    try std.testing.expectEqual(@as(u16, 4), glyphs[3].glyph_id);
+    try std.testing.expectEqual(@as(i32, 140), glyphs[3].x_offset);
+    try std.testing.expectEqual(@as(u16, 5), glyphs[4].glyph_id);
+    try std.testing.expectEqual(@as(i32, 190), glyphs[4].x_offset);
+    try std.testing.expectEqual(@as(u16, 6), glyphs[5].glyph_id);
+    try std.testing.expectEqual(@as(i32, 210), glyphs[5].x_offset);
+    try std.testing.expectEqual(@as(u16, 1), glyphs[6].glyph_id);
+    try std.testing.expectEqual(@as(i32, 260), glyphs[6].x_offset);
 }
 
 test "RTL visual order treats standalone neutral punctuation as RTL run content" {
