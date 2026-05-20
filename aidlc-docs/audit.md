@@ -1265,3 +1265,18 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build run -- --font /usr/share/fonts/truetype/noto/NotoSansHebrew-Regular.ttf --text 'אב A-B C ג' --output /tmp/zig-font-renderer-bidi-ltr-connectors.svg --font-size 96`
 - `wc -c /tmp/zig-font-renderer-bidi-ltr-connectors.svg`
 **Context**: Construction Phase - Unit 2 - Bidi handling increment. LTR phrase connector preservation is complete at the tested scope; full Unicode Bidi algorithm coverage, full Indic syllable shaping, and remaining full typography coverage remain pending.
+
+---
+
+## Code Generation - CLI Variation Selection
+**Timestamp**: 2026-05-20T01:14:21Z
+**User Input**: "次の作業をおねがい"
+**AI Response**: "Implemented the next Unit 3 SVG/CLI variation increment. The CLI now accepts repeatable `--variation <axis=value>` options and a mutually exclusive `--variation-instance <n>` option, validates variation inputs, and forwards selections through the high-level SVG rendering path."
+**Verification**:
+- `zig fmt src/main.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --font '/usr/share/fonts/truetype/ubuntu/UbuntuSans[wdth,wght].ttf' --text A --output /tmp/zig-font-renderer-cli-variation.svg --font-size 96 --variation wght=700 --variation wdth=75`
+- `zig build run -- --font '/usr/share/fonts/truetype/ubuntu/UbuntuSans[wdth,wght].ttf' --text A --output /tmp/zig-font-renderer-cli-variation-instance.svg --font-size 96 --variation-instance 0`
+- `wc -c /tmp/zig-font-renderer-cli-variation.svg /tmp/zig-font-renderer-cli-variation-instance.svg`
+**Context**: Construction Phase - Unit 3 - SVG Rendering & CLI variation increment. CLI variation selection is complete at the tested scope; full Unicode Bidi algorithm coverage, full Indic syllable shaping, and remaining full typography coverage remain pending.

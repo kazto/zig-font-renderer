@@ -23,8 +23,9 @@ The current increment renders shaped text as SVG paths for TrueType `glyf` outli
 
 1. Read font bytes from a font path.
 2. Parse `Face`.
-3. Render text to SVG with `SvgRenderer`.
-4. Return an owned SVG buffer to the caller.
+3. Parse optional CLI variation axis coordinates or named instance selection into `RenderOptions`.
+4. Render text to SVG with `SvgRenderer`.
+5. Return an owned SVG buffer to the caller.
 
 ## Deferred Logic
 

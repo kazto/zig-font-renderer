@@ -162,6 +162,13 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
   - Reject out-of-range face indexes with a specific parser error.
   - Verify real TTC SVG output using a non-zero face index.
 
+- [x] Step 26: Add CLI variation coordinate selection
+  - Add repeatable `--variation <axis=value>` parsing for four-byte fvar axis tags.
+  - Add `--variation-instance <n>` parsing for zero-based fvar named instance selection.
+  - Reject invalid coordinates and conflicting direct-axis versus named-instance selection.
+  - Forward CLI variation selections through the high-level SVG rendering path.
+  - Verify with parser tests and a real variable font SVG smoke test.
+
 ## Completion Criteria
 
 - [x] A visible SVG can be generated from a TrueType font with simple glyphs.
@@ -181,6 +188,7 @@ This plan covers the first visual SVG increment. It prioritizes visible output o
 - [x] Design-space variation coordinates can be normalized through `fvar` and optional `avar` data for CFF2 rendering callers.
 - [x] fvar named instance coordinates can be selected by index and normalized for CFF2 rendering callers.
 - [x] Non-first TTC faces can be selected explicitly for parser and SVG rendering paths.
+- [x] CLI SVG rendering can select fvar design-space coordinates or a named instance.
 - [x] Common CFF Type 2 curve operators and hint masks are handled.
 - [x] Type 2 flex operators are emitted as cubic SVG paths.
 - [x] Type 2 calculation and stack operators can feed subsequent drawing operands.

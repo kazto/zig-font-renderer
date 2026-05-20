@@ -2,9 +2,12 @@ const std = @import("std");
 const zfr = @import("zig_font_renderer");
 
 const CliError = error{
+    ConflictingVariationOptions,
     InvalidFaceIndex,
     InvalidFontSize,
     InvalidMargin,
+    InvalidVariationCoord,
+    InvalidVariationInstanceIndex,
     MissingFontPath,
     MissingOptionValue,
     TooManyArguments,
@@ -13,6 +16,8 @@ const CliError = error{
 
 const default_font_size_px = 64.0;
 const default_margin_px = 8.0;
+const max_cli_variation_coords = 8;
+const variation_tag_len = 4;
 
 const CliOptions = struct {
     font_path: []const u8,
@@ -24,6 +29,9 @@ const CliOptions = struct {
     background: ?[]const u8 = null,
     direction: zfr.ShapeDirection = .auto,
     face_index: u32 = 0,
+    variation_coords: [max_cli_variation_coords]zfr.VariationCoord = undefined,
+    variation_coord_count: usize = 0,
+    variation_instance_index: ?u16 = null,
     quiet: bool = false,
     help: bool = false,
 };
@@ -81,6 +89,8 @@ pub fn main() !void {
                 .background = options.background,
                 .shape = .{ .direction = options.direction },
                 .face_index = options.face_index,
+                .variation_coords = options.variation_coords[0..options.variation_coord_count],
+                .variation_instance_index = options.variation_instance_index,
             });
         } else {
             var loaded = try loadFaceOrExit(allocator, stderr, options.font_path, options.face_index);
@@ -128,6 +138,9 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
     var background: ?[]const u8 = null;
     var direction: zfr.ShapeDirection = .auto;
     var face_index: u32 = 0;
+    var variation_coords: [max_cli_variation_coords]zfr.VariationCoord = undefined;
+    var variation_coord_count: usize = 0;
+    var variation_instance_index: ?u16 = null;
     var quiet = false;
     var positional_count: u8 = 0;
 
@@ -176,6 +189,24 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
             index += 1;
             if (index >= args.len) return CliError.MissingOptionValue;
             face_index = std.fmt.parseInt(u32, args[index], 10) catch return CliError.InvalidFaceIndex;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, "--variation")) {
+            index += 1;
+            if (index >= args.len) return CliError.MissingOptionValue;
+            if (variation_instance_index != null) return CliError.ConflictingVariationOptions;
+            if (variation_coord_count >= max_cli_variation_coords) return CliError.InvalidVariationCoord;
+            variation_coords[variation_coord_count] = try parseVariationCoord(args[index]);
+            variation_coord_count += 1;
+            continue;
+        }
+
+        if (std.mem.eql(u8, arg, "--variation-instance")) {
+            index += 1;
+            if (index >= args.len) return CliError.MissingOptionValue;
+            if (variation_coord_count > 0) return CliError.ConflictingVariationOptions;
+            variation_instance_index = std.fmt.parseInt(u16, args[index], 10) catch return CliError.InvalidVariationInstanceIndex;
             continue;
         }
 
@@ -228,19 +259,36 @@ fn parseArgs(args: []const []const u8) CliError!CliOptions {
         .background = background,
         .direction = direction,
         .face_index = face_index,
+        .variation_coords = variation_coords,
+        .variation_coord_count = variation_coord_count,
+        .variation_instance_index = variation_instance_index,
         .quiet = quiet,
     };
 }
 
 fn cliErrorMessage(err: CliError) []const u8 {
     return switch (err) {
+        CliError.ConflictingVariationOptions => "cannot combine --variation and --variation-instance",
         CliError.InvalidFaceIndex => "invalid face index",
         CliError.InvalidFontSize => "invalid font size",
         CliError.InvalidMargin => "invalid margin",
+        CliError.InvalidVariationCoord => "invalid variation coordinate",
+        CliError.InvalidVariationInstanceIndex => "invalid variation instance index",
         CliError.MissingFontPath => "missing font path",
         CliError.MissingOptionValue => "missing value after option",
         CliError.TooManyArguments => "too many positional arguments",
         CliError.UnknownOption => "unknown option",
+    };
+}
+
+fn parseVariationCoord(value: []const u8) CliError!zfr.VariationCoord {
+    const separator = std.mem.indexOfScalar(u8, value, '=') orelse return CliError.InvalidVariationCoord;
+    if (separator != variation_tag_len or separator + 1 >= value.len) return CliError.InvalidVariationCoord;
+    const coord = std.fmt.parseFloat(f64, value[separator + 1 ..]) catch return CliError.InvalidVariationCoord;
+    if (!std.math.isFinite(coord)) return CliError.InvalidVariationCoord;
+    return .{
+        .tag = value[0..variation_tag_len].*,
+        .value = coord,
     };
 }
 
@@ -255,7 +303,7 @@ fn parseDirection(value: []const u8) !zfr.ShapeDirection {
 fn printUsage(writer: *std.Io.Writer) !void {
     try writer.print(
         \\Usage:
-        \\  zig_font_renderer --font <font-file> [--face-index <n>] [--text <utf8-text>] [--output <svg-file>] [--font-size <px>] [--margin <px>] [--fill <color>] [--background <color>] [--direction <auto|ltr|rtl|ttb>] [--quiet]
+        \\  zig_font_renderer --font <font-file> [--face-index <n>] [--text <utf8-text>] [--output <svg-file>] [--font-size <px>] [--margin <px>] [--fill <color>] [--background <color>] [--direction <auto|ltr|rtl|ttb>] [--variation <axis=value>]... [--variation-instance <n>] [--quiet]
         \\  zig_font_renderer <font-file> [utf8-text]
         \\
         \\Prints data currently available from the Unit 1 font parser:
@@ -313,6 +361,8 @@ fn writeSvg(
         background: ?[]const u8,
         shape: zfr.ShapeOptions,
         face_index: u32,
+        variation_coords: []const zfr.VariationCoord,
+        variation_instance_index: ?u16,
     },
 ) !void {
     const svg = zfr.renderToSvg(allocator, font_path, text, .{
@@ -322,6 +372,8 @@ fn writeSvg(
             .fill = options.fill,
             .background = options.background,
             .shape = options.shape,
+            .variation_coords = options.variation_coords,
+            .variation_instance_index = options.variation_instance_index,
         },
         .face_index = options.face_index,
     }) catch |err| {
@@ -359,6 +411,10 @@ test "parse named font and text arguments" {
         "96",
         "--face-index",
         "2",
+        "--variation",
+        "wght=700",
+        "--variation",
+        "wdth=75",
         "--margin",
         "12",
         "--fill",
@@ -373,6 +429,11 @@ test "parse named font and text arguments" {
     try std.testing.expectEqualStrings("out.svg", options.output_path.?);
     try std.testing.expectEqual(@as(f64, 96.0), options.font_size_px);
     try std.testing.expectEqual(@as(u32, 2), options.face_index);
+    try std.testing.expectEqual(@as(usize, 2), options.variation_coord_count);
+    try std.testing.expectEqualStrings("wght", &options.variation_coords[0].tag);
+    try std.testing.expectEqual(@as(f64, 700.0), options.variation_coords[0].value);
+    try std.testing.expectEqualStrings("wdth", &options.variation_coords[1].tag);
+    try std.testing.expectEqual(@as(f64, 75.0), options.variation_coords[1].value);
     try std.testing.expectEqual(@as(f64, 12.0), options.margin_px);
     try std.testing.expectEqualStrings("#222", options.fill);
     try std.testing.expectEqualStrings("white", options.background.?);
@@ -392,6 +453,22 @@ test "parse rejects invalid font size" {
 test "parse rejects invalid face index" {
     const args = [_][]const u8{ "zig_font_renderer", "--font", "font.ttc", "--face-index", "-1" };
     try std.testing.expectError(CliError.InvalidFaceIndex, parseArgs(&args));
+}
+
+test "parse accepts variation instance index" {
+    const args = [_][]const u8{ "zig_font_renderer", "--font", "font.ttf", "--variation-instance", "1" };
+    const options = try parseArgs(&args);
+    try std.testing.expectEqual(@as(?u16, 1), options.variation_instance_index);
+}
+
+test "parse rejects invalid variation coordinate" {
+    const args = [_][]const u8{ "zig_font_renderer", "--font", "font.ttf", "--variation", "weight=700" };
+    try std.testing.expectError(CliError.InvalidVariationCoord, parseArgs(&args));
+}
+
+test "parse rejects conflicting variation options" {
+    const args = [_][]const u8{ "zig_font_renderer", "--font", "font.ttf", "--variation", "wght=700", "--variation-instance", "1" };
+    try std.testing.expectError(CliError.ConflictingVariationOptions, parseArgs(&args));
 }
 
 test "parse rejects invalid margin" {

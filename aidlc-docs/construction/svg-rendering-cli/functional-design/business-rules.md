@@ -21,6 +21,9 @@
 - SVG color values must be non-empty and limited to characters safe for attribute values.
 - Text advance remains included in horizontal bounds when advance exceeds visible outline bounds.
 - `--direction` can select `auto`, `ltr`, `rtl`, or `ttb` shaping direction.
+- `--variation <axis=value>` accepts repeatable four-byte fvar axis tags with finite design-space values.
+- `--variation-instance <n>` accepts a zero-based fvar named instance index.
+- Direct variation coordinates and named instance selection are mutually exclusive in the CLI.
 - Automatic direction handling keeps pure RTL text in RTL visual order and reverses contiguous strong RTL runs within mixed strong LTR/RTL text when the paragraph resolves to LTR.
 - Top-to-bottom direction stacks glyphs on the vertical axis while preserving cross-axis positioning from shaping.
 - CLI metadata output is suppressed when `--output` is used.
