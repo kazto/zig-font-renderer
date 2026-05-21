@@ -4,6 +4,7 @@ pub const font_parser = @import("font_parser.zig");
 pub const font_rendering_service = @import("font_rendering_service.zig");
 pub const shaper = @import("shaper.zig");
 pub const svg_renderer = @import("svg_renderer.zig");
+pub const c_api = @import("c_api.zig");
 
 pub const Face = font_parser.Face;
 pub const GlyphInfo = font_parser.GlyphInfo;
@@ -27,9 +28,17 @@ pub const RenderToSvgError = font_rendering_service.RenderToSvgError;
 pub const RenderToSvgOptions = font_rendering_service.RenderToSvgOptions;
 pub const renderToSvg = font_rendering_service.renderToSvg;
 
+comptime {
+    _ = c_api.zfr_default_render_options;
+    _ = c_api.zfr_render_svg_file;
+    _ = c_api.zfr_free_string;
+    _ = c_api.zfr_status_message;
+}
+
 test {
     _ = font_parser;
     _ = font_rendering_service;
     _ = shaper;
     _ = svg_renderer;
+    _ = c_api;
 }

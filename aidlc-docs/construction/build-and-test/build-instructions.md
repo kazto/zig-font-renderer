@@ -23,10 +23,23 @@ No environment configuration is required.
 zig build
 ```
 
+This installs all build artifacts:
+
+- Static library: `zig-out/lib/libzig_font_renderer.a`
+- Shared library: `zig-out/lib/libzig_font_renderer.so` on Linux
+- C API header: `zig-out/include/zig_font_renderer.h`
+- Wrapper executable: `zig-out/bin/zig_font_renderer`
+
+To build only the library artifact:
+
+```bash
+zig build lib
+```
+
 ### 4. Verify Build Success
 
 - **Expected Output**: Command exits with status 0 and no compilation errors.
-- **Build Artifacts**: Installed executable under `zig-out/bin/zig_font_renderer`.
+- **Build Artifacts**: Installed static library under `zig-out/lib/libzig_font_renderer.a`, shared library under `zig-out/lib/libzig_font_renderer.so` on Linux, C API header under `zig-out/include/zig_font_renderer.h`, and wrapper executable under `zig-out/bin/zig_font_renderer`.
 - **Common Warnings**: No warnings are expected for the current Unit 1 scope.
 
 ### 5. Optional Performance Smoke

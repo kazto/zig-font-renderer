@@ -1382,3 +1382,34 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --quiet`
 - `zig build perf`
 **Context**: Construction Phase - cross-unit build compatibility. Scope was limited to Zig 0.16.0 API migration and Build/Test documentation refresh; typography behavior was preserved.
+
+---
+
+## Cross-Unit Build Artifact Split - Library and Wrapper Executable
+**Timestamp**: 2026-05-21T14:38:31+09:00
+**User Input**: "次の新たな作業。現在本リポジトリは実行ファイルのみビルドしているが、これをライブラリと、ラッパ実行ファイルの2つに分けたい。"
+**AI Response**: "Updated `build.zig` so the default build installs static and shared library artifacts from `src/root.zig` and keeps `src/main.zig` as the CLI wrapper executable. Added an explicit `zig build lib` step for both library artifacts and updated AIDLC Build and Test documentation."
+**Verification**:
+- `zig fmt build.zig`
+- `zig build`
+- `zig build lib`
+- `zig build test`
+- `find zig-out -maxdepth 3 -type f` -> `zig-out/lib/libzig_font_renderer.a`, `zig-out/lib/libzig_font_renderer.so`, `zig-out/bin/zig_font_renderer`
+- `zig build run -- --help`
+**Context**: Construction Phase - cross-unit build artifact split. Scope was limited to build graph and documentation; public API and CLI behavior were preserved.
+
+---
+
+## Cross-Unit C API Header and Shared Library Exports
+**Timestamp**: 2026-05-21T15:01:04+09:00
+**User Input**: "理論上、libzig_font_renderer.so はC言語から呼出可能なはずだ。C言語から呼び出せるように、APIのヘッダファイルを作成したい。"
+**AI Response**: "Added a C ABI layer in `src/c_api.zig`, installed `include/zig_font_renderer.h`, and ensured `libzig_font_renderer.so` exports `zfr_default_render_options`, `zfr_render_svg_file`, `zfr_free_string`, and `zfr_status_message`. Verified the header and shared library from a C smoke program."
+**Verification**:
+- `zig fmt build.zig src/root.zig src/c_api.zig`
+- `zig build`
+- `zig build test`
+- `zig build lib`
+- `find zig-out -maxdepth 3 -type f`
+- `nm -D --defined-only zig-out/lib/libzig_font_renderer.so | rg ' zfr_'`
+- `zig cc /tmp/zfr_c_smoke.c -I zig-out/include -L zig-out/lib -lzig_font_renderer -Wl,-rpath,/home/kazto/src/zig-font-renderer/zig-out/lib -o /tmp/zfr_c_smoke && /tmp/zfr_c_smoke`
+**Context**: Construction Phase - cross-unit C API export. The C API currently exposes file-to-SVG rendering with explicit string ownership via `zfr_free_string`.
