@@ -2,7 +2,7 @@
 
 ## Build Status
 
-- **Build Tool**: Zig 0.15.2
+- **Build Tool**: Zig 0.16.0
 - **Build Status**: Success
 - **Build Artifacts**: `zig-out/bin/zig_font_renderer`
 - **Build Command**: `zig build`
@@ -20,11 +20,12 @@
 
 ### Integration Tests
 
-- **Test Scenarios**: Library export, executable link integration, CLI help output, and parser inspection against `/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`
+- **Test Scenarios**: Library export, executable link integration, CLI help output, parser inspection against `/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`, and optional performance smoke.
 - **Commands**:
   - `zig build`
   - `zig build run -- --help`
-  - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text Aあ`
+  - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --quiet`
+  - `zig build perf`
 - **Status**: Pass
 
 ### Performance Tests
@@ -42,7 +43,7 @@
 
 - **Build**: Success
 - **All Tests**: Pass for implemented build, unit, integration, and performance smoke checks.
-- **Ready for Operations**: Yes; all logical design, code generation, and test verification phases for the parser, shaper (including Advanced Complex Typography GPOS Type 3 & 8), and SVG renderer are fully completed and validated.
+- **Ready for Operations**: Yes; all logical design, code generation, and test verification phases for the parser, shaper (including Advanced Complex Typography GPOS Type 3 & 8), SVG renderer, CLI, and Zig 0.16.0 build compatibility are completed and validated.
 
 ## Generated Instruction Files
 

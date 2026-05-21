@@ -173,7 +173,7 @@ fn glyphBounds(face: font_parser.Face, glyph_id: u16) SvgGlyphError!?Bounds {
 
 pub fn appendGlyphPath(
     allocator: std.mem.Allocator,
-    writer: std.ArrayList(u8).Writer,
+    writer: *std.Io.Writer,
     face: font_parser.Face,
     glyph_id: u16,
     transform: Transform,
@@ -297,7 +297,7 @@ fn readSimpleGlyphOutline(
 
 fn appendCompositeGlyphPaths(
     allocator: std.mem.Allocator,
-    writer: std.ArrayList(u8).Writer,
+    writer: *std.Io.Writer,
     face: font_parser.Face,
     glyph: []const u8,
     transform: Transform,
@@ -528,7 +528,7 @@ fn readCompositeTransform(glyph: []const u8, flags: u16, offset: *usize) font_pa
     return transform;
 }
 
-fn appendContourPath(writer: std.ArrayList(u8).Writer, contour: []const Point, transform: Transform) !void {
+fn appendContourPath(writer: *std.Io.Writer, contour: []const Point, transform: Transform) !void {
     if (contour.len == 0) return;
 
     const first = contour[0];
@@ -670,9 +670,9 @@ test "glyph transform applies vertical origin from VORG" {
 }
 
 test "CFF2 outline path emits through charstring renderer" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const data = [_]u8{
         2,   0,   5,   0,   2,
         150, 17,  0,   0,   0,
@@ -698,14 +698,14 @@ test "CFF2 outline path emits through charstring renderer" {
     };
 
     try appendGlyphPath(std.testing.allocator, writer, face, 0, Transform{}, 0, &.{});
-    try std.testing.expectEqualStrings("    <path d=\"M 0.00 0.00 L 50.00 0.00 Z \"/>\n", output.items);
+    try std.testing.expectEqualStrings("    <path d=\"M 0.00 0.00 L 50.00 0.00 Z \"/>\n", output.written());
 }
 
 test "composite glyph parser rejects point-matched first component" {
     const allocator = std.testing.allocator;
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(allocator);
-    const writer = output.writer(allocator);
+    var output = std.Io.Writer.Allocating.init(allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const face: font_parser.Face = undefined;
     const glyph = [_]u8{
         0xff, 0xff, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -764,9 +764,9 @@ test "composite glyph parser aligns point-matched components" {
         .cmap = null,
     };
 
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(allocator);
-    const writer = output.writer(allocator);
+    var output = std.Io.Writer.Allocating.init(allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const glyph = [_]u8{
         0xff, 0xff, 0, 0, 0,  0,  0, 0, 0, 0,
         0,    0x22, 0, 0, 20, 30, 0, 0, 0, 1,
@@ -774,5 +774,5 @@ test "composite glyph parser aligns point-matched components" {
     };
 
     try appendCompositeGlyphPaths(allocator, writer, face, &glyph, Transform{}, 0, &.{});
-    try std.testing.expectEqual(@as(usize, test_composite_point_match_count), std.mem.count(u8, output.items, "M 20.00 30.00"));
+    try std.testing.expectEqual(@as(usize, test_composite_point_match_count), std.mem.count(u8, output.written(), "M 20.00 30.00"));
 }

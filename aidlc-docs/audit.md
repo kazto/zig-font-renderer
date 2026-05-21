@@ -1366,3 +1366,19 @@ zig言語をもちいて、TrueType/OpenTypeフォントを読み込んでテキ
 - Updated `aidlc-docs/construction/build-and-test/build-and-test-summary.md` setting Ready for Operations to Yes.
 - Transitioned current stage to `BUILD AND TEST` in `aidlc-docs/aidlc-state.md`.
 **Context**: Build and Test Stage - Final comprehensive system verification.
+
+---
+
+## Cross-Unit Build Compatibility - Zig 0.16.0
+**Timestamp**: 2026-05-21T14:25:30+09:00
+**User Input**: "AIDLCにもとづき、新たな対応を行いたい。現在本リポジトリはzig 0.15.2向けに開発しているが、0.16.0でビルドできるように変更していきたい。"
+**AI Response**: "Implemented Zig 0.16.0 compatibility across CLI, render service, SVG/CFF writer paths, and optional performance smoke. Updated AIDLC Build and Test documentation and tech stack decision notes to target Zig 0.16.0."
+**Verification**:
+- `zig version` -> `0.16.0`
+- `zig fmt src/font_rendering_service.zig src/svg_renderer.zig src/svg_glyph.zig src/type2_charstring.zig src/type2_path_ops.zig src/cff_outline.zig src/cff_types.zig src/main.zig src/perf_smoke.zig`
+- `zig build test`
+- `zig build`
+- `zig build run -- --help`
+- `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --quiet`
+- `zig build perf`
+**Context**: Construction Phase - cross-unit build compatibility. Scope was limited to Zig 0.16.0 API migration and Build/Test documentation refresh; typography behavior was preserved.

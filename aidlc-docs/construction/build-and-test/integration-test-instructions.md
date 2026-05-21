@@ -9,7 +9,7 @@ Validate the integration boundaries across all components (Parser, Shaper, SVG R
 ### Scenario 1: Full Layout and Rendering Pipeline (Parser -> Shaper -> Renderer -> CLI)
 
 - **Description**: Verify that the CLI successfully parses an OpenType font, applies GSUB/GPOS shaping features, translates coordinates into vector SVG paths, and exports the resulting markup.
-- **Setup**: Zig 0.15.2 installed, and system font files (e.g., DejaVuSans.ttf) available.
+- **Setup**: Zig 0.16.0 installed, and system font files (e.g., DejaVuSans.ttf) available.
 - **Test Steps**:
   1. Build the release binary: `zig build`
   2. Run layout and render: `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text "AV" --output /tmp/integration-test-gpos.svg --font-size 96`
@@ -21,7 +21,7 @@ Validate the integration boundaries across all components (Parser, Shaper, SVG R
 ### Scenario 2: Public API Exports via Root Module
 
 - **Description**: Ensure `src/root.zig` exposes full APIs (Face, ShapeEngine, SVG Renderer structures) properly to external packages.
-- **Setup**: Zig 0.15.2 installed.
+- **Setup**: Zig 0.16.0 installed.
 - **Test Steps**: Run `zig build test`.
 - **Expected Results**: All unit and module integration tests pass successfully without compiler package mapping issues.
 - **Cleanup**: No cleanup required.

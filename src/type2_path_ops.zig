@@ -18,7 +18,7 @@ const flex_operand_count = 13;
 const optional_width_operand_count = 1;
 const zero_delta = 0;
 
-pub fn emitCurve(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State, dx1: i32, dy1: i32, dx2: i32, dy2: i32, dx3: i32, dy3: i32) CffError!void {
+pub fn emitCurve(writer: *std.Io.Writer, transform: Transform, state: *Type2State, dx1: i32, dy1: i32, dx2: i32, dy2: i32, dx3: i32, dy3: i32) CffError!void {
     const c1x = state.x + dx1;
     const c1y = state.y + dy1;
     const c2x = c1x + dx2;
@@ -39,21 +39,21 @@ pub fn executeSetCurrentPoint(state: *Type2State) CffError!void {
     state.stack_len = stack_empty;
 }
 
-pub fn emitFlex(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
+pub fn emitFlex(writer: *std.Io.Writer, transform: Transform, state: *Type2State) CffError!void {
     if (!state.has_current_point or state.stack_len != flex_operand_count) return font_parser.ParserError.InvalidTable;
     try emitCurve(writer, transform, state, state.stack[0], state.stack[1], state.stack[2], state.stack[3], state.stack[4], state.stack[5]);
     try emitCurve(writer, transform, state, state.stack[6], state.stack[7], state.stack[8], state.stack[9], state.stack[10], state.stack[11]);
     state.stack_len = stack_empty;
 }
 
-pub fn emitHFlex(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
+pub fn emitHFlex(writer: *std.Io.Writer, transform: Transform, state: *Type2State) CffError!void {
     if (!state.has_current_point or state.stack_len != hflex_operand_count) return font_parser.ParserError.InvalidTable;
     try emitCurve(writer, transform, state, state.stack[0], zero_delta, state.stack[1], state.stack[2], state.stack[3], zero_delta);
     try emitCurve(writer, transform, state, state.stack[4], zero_delta, state.stack[5], -state.stack[2], state.stack[6], zero_delta);
     state.stack_len = stack_empty;
 }
 
-pub fn emitHFlex1(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
+pub fn emitHFlex1(writer: *std.Io.Writer, transform: Transform, state: *Type2State) CffError!void {
     if (!state.has_current_point or state.stack_len != hflex1_operand_count) return font_parser.ParserError.InvalidTable;
     const dy6 = -(state.stack[1] + state.stack[3] + state.stack[7]);
     try emitCurve(writer, transform, state, state.stack[0], state.stack[1], state.stack[2], state.stack[3], state.stack[4], zero_delta);
@@ -61,7 +61,7 @@ pub fn emitHFlex1(writer: std.ArrayList(u8).Writer, transform: Transform, state:
     state.stack_len = stack_empty;
 }
 
-pub fn emitFlex1(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State) CffError!void {
+pub fn emitFlex1(writer: *std.Io.Writer, transform: Transform, state: *Type2State) CffError!void {
     if (!state.has_current_point or state.stack_len != flex1_operand_count) return font_parser.ParserError.InvalidTable;
     const dx_sum = state.stack[0] + state.stack[2] + state.stack[4] + state.stack[6] + state.stack[8];
     const dy_sum = state.stack[1] + state.stack[3] + state.stack[5] + state.stack[7] + state.stack[9];
@@ -73,7 +73,7 @@ pub fn emitFlex1(writer: std.ArrayList(u8).Writer, transform: Transform, state: 
     state.stack_len = stack_empty;
 }
 
-pub fn emitAlternatingCurve(writer: std.ArrayList(u8).Writer, transform: Transform, state: *Type2State, starts_horizontal: bool) CffError!void {
+pub fn emitAlternatingCurve(writer: *std.Io.Writer, transform: Transform, state: *Type2State, starts_horizontal: bool) CffError!void {
     var index: usize = 0;
     var horizontal = starts_horizontal;
     while (index < state.stack_len) {
@@ -107,9 +107,9 @@ fn absI32(value: i32) i32 {
 }
 
 test "Type2 flex1 chooses final axis delta" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     var state = Type2State{
         .stack = undefined,
         .stack_len = flex1_operand_count,
@@ -121,6 +121,6 @@ test "Type2 flex1 chooses final axis delta" {
 
     try emitFlex1(writer, Transform{}, &state);
 
-    try std.testing.expectEqualStrings("C 10.00 5.00 20.00 10.00 30.00 15.00 C 40.00 20.00 50.00 25.00 50.00 0.00 ", output.items);
+    try std.testing.expectEqualStrings("C 10.00 5.00 20.00 10.00 30.00 15.00 C 40.00 20.00 50.00 25.00 50.00 0.00 ", output.written());
     try std.testing.expectEqual(@as(usize, 0), state.stack_len);
 }

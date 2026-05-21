@@ -51,23 +51,28 @@ const stdout_buffer_size = 4096;
 const stderr_buffer_size = 256;
 const max_font_file_size = 256 * 1024 * 1024;
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const allocator = init.gpa;
+
     var stdout_buffer: [stdout_buffer_size]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
     const stdout = &stdout_writer.interface;
 
     var stderr_buffer: [stderr_buffer_size]u8 = undefined;
-    var stderr_writer = std.fs.File.stderr().writer(&stderr_buffer);
+    var stderr_writer = std.Io.File.stderr().writer(io, &stderr_buffer);
     const stderr = &stderr_writer.interface;
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var args_iterator = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args_iterator.deinit();
 
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+    var args = std.ArrayList([]const u8).empty;
+    defer args.deinit(allocator);
+    while (args_iterator.next()) |arg| {
+        try args.append(allocator, arg);
+    }
 
-    const options = parseArgs(args) catch |err| {
+    const options = parseArgs(args.items) catch |err| {
         try stderr.print("error: {s}\n\n", .{cliErrorMessage(err)});
         try printUsage(stderr);
         try stderr.flush();
@@ -111,7 +116,8 @@ pub fn main() !void {
 }
 
 fn loadFaceOrExit(allocator: std.mem.Allocator, stderr: *std.Io.Writer, font_path: []const u8, face_index: u32) !LoadedFace {
-    const font_data = std.fs.cwd().readFileAlloc(allocator, font_path, max_font_file_size) catch |err| {
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const font_data = std.Io.Dir.cwd().readFileAlloc(io, font_path, allocator, .limited(max_font_file_size)) catch |err| {
         try stderr.print("error: failed to read font file '{s}': {s}\n", .{ font_path, @errorName(err) });
         try stderr.flush();
         std.process.exit(1);
@@ -383,7 +389,8 @@ fn writeSvg(
     };
     defer allocator.free(svg);
 
-    std.fs.cwd().writeFile(.{ .sub_path = output_path, .data = svg }) catch |err| {
+    const io = std.Io.Threaded.global_single_threaded.io();
+    std.Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path, .data = svg }) catch |err| {
         try stderr.print("error: failed to write SVG '{s}': {s}\n", .{ output_path, @errorName(err) });
         try stderr.flush();
         std.process.exit(1);

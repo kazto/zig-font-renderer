@@ -8,17 +8,17 @@ const types = @import("cff_types.zig");
 pub const CffError = types.CffError;
 pub const Transform = types.Transform;
 
-pub fn appendGlyphPath(writer: std.ArrayList(u8).Writer, cff: []const u8, glyph_id: u16, transform: Transform) CffError!void {
+pub fn appendGlyphPath(writer: *std.Io.Writer, cff: []const u8, glyph_id: u16, transform: Transform) CffError!void {
     const context = try cff_context.parseCffContext(cff);
     try appendGlyphPathFromContext(writer, context, glyph_id, transform);
 }
 
-pub fn appendCff2GlyphPath(writer: std.ArrayList(u8).Writer, cff2: []const u8, glyph_id: u16, transform: Transform) CffError!void {
+pub fn appendCff2GlyphPath(writer: *std.Io.Writer, cff2: []const u8, glyph_id: u16, transform: Transform) CffError!void {
     const context = try cff_context.parseCff2Context(cff2);
     try appendGlyphPathFromContext(writer, context, glyph_id, transform);
 }
 
-pub fn appendCff2GlyphPathWithVariationCoords(allocator: std.mem.Allocator, writer: std.ArrayList(u8).Writer, cff2: []const u8, glyph_id: u16, transform: Transform, normalized_coords: []const f64) CffError!void {
+pub fn appendCff2GlyphPathWithVariationCoords(allocator: std.mem.Allocator, writer: *std.Io.Writer, cff2: []const u8, glyph_id: u16, transform: Transform, normalized_coords: []const f64) CffError!void {
     var context = try cff_context.parseCff2Context(cff2);
     var weights: ?[]f64 = null;
     defer if (weights) |items| allocator.free(items);
@@ -33,7 +33,7 @@ pub fn appendCff2GlyphPathWithVariationCoords(allocator: std.mem.Allocator, writ
     try appendGlyphPathFromContext(writer, context, glyph_id, transform);
 }
 
-fn appendGlyphPathFromContext(writer: std.ArrayList(u8).Writer, context: cff_context.CffContext, glyph_id: u16, transform: Transform) CffError!void {
+fn appendGlyphPathFromContext(writer: *std.Io.Writer, context: cff_context.CffContext, glyph_id: u16, transform: Transform) CffError!void {
     const charstring = try cff_index.getCffIndexObject(context.charstrings, glyph_id);
     if (charstring.len == 0) return;
     const local_subrs = try cff_context.getCffGlyphLocalSubrs(context, glyph_id);

@@ -40,16 +40,16 @@ const subr_bias_high = 32768;
 const type2_i32_min = @as(f64, @floatFromInt(std.math.minInt(i32)));
 const type2_i32_max = @as(f64, @floatFromInt(std.math.maxInt(i32)));
 
-pub fn appendType2CharStringPath(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext) CffError!void {
+pub fn appendType2CharStringPath(writer: *std.Io.Writer, charstring: []const u8, transform: Transform, context: CffContext) CffError!void {
     try appendType2CharStringPathWithSubrs(writer, charstring, transform, context, context.local_subrs);
 }
 
-pub fn appendType2CharStringPathWithSubrs(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext, local_subrs: ?CffIndex) CffError!void {
+pub fn appendType2CharStringPathWithSubrs(writer: *std.Io.Writer, charstring: []const u8, transform: Transform, context: CffContext, local_subrs: ?CffIndex) CffError!void {
     var state = Type2State{};
     try executeType2CharString(writer, charstring, transform, context, local_subrs, &state, initial_subroutine_depth);
 }
 
-pub fn executeType2CharString(writer: std.ArrayList(u8).Writer, charstring: []const u8, transform: Transform, context: CffContext, local_subrs: ?CffIndex, state: *Type2State, depth: u8) CffError!void {
+pub fn executeType2CharString(writer: *std.Io.Writer, charstring: []const u8, transform: Transform, context: CffContext, local_subrs: ?CffIndex, state: *Type2State, depth: u8) CffError!void {
     if (depth > Cff.max_subr_depth) return CffError.UnsupportedCffOperator;
     var offset: usize = 0;
 
@@ -296,7 +296,7 @@ fn executeCff2Blend(state: *Type2State, context: CffContext) CffError!void {
     state.stack_len = base + blend_count;
 }
 
-fn executeCffSubroutine(writer: std.ArrayList(u8).Writer, transform: Transform, context: CffContext, maybe_subrs: ?CffIndex, state: *Type2State, depth: u8) CffError!void {
+fn executeCffSubroutine(writer: *std.Io.Writer, transform: Transform, context: CffContext, maybe_subrs: ?CffIndex, state: *Type2State, depth: u8) CffError!void {
     const subrs = maybe_subrs orelse return CffError.UnsupportedCffOperator;
     if (state.stack_len == stack_empty) return font_parser.ParserError.InvalidTable;
     const raw_index = state.stack[state.stack_len - stack_single_operand];
@@ -455,9 +455,9 @@ test "CFF FDSelect format 3 maps glyph ranges" {
 }
 
 test "Type2 charstring emits moveto and lines" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -473,13 +473,13 @@ test "Type2 charstring emits moveto and lines" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 L 50.00 50.00 L 0.00 50.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 L 50.00 50.00 L 0.00 50.00 Z ", output.written());
 }
 
 test "Type2 escaped arithmetic operators feed drawing operands" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -496,13 +496,13 @@ test "Type2 escaped arithmetic operators feed drawing operands" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 L 30.00 6.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 30.00 6.00 Z ", output.written());
 }
 
 test "Type2 hstem3 and vstem3 contribute to hintmask length" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -517,13 +517,13 @@ test "Type2 hstem3 and vstem3 contribute to hintmask length" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 Z ", output.written());
 }
 
 test "Type2 setcurrentpoint updates the current point" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -539,13 +539,13 @@ test "Type2 setcurrentpoint updates the current point" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 L 12.00 23.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 12.00 23.00 Z ", output.written());
 }
 
 test "Type2 callothersubr and pop preserve operands" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -563,13 +563,13 @@ test "Type2 callothersubr and pop preserve operands" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 L 10.00 20.00 L 12.00 23.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 10.00 20.00 L 12.00 23.00 Z ", output.written());
 }
 
 test "Type2 closepath closes the active contour once" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -584,13 +584,13 @@ test "Type2 closepath closes the active contour once" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 Z ", output.written());
 }
 
 test "CFF2 blend keeps default operands for default instance" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -608,13 +608,13 @@ test "CFF2 blend keeps default operands for default instance" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 50.00 0.00 Z ", output.written());
 }
 
 test "CFF2 blend applies non-default region weights" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const weights = [_]f64{ 0.5, 1.0 };
     const context = CffContext{
@@ -634,13 +634,13 @@ test "CFF2 blend applies non-default region weights" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 L 75.00 -4.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 75.00 -4.00 Z ", output.written());
 }
 
 test "Type2 escaped storage and conditional operators feed drawing operands" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -659,13 +659,13 @@ test "Type2 escaped storage and conditional operators feed drawing operands" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 L 43.00 0.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 L 43.00 0.00 Z ", output.written());
 }
 
 test "Type2 hflex emits two cubic curves" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -682,13 +682,13 @@ test "Type2 hflex emits two cubic curves" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 0.00 30.00 30.00 70.00 30.00 C 120.00 30.00 180.00 0.00 250.00 0.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 0.00 30.00 30.00 70.00 30.00 C 120.00 30.00 180.00 0.00 250.00 0.00 Z ", output.written());
 }
 
 test "Type2 flex emits two cubic curves" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -707,13 +707,13 @@ test "Type2 flex emits two cubic curves" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 0.00 30.00 0.00 60.00 0.00 C 100.00 0.00 150.00 0.00 210.00 0.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 0.00 30.00 0.00 60.00 0.00 C 100.00 0.00 150.00 0.00 210.00 0.00 Z ", output.written());
 }
 
 test "Type2 hflex1 balances final y delta" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -730,13 +730,13 @@ test "Type2 hflex1 balances final y delta" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 5.00 30.00 10.00 60.00 10.00 C 100.00 10.00 150.00 15.00 210.00 0.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 5.00 30.00 10.00 60.00 10.00 C 100.00 10.00 150.00 15.00 210.00 0.00 Z ", output.written());
 }
 
 test "Type2 flex1 chooses final axis delta" {
-    var output = std.ArrayList(u8).empty;
-    defer output.deinit(std.testing.allocator);
-    const writer = output.writer(std.testing.allocator);
+    var output = std.Io.Writer.Allocating.init(std.testing.allocator);
+    defer output.deinit();
+    const writer = &output.writer;
     const empty_index = try readCffIndex(&[_]u8{ 0, 0 });
     const context = CffContext{
         .cff = &[_]u8{},
@@ -754,5 +754,5 @@ test "Type2 flex1 chooses final axis delta" {
     };
 
     try appendType2CharStringPath(writer, &charstring, Transform{}, context);
-    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 5.00 20.00 10.00 30.00 15.00 C 40.00 20.00 50.00 25.00 50.00 0.00 Z ", output.items);
+    try std.testing.expectEqualStrings("M 0.00 0.00 C 10.00 5.00 20.00 10.00 30.00 15.00 C 40.00 20.00 50.00 25.00 50.00 0.00 Z ", output.written());
 }

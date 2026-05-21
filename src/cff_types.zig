@@ -1,7 +1,7 @@
 const std = @import("std");
 const font_parser = @import("font_parser.zig");
 
-pub const CffError = font_parser.ParserError || std.mem.Allocator.Error || error{
+pub const CffError = font_parser.ParserError || std.mem.Allocator.Error || std.Io.Writer.Error || error{
     UnsupportedCffOperator,
 };
 

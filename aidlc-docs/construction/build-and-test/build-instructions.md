@@ -2,10 +2,10 @@
 
 ## Prerequisites
 
-- **Build Tool**: Zig 0.15.2
+- **Build Tool**: Zig 0.16.0
 - **Dependencies**: Zig standard library only; no external package dependencies
 - **Environment Variables**: None required
-- **System Requirements**: Native platform supported by Zig 0.15.2 with write access to Zig cache and `zig-out/`
+- **System Requirements**: Native platform supported by Zig 0.16.0 with write access to Zig cache and `zig-out/`
 
 ## Build Steps
 
@@ -48,4 +48,4 @@ zig build perf
 ### Build Fails with Compilation Errors
 
 - **Cause**: Zig version mismatch or source-level compile error.
-- **Solution**: Confirm `zig version` reports `0.15.2`, then fix the reported file and line before rerunning `zig build`.
+- **Solution**: Confirm `zig version` reports `0.16.0`, then fix the reported file and line before rerunning `zig build`.

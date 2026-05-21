@@ -1,8 +1,8 @@
 # Tech Stack Decisions - Unit 1: Font Parser
 
 ## 1. Core Language & Build System
-- **Decision**: **Zig 0.15.2**
-- **Rationale**: User mandate for a Pure Zig implementation. Zig provides native big-endian to native-endian conversion utilities, explicit memory management, and excellent safety features (bounds checking by default) suitable for binary parsing.
+- **Decision**: **Zig 0.16.0**
+- **Rationale**: User mandate for a Pure Zig implementation. The project now targets Zig 0.16.0, using the current `std.Io` and `std.heap.DebugAllocator` APIs while preserving explicit memory management and bounds-checked binary parsing.
 
 ## 2. Dependency Strategy
 - **Decision**: **Zero External Dependencies**
@@ -10,7 +10,7 @@
 
 ## 3. Data Handling Pattern
 - **Decision**: **Slice-based Big-Endian Parsers**
-- **Rationale**: Using `std.mem.readIntBig` and `std.io.fixedBufferStream` for safe and efficient binary reading.
+- **Rationale**: Using local big-endian binary reader helpers and Zig standard library primitives for safe and efficient binary reading.
 
 ## 4. Optimization Strategy
 - **Decision**: **Cross-Platform SIMD (Planned)**

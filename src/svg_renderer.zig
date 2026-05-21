@@ -64,9 +64,9 @@ pub const SvgRenderer = struct {
         defer if (normalized_variation_coords) |coords| allocator.free(coords);
         const cff2_variation_coords = normalized_variation_coords orelse options.cff2_variation_coords;
 
-        var output = std.ArrayList(u8).empty;
-        errdefer output.deinit(allocator);
-        const writer = output.writer(allocator);
+        var output = std.Io.Writer.Allocating.init(allocator);
+        errdefer output.deinit();
+        const writer = &output.writer;
 
         try writer.print(
             \\<svg xmlns="http://www.w3.org/2000/svg" width="{d:.2}" height="{d:.2}" viewBox="0 0 {d:.2} {d:.2}">
@@ -104,6 +104,6 @@ pub const SvgRenderer = struct {
             \\
         , .{});
 
-        return try output.toOwnedSlice(allocator);
+        return try output.toOwnedSlice();
     }
 };

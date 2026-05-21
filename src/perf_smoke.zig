@@ -36,14 +36,13 @@ const perf_fonts = [_]PerfFont{
     },
 };
 
-pub fn main() !void {
-    var stdout_buffer: [4096]u8 = undefined;
-    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
-    const stdout = &stdout_writer.interface;
+pub fn main(init: std.process.Init) !void {
+    const io = init.io;
+    const allocator = init.gpa;
 
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+    var stdout_buffer: [4096]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writer(io, &stdout_buffer);
+    const stdout = &stdout_writer.interface;
 
     var executed: usize = 0;
     for (perf_fonts) |font| {
@@ -62,17 +61,18 @@ pub fn main() !void {
 }
 
 fn runFontSmoke(allocator: std.mem.Allocator, stdout: *std.Io.Writer, font: PerfFont) !void {
-    const data = try std.fs.cwd().readFileAlloc(allocator, font.path, max_font_file_size);
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const data = try std.Io.Dir.cwd().readFileAlloc(io, font.path, allocator, .limited(max_font_file_size));
     defer allocator.free(data);
 
-    var timer = try std.time.Timer.start();
+    var lap_start = std.Io.Timestamp.now(io, .awake);
 
     var parser_iteration: usize = 0;
     while (parser_iteration < parser_iterations) : (parser_iteration += 1) {
         var face = try zfr.Face.init(allocator, data);
         face.deinit(allocator);
     }
-    const parser_ns = timer.lap();
+    const parser_ns = lap(&lap_start, io);
 
     var face = try zfr.Face.init(allocator, data);
     defer face.deinit(allocator);
@@ -87,7 +87,7 @@ fn runFontSmoke(allocator: std.mem.Allocator, stdout: *std.Io.Writer, font: Perf
         checksum +%= glyph_id;
         checksum +%= metric.advance_width;
     }
-    const lookup_ns = timer.lap();
+    const lookup_ns = lap(&lap_start, io);
 
     var engine = zfr.ShapeEngine.init();
     var shape_iteration: usize = 0;
@@ -96,7 +96,7 @@ fn runFontSmoke(allocator: std.mem.Allocator, stdout: *std.Io.Writer, font: Perf
         checksum +%= @intCast(shaped.total_advance);
         shaped.deinit(allocator);
     }
-    const shaping_ns = timer.lap();
+    const shaping_ns = lap(&lap_start, io);
 
     var renderer = zfr.SvgRenderer.init();
     var svg_iteration: usize = 0;
@@ -105,7 +105,7 @@ fn runFontSmoke(allocator: std.mem.Allocator, stdout: *std.Io.Writer, font: Perf
         checksum +%= svg.len;
         allocator.free(svg);
     }
-    const svg_ns = timer.lap();
+    const svg_ns = lap(&lap_start, io);
 
     try stdout.print(
         "perf smoke {s}: init {d:.3}ms/iter, lookup {d:.3}us/iter, shape {d:.3}us/iter, svg {d:.3}us/iter, checksum {d}\n",
@@ -121,8 +121,16 @@ fn runFontSmoke(allocator: std.mem.Allocator, stdout: *std.Io.Writer, font: Perf
 }
 
 fn pathExists(path: []const u8) bool {
-    std.fs.cwd().access(path, .{}) catch return false;
+    const io = std.Io.Threaded.global_single_threaded.io();
+    std.Io.Dir.cwd().access(io, path, .{}) catch return false;
     return true;
+}
+
+fn lap(start: *std.Io.Timestamp, io: std.Io) u64 {
+    const now = std.Io.Timestamp.now(io, .awake);
+    const duration = start.durationTo(now);
+    start.* = now;
+    return @intCast(duration.toNanoseconds());
 }
 
 fn perIterMs(ns: u64, iterations: usize) f64 {
