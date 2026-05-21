@@ -39,7 +39,31 @@ pub fn build(b: *std.Build) void {
         // Later on we'll use this module as the root module of a test executable
         // which requires us to specify a target.
         .target = target,
+        .optimize = optimize,
     });
+
+    const static_lib = b.addLibrary(.{
+        .name = "zig_font_renderer",
+        .linkage = .static,
+        .root_module = mod,
+    });
+    const install_static_lib = b.addInstallArtifact(static_lib, .{});
+    b.getInstallStep().dependOn(&install_static_lib.step);
+
+    const shared_lib = b.addLibrary(.{
+        .name = "zig_font_renderer",
+        .linkage = .dynamic,
+        .root_module = mod,
+    });
+    const install_shared_lib = b.addInstallArtifact(shared_lib, .{});
+    b.getInstallStep().dependOn(&install_shared_lib.step);
+
+    const install_c_header = b.addInstallFileWithDir(
+        b.path("include/zig_font_renderer.h"),
+        .header,
+        "zig_font_renderer.h",
+    );
+    b.getInstallStep().dependOn(&install_c_header.step);
 
     // Here we define an executable. An executable needs to have a root module
     // which needs to expose a `main` function. While we could add a main function
@@ -83,11 +107,16 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // This declares intent for the executable to be installed into the
+    // This declares intent for the wrapper executable to be installed into the
     // install prefix when running `zig build` (i.e. when executing the default
     // step). By default the install prefix is `zig-out/` but can be overridden
     // by passing `--prefix` or `-p`.
     b.installArtifact(exe);
+
+    const lib_step = b.step("lib", "Build the library artifacts");
+    lib_step.dependOn(&install_static_lib.step);
+    lib_step.dependOn(&install_shared_lib.step);
+    lib_step.dependOn(&install_c_header.step);
 
     // This creates a top level step. Top level steps have a name and can be
     // invoked by name when running `zig build` (e.g. `zig build run`).

@@ -4,7 +4,7 @@
 
 - **Build Tool**: Zig 0.16.0
 - **Build Status**: Success
-- **Build Artifacts**: `zig-out/bin/zig_font_renderer`
+- **Build Artifacts**: `zig-out/lib/libzig_font_renderer.a`, `zig-out/lib/libzig_font_renderer.so`, `zig-out/include/zig_font_renderer.h`, `zig-out/bin/zig_font_renderer`
 - **Build Command**: `zig build`
 - **Build Time**: Not measured
 
@@ -20,9 +20,13 @@
 
 ### Integration Tests
 
-- **Test Scenarios**: Library export, executable link integration, CLI help output, parser inspection against `/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`, and optional performance smoke.
+- **Test Scenarios**: Static library artifact generation, shared library artifact generation, C API header installation, wrapper executable generation, exported C symbols, C smoke link/render, public module exports, executable link integration, CLI help output, parser inspection against `/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf`, and optional performance smoke.
 - **Commands**:
   - `zig build`
+  - `zig build lib`
+  - `find zig-out -maxdepth 3 -type f`
+  - `nm -D --defined-only zig-out/lib/libzig_font_renderer.so | rg ' zfr_'`
+  - `zig cc /tmp/zfr_c_smoke.c -I zig-out/include -L zig-out/lib -lzig_font_renderer -Wl,-rpath,/home/kazto/src/zig-font-renderer/zig-out/lib -o /tmp/zfr_c_smoke && /tmp/zfr_c_smoke`
   - `zig build run -- --help`
   - `zig build run -- --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --text AV --quiet`
   - `zig build perf`
@@ -43,7 +47,7 @@
 
 - **Build**: Success
 - **All Tests**: Pass for implemented build, unit, integration, and performance smoke checks.
-- **Ready for Operations**: Yes; all logical design, code generation, and test verification phases for the parser, shaper (including Advanced Complex Typography GPOS Type 3 & 8), SVG renderer, CLI, and Zig 0.16.0 build compatibility are completed and validated.
+- **Ready for Operations**: Yes; all logical design, code generation, and test verification phases for the parser, shaper (including Advanced Complex Typography GPOS Type 3 & 8), SVG renderer, static/shared library artifacts, C API header, wrapper CLI, and Zig 0.16.0 build compatibility are completed and validated.
 
 ## Generated Instruction Files
 
